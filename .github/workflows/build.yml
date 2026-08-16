@@ -25,14 +25,28 @@ jobs:
       - name: Patch Android project
         run: python3 scripts/patch_android.py
       - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Analyze Dart
+        id: analyze
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log
+      - name: Surface analyze error
+        if: steps.analyze.outcome == 'failure'
+        run: |
+          {
+            echo "## ❌ flutter analyze failed:"
+            echo '```'
+            cat analyze.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::flutter analyze failed: $(cat analyze.log | tr '\n' ' ' | cut -c1-4000)"
       - name: Build APK
         id: build
         run: |
           set -o pipefail
           flutter build apk --release 2>&1 | tee build.log
       - name: Surface build error
-        if: failure()
+        if: steps.build.outcome == 'failure'
         run: |
           {
             echo "## ❌ flutter build failed — last 80 lines of log:"
@@ -40,7 +54,6 @@ jobs:
             tail -n 80 build.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          # backup channel: emit as a single-line error annotation (readable via Checks API)
           echo "::error::flutter build failed: $(tail -n 40 build.log | tr '\n' ' ' | cut -c1-4000)"
       - name: Upload APK artifact
         if: success()
