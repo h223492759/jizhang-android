@@ -31,7 +31,7 @@ jobs:
           set -o pipefail
           flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log
       - name: Surface analyze error
-        if: steps.analyze.outcome == 'failure'
+        if: failure() && steps.analyze.outcome == 'failure'
         run: |
           {
             echo "## ❌ flutter analyze failed:"
@@ -46,7 +46,7 @@ jobs:
           set -o pipefail
           flutter build apk --release 2>&1 | tee build.log
       - name: Surface build error
-        if: steps.build.outcome == 'failure'
+        if: failure() && steps.build.outcome == 'failure'
         run: |
           {
             echo "## ❌ flutter build failed — last 80 lines of log:"
