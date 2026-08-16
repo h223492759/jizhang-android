@@ -58,11 +58,13 @@ def patch_build_gradle():
                 s = s[:insert_pos] + signing_block + s[insert_pos:]
             else:
                 s = s.replace("android {", "android {\n" + signing_block, 1)
-    # 确保 release 构建类型使用 signingConfigs.debug
-    if "signingConfig signingConfigs.debug" not in s:
+    # 确保 release 构建类型使用 signingConfigs.debug（兼容 signingConfig 与 signingConfig = 两种写法）
+    has_release_signing = re.search(
+        r'release\s*\{[\s\S]*?signingConfig\s*=?\s*signingConfigs\.debug', s) is not None
+    if not has_release_signing:
         s = re.sub(
-            r'(    buildTypes \{[\s\S]*?release \{[\s\S]*?)\n        \}',
-            r'\1            signingConfig signingConfigs.debug\n        \}',
+            r'(    buildTypes \{[\s\S]*?release\s*\{[\s\S]*?)\n        \}',
+            r'\1            signingConfig signingConfigs.debug\n        }',
             s,
         )
     with open(p, "w", encoding="utf-8") as f:
