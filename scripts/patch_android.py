@@ -57,12 +57,48 @@ def patch_manifest():
     # usesCleartextTraffic 必须是 <application> 的属性，<manifest> 上无效
     if "usesCleartextTraffic" not in s:
         s = s.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
+    # 显式引用 network_security_config，比单独 usesCleartextTraffic 更稳
+    if "networkSecurityConfig" not in s:
+        s = s.replace("<application", '<application android:networkSecurityConfig="@xml/network_security_config"', 1)
+    # 只保留 INTERNET 权限，去掉 Flutter 模板可能带的不必要权限，减少安装时 allow 提示
+    lines = s.splitlines()
+    filtered = []
+    has_internet = False
+    manifest_open_idx = -1
+    for i, line in enumerate(lines):
+        if manifest_open_idx == -1 and "<manifest" in line:
+            manifest_open_idx = i
+        if "<uses-permission" in line:
+            if 'android.permission.INTERNET' in line:
+                has_internet = True
+                filtered.append(line)
+            continue
+        filtered.append(line)
+    if not has_internet and manifest_open_idx != -1:
+        # 确保 INTERNET 权限一定存在，插在 <manifest> 之后
+        filtered.insert(manifest_open_idx + 1, '    <uses-permission android:name="android.permission.INTERNET" />')
+    s = "\n".join(filtered)
     with open(p, "w", encoding="utf-8") as f:
         f.write(s)
     print("manifest patched")
+
+
+def patch_network_security_config():
+    dir_path = "android/app/src/main/res/xml"
+    os.makedirs(dir_path, exist_ok=True)
+    p = os.path.join(dir_path, "network_security_config.xml")
+    xml = '''<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
+'''
+    with open(p, "w", encoding="utf-8") as f:
+        f.write(xml)
+    print("network_security_config.xml created")
 
 
 if __name__ == "__main__":
     patch_pubspec()
     patch_build_gradle()
     patch_manifest()
+    patch_network_security_config()

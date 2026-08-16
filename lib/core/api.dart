@@ -49,23 +49,51 @@ class ApiClient {
       if (e.response?.data is Map && e.response?.data['error'] != null) {
         throw ApiException(e.response!.data['error'].toString());
       }
-      final msg = switch (e.type) {
+      final url = e.requestOptions.uri.toString();
+      final type = e.type.toString();
+      final detail = e.message ?? '无详情';
+      final base = switch (e.type) {
         DioExceptionType.connectionError ||
         DioExceptionType.connectionTimeout ||
         DioExceptionType.sendTimeout ||
         DioExceptionType.receiveTimeout =>
-          '连接服务器失败，请检查：\n1. 手机与服务器是否连接同一 WiFi\n2. 后端是否已启动\n3. 后端是否监听 0.0.0.0:9600（不能仅监听 127.0.0.1）',
+          '连接服务器失败',
         DioExceptionType.badCertificate =>
-          '证书错误：如使用自签名 HTTPS 请检查配置',
-        _ => e.message ?? '网络错误',
+          '证书校验失败',
+        DioExceptionType.cancel =>
+          '请求被取消',
+        DioExceptionType.badResponse =>
+          '服务器返回异常',
+        DioExceptionType.unknown =>
+          '未知网络错误',
       };
-      throw ApiException(msg);
+      final hint = switch (e.type) {
+        DioExceptionType.connectionError ||
+        DioExceptionType.connectionTimeout ||
+        DioExceptionType.sendTimeout ||
+        DioExceptionType.receiveTimeout =>
+          '请检查：\n1. 手机与服务器是否同一 WiFi\n2. 应用是否有网络权限\n3. 后端是否监听 0.0.0.0:9600',
+        DioExceptionType.badCertificate =>
+          '如使用自签名 HTTPS，请确认证书域名/有效期正确',
+        _ => '',
+      };
+      throw ApiException('$base\nURL: $url\n类型: $type\n详情: $detail${hint.isNotEmpty ? '\n$hint' : ''}');
     }
   }
 
   Future<Meta> getMeta() async {
     final d = await _req(() => _dio.get('/meta'));
     return Meta.fromJson(d);
+  }
+
+  /// 测试与后端的连通性，返回耗时（毫秒）或抛出异常。
+  Future<int> ping() async {
+    final stopwatch = Stopwatch()..start();
+    await _req(() => _dio.get('/meta',
+        options: Options(sendTimeout: Duration(seconds: 10),
+                         receiveTimeout: Duration(seconds: 10))));
+    stopwatch.stop();
+    return stopwatch.elapsedMilliseconds;
   }
 
   Future<LoginResult> login(String username, String password) async {

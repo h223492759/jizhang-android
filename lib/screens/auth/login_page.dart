@@ -57,6 +57,48 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  Future<void> _testConnection() async {
+    final api = ref.read(sessionProvider).api;
+    setState(() => _loading = true);
+    try {
+      final ms = await api.ping();
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('连接成功'),
+            content: Text('与后端连通正常，耗时 ${ms}ms'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('确定'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      final msg = e.toString().replaceFirst('ApiException: ', '');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('连接测试失败'),
+            content: Text(msg),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('确定'),
+              ),
+            ],
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final server = ref.watch(sessionProvider).serverUrl ?? '';
@@ -109,6 +151,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               child: _loading
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Text('登录', style: TextStyle(fontSize: 16)),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: _loading ? null : _testConnection,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryDark,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text('测试连接', style: TextStyle(fontSize: 14)),
             ),
           ],
         ),
