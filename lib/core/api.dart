@@ -49,7 +49,17 @@ class ApiClient {
       if (e.response?.data is Map && e.response?.data['error'] != null) {
         throw ApiException(e.response!.data['error'].toString());
       }
-      throw ApiException(e.message ?? '网络错误');
+      final msg = switch (e.type) {
+        DioExceptionType.connectionError ||
+        DioExceptionType.connectionTimeout ||
+        DioExceptionType.sendTimeout ||
+        DioExceptionType.receiveTimeout =>
+          '连接服务器失败，请检查：\n1. 手机与服务器是否连接同一 WiFi\n2. 后端是否已启动\n3. 后端是否监听 0.0.0.0:9600（不能仅监听 127.0.0.1）',
+        DioExceptionType.badCertificate =>
+          '证书错误：如使用自签名 HTTPS 请检查配置',
+        _ => e.message ?? '网络错误',
+      };
+      throw ApiException(msg);
     }
   }
 

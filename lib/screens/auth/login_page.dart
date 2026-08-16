@@ -36,7 +36,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       toast('登录成功');
       // RootRouter 会自动按状态跳转到账本选择页
     } catch (e) {
-      toast(e.toString().replaceFirst('ApiException: ', ''));
+      final msg = e.toString().replaceFirst('ApiException: ', '');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('登录失败'),
+            content: Text(msg),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('确定'),
+              ),
+            ],
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

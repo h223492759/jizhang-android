@@ -29,10 +29,12 @@ jobs:
           p='android/app/src/main/AndroidManifest.xml'
           s=open(p,encoding='utf-8').read()
           s=re.sub(r'android:label="[^"]*"', 'android:label="记账本"', s)
+          # usesCleartextTraffic 必须是 <application> 的属性，<manifest> 上无效
           if 'usesCleartextTraffic' not in s:
-              s=s.replace('<manifest', '<manifest android:usesCleartextTraffic="true"', 1)
+              s=s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
           open(p,'w',encoding='utf-8').write(s)
           print('manifest patched')
+          print(open(p,encoding='utf-8').read())
           PY
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
