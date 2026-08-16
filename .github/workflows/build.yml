@@ -26,14 +26,31 @@ jobs:
         run: python3 scripts/patch_android.py
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - run: flutter build apk --release
+      - name: Build APK
+        id: build
+        run: |
+          set -o pipefail
+          flutter build apk --release 2>&1 | tee build.log
+        continue-on-error: true
+      - name: Surface build error
+        if: steps.build.outcome == 'failure'
+        run: |
+          {
+            echo "## ❌ flutter build failed — last 80 lines of log:"
+            echo '```'
+            tail -n 80 build.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # backup channel: emit as a single-line error annotation (readable via Checks API)
+          echo "::error::flutter build failed: $(tail -n 40 build.log | tr '\n' ' ' | cut -c1-4000)"
       - name: Upload APK artifact
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
       - name: Publish to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.build.outcome == 'success' && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: build/app/outputs/flutter-apk/app-release.apk

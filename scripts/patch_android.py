@@ -23,7 +23,7 @@ def patch_build_gradle():
     # 使用仓库中固定的 PKCS12 签名文件，保证每次签名一致，可覆盖安装
     signing_block = '''    signingConfigs {
         release {
-            storeFile file("../../jizhang.p12")
+            storeFile rootProject.file("../jizhang.p12")
             storePassword "jizhang123"
             keyAlias "jizhang"
             keyPassword "jizhang123"
