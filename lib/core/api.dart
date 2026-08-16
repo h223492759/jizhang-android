@@ -53,9 +53,9 @@ class ApiClient {
       final type = e.type.toString();
       final detail = e.message ?? '无详情';
       final base = switch (e.type) {
-        DioExceptionType.connectionError ||
-        DioExceptionType.connectionTimeout ||
-        DioExceptionType.sendTimeout ||
+        DioExceptionType.connectionError |
+        DioExceptionType.connectionTimeout |
+        DioExceptionType.sendTimeout |
         DioExceptionType.receiveTimeout =>
           '连接服务器失败',
         DioExceptionType.badCertificate =>
@@ -68,9 +68,9 @@ class ApiClient {
           '未知网络错误',
       };
       final hint = switch (e.type) {
-        DioExceptionType.connectionError ||
-        DioExceptionType.connectionTimeout ||
-        DioExceptionType.sendTimeout ||
+        DioExceptionType.connectionError |
+        DioExceptionType.connectionTimeout |
+        DioExceptionType.sendTimeout |
         DioExceptionType.receiveTimeout =>
           '请检查：\n1. 手机与服务器是否同一 WiFi\n2. 应用是否有网络权限\n3. 后端是否监听 0.0.0.0:9600',
         DioExceptionType.badCertificate =>
