@@ -16,10 +16,22 @@ jobs:
           flutter-version: '3.22.3'
           channel: 'stable'
       - name: Generate Android runner
-        run: flutter create --platforms=android .
+        run: |
+          flutter create --no-pub --platforms=android _gen_tmp
+          cp -r _gen_tmp/android .
+          rm -rf _gen_tmp
       - name: Allow cleartext (LAN http) & set app label
         run: |
-          sed -i 's|android:label="jizhang_android"|android:label="记账本" android:usesCleartextTraffic="true"|' android/app/src/main/AndroidManifest.xml
+          python3 - <<'PY'
+          import re
+          p='android/app/src/main/AndroidManifest.xml'
+          s=open(p,encoding='utf-8').read()
+          s=re.sub(r'android:label="[^"]*"', 'android:label="记账本"', s)
+          if 'usesCleartextTraffic' not in s:
+              s=s.replace('<manifest', '<manifest android:usesCleartextTraffic="true"', 1)
+          open(p,'w',encoding='utf-8').write(s)
+          print('manifest patched')
+          PY
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
       - run: flutter build apk --release
