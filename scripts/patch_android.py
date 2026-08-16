@@ -20,9 +20,11 @@ def patch_build_gradle():
     p = "android/app/build.gradle"
     with open(p, encoding="utf-8") as f:
         s = f.read()
-    # 使用仓库中固定的 PKCS12 签名文件，保证每次签名一致，可覆盖安装
+    # 覆盖 AGP 自动生成的 debug signingConfig，使其指向仓库中固定的 PKCS12 签名文件。
+    # release 构建沿用 signingConfigs.debug（始终存在），避免新增 signingConfigs.release
+    # 导致 “Could not get unknown property 'release'” 的 Gradle 错误。
     signing_block = '''    signingConfigs {
-        release {
+        debug {
             storeFile rootProject.file("../jizhang.p12")
             storePassword "jizhang123"
             keyAlias "jizhang"
@@ -42,12 +44,9 @@ def patch_build_gradle():
                 s = s[:insert_pos] + signing_block + s[insert_pos:]
             else:
                 s = s.replace("android {", "android {\n" + signing_block, 1)
-    # 多种可能的 debug signing 写法都替换掉
-    s = s.replace("signingConfig = signingConfigs.debug", "signingConfig = signingConfigs.release")
-    s = s.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release")
     with open(p, "w", encoding="utf-8") as f:
         f.write(s)
-    print("build.gradle patched")
+    print("build.gradle patched (debug signingConfig -> jizhang.p12)")
 
 
 def patch_manifest():
