@@ -21,10 +21,7 @@ def patch_build_gradle():
     with open(p, encoding="utf-8") as f:
         s = f.read()
     # 使用仓库中固定的 PKCS12 签名文件，保证每次签名一致，可覆盖安装
-    if "signingConfigs" not in s:
-        s = s.replace(
-            "    buildTypes {",
-            '''    signingConfigs {
+    signing_block = '''    signingConfigs {
         release {
             storeFile file("../../jizhang.p12")
             storePassword "jizhang123"
@@ -33,10 +30,21 @@ def patch_build_gradle():
             storeType "PKCS12"
         }
     }
-
-    buildTypes {''',
-        )
+'''
+    if "signingConfigs" not in s:
+        # 在 android { 后的第一个配置项之前插入 signingConfigs，避免依赖缩进字符串
+        idx = s.find("android {")
+        if idx != -1:
+            rest = s[idx + len("android {"):]
+            match = re.search(r"\n(    \S)", rest)
+            if match:
+                insert_pos = idx + len("android {") + match.start() + 1
+                s = s[:insert_pos] + signing_block + s[insert_pos:]
+            else:
+                s = s.replace("android {", "android {\n" + signing_block, 1)
+    # 多种可能的 debug signing 写法都替换掉
     s = s.replace("signingConfig = signingConfigs.debug", "signingConfig = signingConfigs.release")
+    s = s.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release")
     with open(p, "w", encoding="utf-8") as f:
         f.write(s)
     print("build.gradle patched")
