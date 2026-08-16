@@ -610,3 +610,40 @@ class Meta {
   factory Meta.fromJson(Map<String, dynamic> j) =>
       Meta(name: j['name'] ?? '记账本', version: j['version'] ?? '');
 }
+
+class PresetName {
+  final String name;
+  final String? category;
+  final String? paymentMethod;
+  final double? amount;
+  PresetName({
+    required this.name,
+    this.category,
+    this.paymentMethod,
+    this.amount,
+  });
+  factory PresetName.fromJson(Map<String, dynamic> j) => PresetName(
+        name: j['name'] ?? '',
+        category: j['category'],
+        paymentMethod: j['payment_method'],
+        amount: j['amount'] != null ? (j['amount']).toDouble() : null,
+      );
+  static List<PresetName> listFrom(dynamic v) =>
+      (v as List? ?? []).map((e) => PresetName.fromJson(e)).toList();
+}
+
+class PresetsData {
+  final List<PresetName> presets;
+  final List<PresetName> frequent;
+  final List<PresetName> recent;
+  PresetsData({
+    required this.presets,
+    required this.frequent,
+    required this.recent,
+  });
+  factory PresetsData.fromJson(Map<String, dynamic> j) => PresetsData(
+        presets: PresetName.listFrom(j['presets']),
+        frequent: PresetName.listFrom(j['frequent']),
+        recent: PresetName.listFrom(j['recent']),
+      );
+}

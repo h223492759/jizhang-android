@@ -5,6 +5,7 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/screens/bills/bill_month_detail_page.dart';
 
 class BillsPage extends ConsumerStatefulWidget {
   const BillsPage({super.key});
@@ -98,7 +99,6 @@ class _BillsPageState extends ConsumerState<BillsPage> {
             _col('收入', s.income, AppColors.income),
             _col('支出', s.expense, AppColors.expense),
             _col('结余', s.balance, AppColors.text),
-            _col('笔数', s.count.toDouble(), AppColors.textSecondary),
           ],
         ),
       );
@@ -114,7 +114,6 @@ class _BillsPageState extends ConsumerState<BillsPage> {
   Widget _row(BillRow r) => Card(
         child: ListTile(
           title: Text(r.label.isEmpty ? '${r.year}年' : r.label),
-          subtitle: Text('${r.count} 笔'),
           trailing: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -123,6 +122,12 @@ class _BillsPageState extends ConsumerState<BillsPage> {
               Text('支 ${fmtMoney(r.expense)}', style: TextStyle(color: AppColors.expense, fontSize: 12)),
             ],
           ),
+          onTap: r.month.isNotEmpty
+              ? () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => BillMonthDetailPage(ym: r.month)),
+                  )
+              : null,
         ),
       );
 

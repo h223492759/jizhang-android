@@ -216,10 +216,20 @@ class ApiClient {
     return BillYearly.fromJson(d);
   }
 
-  Future<BillRow> getMonthDetail(String ym) async {
+  Future<Map<String, dynamic>> getBillMonthDetail(String ym) async {
     final d = await _req(
         () => _dio.get('/bills/month-detail', queryParameters: {'ym': ym}));
-    return BillRow.fromJson(d);
+    return d as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getSavingsItemHistory(int id) async {
+    final d = await _req(() => _dio.get('/savings/items/$id/history'));
+    return d as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getWalletTxns(int id) async {
+    final d = await _req(() => _dio.get('/wallets/$id/txns'));
+    return d as Map<String, dynamic>;
   }
 
   Future<SavingsOverview> getSavings() async {
@@ -288,6 +298,14 @@ class ApiClient {
   Future<List<AiModel>> getAiModels() async {
     final d = await _req(() => _dio.get('/settings/ai'));
     return AiModel.listFrom(d['models'] ?? []);
+  }
+
+  Future<PresetsData> getPresets({required String type, int limit = 12}) async {
+    final d = await _req(() => _dio.get('/presets', queryParameters: {
+      'type': type,
+      'limit': limit,
+    }));
+    return PresetsData.fromJson(d);
   }
 }
 

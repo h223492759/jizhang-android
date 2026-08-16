@@ -5,6 +5,8 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/screens/assets/savings_item_detail_page.dart';
+import 'package:jizhang_android/screens/assets/wallet_detail_page.dart';
 
 class AssetsPage extends ConsumerStatefulWidget {
   final int initialTab;
@@ -141,6 +143,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
               style: TextStyle(
                   color: it.isLiability ? AppColors.expense : AppColors.income,
                   fontWeight: FontWeight.bold)),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => SavingsItemDetailPage(item: it)),
+          ),
         ),
       );
 
@@ -240,7 +246,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 leading: CircleAvatar(backgroundColor: AppColors.primarySoft, child: Text(it.icon)),
                 title: Text(it.name),
                 subtitle: it.linkCategory.isNotEmpty
-                    ? Text('关联「$it.linkCategory」自 ${it.linkFrom}')
+                    ? Text('关联「${it.linkCategory}」自 ${it.linkFrom}')
                     : null,
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -250,6 +256,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                     if (it.target > 0)
                       Text('目标 ${fmtMoney(it.target)}', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                   ],
+                ),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => WalletDetailPage(wallet: it)),
                 ),
               ),
             )),

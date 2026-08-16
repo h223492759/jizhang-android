@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/core/build_info.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/me/settings_page.dart';
 import 'package:jizhang_android/screens/server/server_list_page.dart';
@@ -61,6 +63,20 @@ class MePage extends ConsumerWidget {
           _tile(Icons.book, '当前账本', null, subtitle: book?.name ?? '未选择'),
           _tile(Icons.link, '服务器', null, subtitle: s.serverUrl ?? ''),
           _tile(Icons.swap_horiz, '切换服务器', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage()))),
+          const SizedBox(height: 12),
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (ctx, snap) {
+              final version = snap.data?.version ?? BuildInfo.version;
+              final build = snap.data?.buildNumber ?? BuildInfo.buildNumber;
+              return _tile(
+                Icons.info_outline,
+                '版本信息',
+                null,
+                subtitle: 'v$version ($build) · 构建 ${BuildInfo.buildTime}',
+              );
+            },
+          ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,

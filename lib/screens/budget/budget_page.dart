@@ -5,6 +5,7 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/screens/flows/flow_filter_page.dart';
 
 class BudgetPage extends ConsumerStatefulWidget {
   const BudgetPage({super.key});
@@ -155,27 +156,44 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       );
 
   Widget _catCard(BudgetCat c) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Text(c.category, style: const TextStyle(fontWeight: FontWeight.bold)),
-                const Spacer(),
-                TextButton(onPressed: () => _setBudget(category: c.category), child: const Text('调整')),
-              ]),
-              LinearProgressIndicator(
-                value: (c.amount <= 0 ? 0.0 : c.percent / 100).clamp(0.0, 1.0),
-                minHeight: 10,
-                backgroundColor: AppColors.background,
-                valueColor: AlwaysStoppedAnimation(
-                  c.percent > 100 ? AppColors.expense : AppColors.primaryDark),
+        child: InkWell(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FlowFilterPage(
+                title: '${c.category} 流水',
+                category: c.category,
+                type: 'expense',
+                start: '$_year-01-01',
+                end: '$_year-12-31',
               ),
-              const SizedBox(height: 6),
-              Text('已花 ${fmtMoney(c.spent)} / 预算 ${fmtMoney(c.amount)}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            ],
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Text(c.category, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => _setBudget(category: c.category),
+                    child: const Text('调整'),
+                  ),
+                ]),
+                LinearProgressIndicator(
+                  value: (c.amount <= 0 ? 0.0 : c.percent / 100).clamp(0.0, 1.0),
+                  minHeight: 10,
+                  backgroundColor: AppColors.background,
+                  valueColor: AlwaysStoppedAnimation(
+                    c.percent > 100 ? AppColors.expense : AppColors.primaryDark),
+                ),
+                const SizedBox(height: 6),
+                Text('已花 ${fmtMoney(c.spent)} / 预算 ${fmtMoney(c.amount)}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
           ),
         ),
       );

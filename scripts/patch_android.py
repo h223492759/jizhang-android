@@ -1,5 +1,10 @@
 import os
 import re
+from datetime import datetime, timezone, timedelta
+
+
+def _beijing_now():
+    return datetime.now(timezone(timedelta(hours=8)))
 
 
 def patch_pubspec():
@@ -22,6 +27,7 @@ def patch_pubspec():
     with open("pubspec.yaml", "w", encoding="utf-8") as f:
         f.write(s)
     print("version:", f"{version_name}+{build}")
+    return version_name, build, tag
 
 
 def patch_build_gradle():
@@ -120,8 +126,27 @@ def patch_network_security_config():
     print("network_security_config.xml created")
 
 
+def patch_build_info(version_name, build, tag):
+    """生成 build_info.dart，供 APP 展示版本号与构建时间。"""
+    os.makedirs("lib/core", exist_ok=True)
+    p = "lib/core/build_info.dart"
+    build_time = _beijing_now().strftime("%Y-%m-%d %H:%M")
+    content = f'''// 由 scripts/patch_android.py 自动生成，请勿手动修改。
+class BuildInfo {{
+  static const String version = '{version_name}';
+  static const String buildNumber = '{build}';
+  static const String tag = '{tag}';
+  static const String buildTime = '{build_time}';
+}}
+'''
+    with open(p, "w", encoding="utf-8") as f:
+        f.write(content)
+    print("build_info.dart created")
+
+
 if __name__ == "__main__":
-    patch_pubspec()
+    version_name, build, tag = patch_pubspec()
     patch_build_gradle()
     patch_manifest()
     patch_network_security_config()
+    patch_build_info(version_name, build, tag)

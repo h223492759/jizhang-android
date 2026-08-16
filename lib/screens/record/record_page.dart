@@ -4,6 +4,7 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/components/simple_date_picker.dart';
 
 class RecordPage extends ConsumerStatefulWidget {
   final Flow? initialFlow;
@@ -22,6 +23,8 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   DateTime _date = DateTime.now();
   bool _saving = false;
   bool _catLoaded = false;
+  PresetsData _presets = PresetsData(presets: [], frequent: [], recent: []);
+  bool _presetsLoaded = false;
 
   bool get _isEdit => widget.initialFlow != null;
 
@@ -36,6 +39,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       _date = parseYmd(datePart(f.flowTime));
     }
     _loadCats();
+    _loadPresets();
   }
 
   Future<void> _loadCats() async {
@@ -55,6 +59,15 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       }
       setState(() => _catLoaded = true);
     }
+  }
+
+  Future<void> _loadPresets() async {
+    try {
+      _presets = await ref.read(apiProvider).getPresets(type: _type, limit: 12);
+    } catch (_) {
+      _presets = PresetsData(presets: [], frequent: [], recent: []);
+    }
+    if (mounted) setState(() => _presetsLoaded = true);
   }
 
   List<Category> get _visibleCats =>
@@ -149,15 +162,11 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await pickSimpleDate(
+      context,
       initialDate: _date,
       firstDate: DateTime(2000),
       lastDate: DateTime.now().add(const Duration(days: 1)),
-      locale: const Locale('zh', 'CN'),
-      helpText: '选择日期',
-      cancelText: '取消',
-      confirmText: '确定',
     );
     if (picked != null) setState(() => _date = picked);
   }
@@ -288,7 +297,9 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             _type = t;
             _cat = null;
             _expression = '';
+            _presetsLoaded = false;
           });
+          _loadPresets();
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 7),
@@ -400,17 +411,65 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     );
   }
 
+  void _applyPreset(PresetName p) {
+    Category? matched;
+    if (p.category != null && p.category!.isNotEmpty) {
+      matched = _cats.cast<Category?>().firstWhere(
+            (c) => c?.name == p.category && c?.type == _type,
+            orElse: () => null,
+          );
+    }
+    setState(() {
+      _name.text = p.name;
+      if (matched != null) _cat = matched;
+      if (p.amount != null && p.amount! > 0) {
+        _expression = _formatComputed(p.amount!);
+      }
+    });
+  }
+
   Widget _nameInput() {
+    final chips = <PresetName>[
+      ..._presets.presets,
+      ..._presets.frequent,
+      ..._presets.recent,
+    ].where((p) => p.name.isNotEmpty).toList();
+    final unique = <String, PresetName>{};
+    for (final p in chips) {
+      unique.putIfAbsent(p.name, () => p);
+    }
+    final display = unique.values.take(10).toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-      child: TextField(
-        controller: _name,
-        decoration: const InputDecoration(
-          labelText: '名称（可选）',
-          hintText: '请输入名称',
-          border: OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(
+              labelText: '名称（可选）',
+              hintText: '请输入名称',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+          if (display.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: display.map((p) {
+                return ActionChip(
+                  label: Text(p.name, style: const TextStyle(fontSize: 12)),
+                  backgroundColor: AppColors.primarySoft,
+                  side: BorderSide.none,
+                  onPressed: () => _applyPreset(p),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
       ),
     );
   }

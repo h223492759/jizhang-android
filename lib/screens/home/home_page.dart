@@ -23,6 +23,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   late DateTime _month;
   Overview? _overview;
   List<Flow> _flows = [];
+  List<Category> _cats = [];
   bool _loading = true;
 
   @override
@@ -48,10 +49,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       final ov = await api.getOverview(start: _rangeStart(), end: _rangeEnd());
       final fp = await api.getFlows(
           start: _rangeStart(), end: _rangeEnd(), pageSize: 500);
+      final cats = await api.getCategories();
       if (mounted) {
         setState(() {
           _overview = ov;
           _flows = fp.list;
+          _cats = cats;
           _loading = false;
         });
       }
@@ -230,15 +233,27 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+  String _catIcon(String categoryName) {
+    final c = _cats.cast<Category?>().firstWhere(
+          (c) => c?.name == categoryName,
+          orElse: () => null,
+        );
+    return c?.icon ?? (categoryName.isNotEmpty ? categoryName[0] : '·');
+  }
+
   Widget _flowTile(Flow f) {
     final expense = f.isExpense;
     return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
+      ),
       onLongPress: () => _showFlowMenu(f),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: AppColors.primarySoft,
-          child: Text(f.category.isNotEmpty ? f.category[0] : '·',
-              style: const TextStyle(color: AppColors.primaryDark)),
+          child: Text(_catIcon(f.category),
+              style: const TextStyle(color: AppColors.primaryDark, fontSize: 18)),
         ),
         title: Text(f.category),
         subtitle: Text(f.description.isNotEmpty ? f.description : (f.attribution.isNotEmpty ? '归属：${f.attribution}' : ''),
