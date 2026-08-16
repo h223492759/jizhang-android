@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'models.dart';
-import 'util.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -20,7 +19,7 @@ class ApiClient {
   late final Dio _dio;
 
   ApiClient({required this.serverUrl, this.token, this.bookId}) {
-    final base = serverUrl.replaceAll(RegExp(r'/$'), '') + '/api';
+    final base = '${serverUrl.replaceAll(RegExp(r'/$'), '')}/api';
     _dio = Dio(BaseOptions(baseUrl: base, connectTimeout: const Duration(seconds: 15)));
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
@@ -52,31 +51,24 @@ class ApiClient {
       final url = e.requestOptions.uri.toString();
       final type = e.type.toString();
       final detail = e.message ?? '无详情';
-      final base = switch (e.type) {
-        DioExceptionType.connectionError |
-        DioExceptionType.connectionTimeout |
-        DioExceptionType.sendTimeout |
-        DioExceptionType.receiveTimeout =>
-          '连接服务器失败',
-        DioExceptionType.badCertificate =>
-          '证书校验失败',
-        DioExceptionType.cancel =>
-          '请求被取消',
-        DioExceptionType.badResponse =>
-          '服务器返回异常',
-        DioExceptionType.unknown =>
-          '未知网络错误',
-      };
-      final hint = switch (e.type) {
-        DioExceptionType.connectionError |
-        DioExceptionType.connectionTimeout |
-        DioExceptionType.sendTimeout |
-        DioExceptionType.receiveTimeout =>
-          '请检查：\n1. 手机与服务器是否同一 WiFi\n2. 应用是否有网络权限\n3. 后端是否监听 0.0.0.0:9600',
-        DioExceptionType.badCertificate =>
-          '如使用自签名 HTTPS，请确认证书域名/有效期正确',
-        _ => '',
-      };
+      final isConn = e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout;
+      final base = isConn
+          ? '连接服务器失败'
+          : e.type == DioExceptionType.badCertificate
+              ? '证书校验失败'
+              : e.type == DioExceptionType.cancel
+                  ? '请求被取消'
+                  : e.type == DioExceptionType.badResponse
+                      ? '服务器返回异常'
+                      : '未知网络错误';
+      final hint = isConn
+          ? '请检查：\n1. 手机与服务器是否同一 WiFi\n2. 应用是否有网络权限\n3. 后端是否监听 0.0.0.0:9600'
+          : e.type == DioExceptionType.badCertificate
+              ? '如使用自签名 HTTPS，请确认证书域名/有效期正确'
+              : '';
       throw ApiException('$base\nURL: $url\n类型: $type\n详情: $detail${hint.isNotEmpty ? '\n$hint' : ''}');
     }
   }
