@@ -22,6 +22,47 @@ jobs:
           flutter create --no-pub --platforms=android _gen_tmp
           cp -r _gen_tmp/android .
           rm -rf _gen_tmp
+      - name: Set versionCode from tag
+        run: |
+          python3 - <<'PY'
+          import os, re
+          tag = os.environ.get('GITHUB_REF_NAME', 'v1').lstrip('v')
+          build = re.sub(r'\D', '', tag)
+          if not build:
+              build = '1'
+          with open('pubspec.yaml', encoding='utf-8') as f:
+              s = f.read()
+          s = re.sub(r'^version: .+', f'version: 1.0.0+{build}', s, flags=re.M)
+          with open('pubspec.yaml', 'w', encoding='utf-8') as f:
+              f.write(s)
+          print('version:', f'1.0.0+{build}')
+          PY
+      - name: Configure release signing
+        run: |
+          python3 - <<'PY'
+          import re
+          p = 'android/app/build.gradle'
+          with open(p, encoding='utf-8') as f:
+              s = f.read()
+          # 使用仓库中固定的 PKCS12 签名文件，保证每次签名一致，可覆盖安装
+          if 'signingConfigs' not in s:
+              s = s.replace('    buildTypes {', '''    signingConfigs {
+        release {
+            storeFile file("../../jizhang.p12")
+            storePassword "jizhang123"
+            keyAlias "jizhang"
+            keyPassword "jizhang123"
+            storeType "PKCS12"
+        }
+    }
+
+    buildTypes {''')
+          s = s.replace('signingConfig = signingConfigs.debug', 'signingConfig = signingConfigs.release')
+          with open(p, 'w', encoding='utf-8') as f:
+              f.write(s)
+          print('build.gradle patched')
+          print(open(p, encoding='utf-8').read())
+          PY
       - name: Allow cleartext (LAN http) & set app label
         run: |
           python3 - <<'PY'
