@@ -1,0 +1,36 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.3'
+          channel: 'stable'
+      - name: Generate Android runner
+        run: flutter create --platforms=android .
+      - name: Allow cleartext (LAN http) & set app label
+        run: |
+          sed -i 's|android:label="jizhang_android"|android:label="记账本" android:usesCleartextTraffic="true"|' android/app/src/main/AndroidManifest.xml
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter build apk --release
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true

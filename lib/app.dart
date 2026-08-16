@@ -1,0 +1,111 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'state/session.dart';
+import 'core/theme.dart';
+import 'core/util.dart';
+import 'screens/server/server_list_page.dart';
+import 'screens/auth/login_page.dart';
+import 'screens/book/book_picker_page.dart';
+import 'screens/home/home_page.dart';
+import 'screens/charts/charts_page.dart';
+import 'screens/discover/discover_page.dart';
+import 'screens/me/me_page.dart';
+import 'screens/record/record_sheet.dart';
+
+class App extends ConsumerWidget {
+  const App({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return MaterialApp(
+      title: '记账本',
+      theme: AppTheme.light,
+      scaffoldMessengerKey: scaffoldMessengerKey,
+      debugShowCheckedModeBanner: false,
+      home: const RootRouter(),
+    );
+  }
+}
+
+class RootRouter extends ConsumerWidget {
+  const RootRouter({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(sessionProvider);
+    if (!s.hasServer) return const ServerListPage();
+    if (!s.hasToken) return const LoginPage();
+    if (!s.hasBook) return const BookPickerPage();
+    return const MainShell();
+  }
+}
+
+class MainShell extends ConsumerStatefulWidget {
+  const MainShell({super.key});
+  @override
+  ConsumerState<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends ConsumerState<MainShell> {
+  int _idx = 0;
+  final _pages = const [HomePage(), ChartsPage(), DiscoverPage(), MePage()];
+
+  void _openRecord() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const RecordSheet(),
+    );
+    // 记一笔后刷新首页（dataVersionProvider 已自增）
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages[_idx],
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openRecord,
+        tooltip: '记一笔',
+        child: const Icon(Icons.add, size: 30),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8,
+        color: Colors.white,
+        child: Row(
+          children: [
+            _navItem(0, Icons.receipt_long, '明细'),
+            _navItem(1, Icons.pie_chart, '图表'),
+            const SizedBox(width: 56),
+            _navItem(2, Icons.auto_awesome, '发现'),
+            _navItem(3, Icons.person_outline, '我的'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(int i, IconData icon, String label) {
+    final active = _idx == i;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _idx = i),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+                color: active ? AppColors.primaryDark : AppColors.textSecondary),
+            const SizedBox(height: 2),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: active ? AppColors.primaryDark : AppColors.textSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+}

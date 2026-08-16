@@ -1,0 +1,13 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    prefer_const_constructors: false
+    prefer_const_literals_to_create_immutables: false
+    always_use_package_imports: false
+    avoid_print: false
+
+analyzer:
+  errors:
+    invalid_use_of_visible_for_testing_member: ignore
+    depend_on_referenced_packages: ignore
