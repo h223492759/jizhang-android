@@ -10,10 +10,18 @@ def patch_pubspec():
     build = build[-8:] if len(build) >= 8 else (build or "1")
     with open("pubspec.yaml", encoding="utf-8") as f:
         s = f.read()
-    s = re.sub(r"^version: .+", f"version: 1.0.0+{build}", s, flags=re.M)
+    # 默认自动递增 patch 位：1.0.0 -> 1.0.1；major/minor 需要手动改 pubspec 指定
+    m = re.search(r"^version:\s*(\d+)\.(\d+)\.(\d+)\+(\d+)", s, flags=re.M)
+    if m:
+        major, minor, patch, _ = m.groups()
+        new_patch = str(int(patch) + 1)
+        version_name = f"{major}.{minor}.{new_patch}"
+    else:
+        version_name = "1.0.1"
+    s = re.sub(r"^version: .+", f"version: {version_name}+{build}", s, flags=re.M)
     with open("pubspec.yaml", "w", encoding="utf-8") as f:
         f.write(s)
-    print("version:", f"1.0.0+{build}")
+    print("version:", f"{version_name}+{build}")
 
 
 def patch_build_gradle():

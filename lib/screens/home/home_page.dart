@@ -62,12 +62,13 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _pickMonth() async {
-    final picked = await showDatePicker(
+    final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: _month,
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      helpText: '选择月份',
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _YearMonthPicker(initial: _month),
     );
     if (picked != null) {
       setState(() => _month = DateTime(picked.year, picked.month));
@@ -241,6 +242,95 @@ class _HomePageState extends ConsumerState<HomePage> {
       trailing: Text(
         '${expense ? '-' : '+'}${fmtMoney(f.amount)}',
         style: TextStyle(color: expense ? AppColors.expense : AppColors.income, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
+class _YearMonthPicker extends StatefulWidget {
+  final DateTime initial;
+  const _YearMonthPicker({required this.initial});
+  @override
+  State<_YearMonthPicker> createState() => _YearMonthPickerState();
+}
+
+class _YearMonthPickerState extends State<_YearMonthPicker> {
+  late int _year;
+  late int _month;
+
+  @override
+  void initState() {
+    super.initState();
+    _year = widget.initial.year;
+    _month = widget.initial.month;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: () => setState(() => _year--),
+                ),
+                Expanded(
+                  child: Text(
+                    '$_year年',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: () => setState(() => _year++),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            GridView.count(
+              shrinkWrap: true,
+              crossAxisCount: 4,
+              childAspectRatio: 1.4,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              children: List.generate(12, (i) {
+                final m = i + 1;
+                final sel = _month == m;
+                return InkWell(
+                  onTap: () => Navigator.pop(context, DateTime(_year, m)),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: sel ? AppColors.primary : AppColors.background,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '$m月',
+                      style: TextStyle(
+                        fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                        color: sel ? AppColors.text : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
