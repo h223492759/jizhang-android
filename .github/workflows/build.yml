@@ -55,15 +55,23 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           echo "::error::flutter build failed: $(tail -n 40 build.log | tr '\n' ' ' | cut -c1-4000)"
+      - name: Rename APK
+        if: success()
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          src="build/app/outputs/flutter-apk/app-release.apk"
+          dst="build/app/outputs/flutter-apk/jizhang-${tag}.apk"
+          cp "$src" "$dst"
+          echo "apk=$dst" >> "$GITHUB_OUTPUT"
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: jizhang-apk
+          path: build/app/outputs/flutter-apk/jizhang-*.apk
       - name: Publish to GitHub Release
         if: success() && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: build/app/outputs/flutter-apk/jizhang-*.apk
           generate_release_notes: true

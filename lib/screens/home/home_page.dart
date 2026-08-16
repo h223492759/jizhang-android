@@ -10,6 +10,8 @@ import 'package:jizhang_android/screens/bills/bills_page.dart';
 import 'package:jizhang_android/screens/budget/budget_page.dart';
 import 'package:jizhang_android/screens/assets/assets_page.dart';
 import 'package:jizhang_android/screens/me/me_page.dart';
+import 'package:jizhang_android/screens/record/record_page.dart';
+import 'package:jizhang_android/screens/record/flow_detail_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -230,19 +232,91 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Widget _flowTile(Flow f) {
     final expense = f.isExpense;
+    return GestureDetector(
+      onLongPress: () => _showFlowMenu(f),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primarySoft,
+          child: Text(f.category.isNotEmpty ? f.category[0] : '·',
+              style: const TextStyle(color: AppColors.primaryDark)),
+        ),
+        title: Text(f.category),
+        subtitle: Text(f.description.isNotEmpty ? f.description : (f.attribution.isNotEmpty ? '归属：${f.attribution}' : ''),
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        trailing: Text(
+          '${expense ? '-' : '+'}${fmtMoney(f.amount)}',
+          style: TextStyle(color: expense ? AppColors.expense : AppColors.income, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showFlowMenu(Flow f) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _menuItem('删除', Icons.delete_outline, AppColors.expense, 'delete'),
+              _menuItem('修改', Icons.edit_outlined, AppColors.text, 'edit'),
+              _menuItem('查看明细', Icons.visibility_outlined, AppColors.text, 'detail'),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'delete') {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('确认删除'),
+          content: const Text('删除后不可恢复，确定删除这条明细吗？'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('删除', style: TextStyle(color: AppColors.expense)),
+            ),
+          ],
+        ),
+      );
+      if (ok == true) {
+        try {
+          await ref.read(apiProvider).deleteFlow(f.id);
+          ref.read(dataVersionProvider.notifier).state++;
+          toast('已删除');
+        } catch (e) {
+          toast(e.toString().replaceFirst('ApiException: ', ''));
+        }
+      }
+    } else if (action == 'edit') {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => RecordPage(initialFlow: f)),
+      );
+    } else if (action == 'detail') {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
+      );
+    }
+  }
+
+  Widget _menuItem(String label, IconData icon, Color color, String value) {
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: AppColors.primarySoft,
-        child: Text(f.category.isNotEmpty ? f.category[0] : '·',
-            style: const TextStyle(color: AppColors.primaryDark)),
-      ),
-      title: Text(f.category),
-      subtitle: Text(f.description.isNotEmpty ? f.description : (f.attribution.isNotEmpty ? '归属：${f.attribution}' : ''),
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-      trailing: Text(
-        '${expense ? '-' : '+'}${fmtMoney(f.amount)}',
-        style: TextStyle(color: expense ? AppColors.expense : AppColors.income, fontWeight: FontWeight.bold),
-      ),
+      leading: Icon(icon, color: color),
+      title: Text(label),
+      onTap: () => Navigator.pop(context, value),
     );
   }
 }

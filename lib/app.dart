@@ -11,7 +11,7 @@ import 'package:jizhang_android/screens/home/home_page.dart';
 import 'package:jizhang_android/screens/charts/charts_page.dart';
 import 'package:jizhang_android/screens/discover/discover_page.dart';
 import 'package:jizhang_android/screens/me/me_page.dart';
-import 'package:jizhang_android/screens/record/record_sheet.dart';
+import 'package:jizhang_android/screens/record/record_page.dart';
 
 class App extends ConsumerWidget {
   const App({super.key});
@@ -58,15 +58,11 @@ class _MainShellState extends ConsumerState<MainShell> {
   int _idx = 0;
   final _pages = const [HomePage(), ChartsPage(), DiscoverPage(), MePage()];
 
-  void _openRecord() async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const RecordSheet(),
+  void _openRecord() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RecordPage()),
     );
-    // 记一笔后刷新首页（dataVersionProvider 已自增）
-    setState(() {});
   }
 
   @override

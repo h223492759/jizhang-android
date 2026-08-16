@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Flow;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/models.dart';
@@ -6,14 +6,16 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
 
-class RecordSheet extends ConsumerStatefulWidget {
-  const RecordSheet({super.key});
+class RecordPage extends ConsumerStatefulWidget {
+  final Flow? initialFlow;
+  const RecordPage({super.key, this.initialFlow});
+
   @override
-  ConsumerState<RecordSheet> createState() => _RecordSheetState();
+  ConsumerState<RecordPage> createState() => _RecordPageState();
 }
 
-class _RecordSheetState extends ConsumerState<RecordSheet> {
-  String _type = 'expense';
+class _RecordPageState extends ConsumerState<RecordPage> {
+  late String _type;
   List<Category> _cats = [];
   Category? _cat;
   String _expression = '';
@@ -22,9 +24,18 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
   bool _saving = false;
   bool _catLoaded = false;
 
+  bool get _isEdit => widget.initialFlow != null;
+
   @override
   void initState() {
     super.initState();
+    final f = widget.initialFlow;
+    _type = f?.type ?? 'expense';
+    if (f != null) {
+      _expression = _formatComputed(f.amount);
+      _name.text = f.description;
+      _date = parseYmd(datePart(f.flowTime));
+    }
     _loadCats();
   }
 
@@ -34,13 +45,24 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
     } catch (_) {
       _cats = [];
     }
-    if (mounted) setState(() => _catLoaded = true);
+    if (mounted) {
+      // 编辑模式：按名称匹配分类
+      final f = widget.initialFlow;
+      if (f != null) {
+        _cat = _cats.cast<Category?>().firstWhere(
+              (c) => c?.name == f.category && c?.type == f.type,
+              orElse: () => null,
+            );
+      }
+      setState(() => _catLoaded = true);
+    }
   }
 
   List<Category> get _visibleCats =>
       _cats.where((c) => c.type == _type).toList();
 
-  bool get _hasOperator => _expression.contains('+') || _expression.contains('-');
+  bool get _hasOperator =>
+      _expression.contains('+') || _expression.contains('-');
 
   double? _compute(String expr) {
     if (expr.isEmpty) return null;
@@ -79,9 +101,9 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
 
   void _tapDigit(String d) {
     if (d == '.') {
-      // 当前操作数最多一个小数点
       final lastOp = _expression.lastIndexOf(RegExp(r'[+-]'));
-      final current = lastOp == -1 ? _expression : _expression.substring(lastOp + 1);
+      final current =
+          lastOp == -1 ? _expression : _expression.substring(lastOp + 1);
       if (current.contains('.')) return;
       if (current.isEmpty) {
         setState(() => _expression += '0.');
@@ -92,7 +114,6 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
       setState(() => _expression = d);
       return;
     }
-    // 限制总长度
     if (_expression.length >= 12) return;
     setState(() => _expression += d);
   }
@@ -101,11 +122,11 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
     if (_expression.isEmpty) return;
     final last = _expression[_expression.length - 1];
     if (last == '+' || last == '-') {
-      setState(() => _expression = _expression.substring(0, _expression.length - 1) + op);
+      setState(() =>
+          _expression = _expression.substring(0, _expression.length - 1) + op);
       return;
     }
     if (_hasOperator) {
-      // 已有运算符，先计算再追加
       final val = _computedAmount;
       if (val == null) return;
       setState(() => _expression = '${_formatComputed(val)}$op');
@@ -116,7 +137,8 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
 
   void _backspace() {
     if (_expression.isNotEmpty) {
-      setState(() => _expression = _expression.substring(0, _expression.length - 1));
+      setState(() =>
+          _expression = _expression.substring(0, _expression.length - 1));
     }
   }
 
@@ -126,15 +148,13 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: _date,
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-      helpText: '选择日期',
-      cancelText: '取消',
-      confirmText: '确定',
-      locale: const Locale('zh', 'CN'),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _DatePickerSheet(initial: _date),
     );
     if (picked != null) setState(() => _date = picked);
   }
@@ -161,16 +181,21 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
     }
     setState(() => _saving = true);
     try {
-      await ref.read(apiProvider).createFlow({
+      final body = {
         'type': _type,
         'amount': amt,
         'category': _cat!.name,
         'description': _name.text.trim(),
         'payment_method': '',
         'flow_time': ymd(_date),
-      });
+      };
+      if (_isEdit) {
+        await ref.read(apiProvider).updateFlow(widget.initialFlow!.id, body);
+      } else {
+        await ref.read(apiProvider).createFlow(body);
+      }
       ref.read(dataVersionProvider.notifier).state++;
-      toast('已保存');
+      toast(_isEdit ? '已更新' : '已保存');
       if (mounted) Navigator.pop(context);
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
@@ -205,64 +230,47 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
-      child: SafeArea(
-        child: Column(
-          children: [
-            _header(),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _categoryGrid(),
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeInOut,
-                      child: _cat != null
-                          ? Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _amountDisplay(),
-                                _nameInput(),
-                                _numpad(),
-                              ],
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+    return Scaffold(
+      backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
         ),
+        title: _typeToggle(),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: _categoryGrid(),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
+            child: _cat != null
+                ? _buildInputPanel()
+                : const SizedBox.shrink(),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _header() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+  Widget _typeToggle() {
+    return Container(
+      width: 160,
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
         children: [
-          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.background, borderRadius: BorderRadius.circular(20)),
-              child: Row(
-                children: [
-                  _typeBtn('expense', '支出'),
-                  _typeBtn('income', '收入'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 40),
+          _typeBtn('expense', '支出'),
+          _typeBtn('income', '收入'),
         ],
       ),
     );
@@ -280,7 +288,7 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
           });
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 7),
           decoration: BoxDecoration(
             color: active ? (t == 'expense' ? AppColors.expense : AppColors.income) : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
@@ -288,7 +296,7 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
           child: Center(
             child: Text(label,
                 style: TextStyle(
-                    color: active ? Colors.white : AppColors.textSecondary,
+                    color: active ? Colors.white : AppColors.text,
                     fontWeight: FontWeight.bold)),
           ),
         ),
@@ -298,44 +306,69 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
 
   Widget _categoryGrid() {
     if (!_catLoaded) {
-      return const Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator());
     }
     final cats = _visibleCats;
     if (cats.isEmpty) {
-      return const Padding(padding: EdgeInsets.all(24), child: Text('暂无分类，请先在网页端添加'));
+      return const Center(child: Text('暂无分类，请先在网页端添加'));
     }
-    return Padding(
+    return GridView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 4, childAspectRatio: 1.1),
-        itemCount: cats.length,
-        itemBuilder: (ctx, i) {
-          final c = cats[i];
-          final sel = _cat?.id == c.id;
-          return InkWell(
-            onTap: () => setState(() => _cat = c),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: sel ? AppColors.primary : AppColors.background,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: sel ? AppColors.primaryDark : Colors.transparent),
-                  ),
-                  padding: const EdgeInsets.all(10),
-                  child: Text(c.icon, style: const TextStyle(fontSize: 22)),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        childAspectRatio: 1.05,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+      ),
+      itemCount: cats.length,
+      itemBuilder: (ctx, i) {
+        final c = cats[i];
+        final sel = _cat?.id == c.id;
+        return InkWell(
+          onTap: () => setState(() => _cat = c),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: sel ? AppColors.primary : AppColors.background,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: sel ? AppColors.primaryDark : Colors.transparent),
                 ),
-                const SizedBox(height: 4),
-                Text(c.name, style: const TextStyle(fontSize: 12),
-                    overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          );
-        },
+                padding: const EdgeInsets.all(10),
+                child: Text(c.icon, style: const TextStyle(fontSize: 22)),
+              ),
+              const SizedBox(height: 4),
+              Text(c.name,
+                  style: const TextStyle(fontSize: 12),
+                  overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInputPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _amountDisplay(),
+          _nameInput(),
+          _numpad(),
+        ],
       ),
     );
   }
@@ -344,19 +377,20 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
     final display = _expression.isEmpty ? '0' : _expression;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       color: AppColors.primary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
             '¥ $display',
-            style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: AppColors.text),
+            style: const TextStyle(
+                fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.text),
           ),
           if (_hasOperator && _computedAmount != null)
             Text(
               '= ${_formatComputed(_computedAmount!)}',
-              style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
             ),
         ],
       ),
@@ -365,14 +399,14 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
 
   Widget _nameInput() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
       child: TextField(
         controller: _name,
-        decoration: InputDecoration(
+        decoration: const InputDecoration(
           labelText: '名称（可选）',
           hintText: '请输入名称',
-          border: const OutlineInputBorder(),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          border: OutlineInputBorder(),
+          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         ),
       ),
     );
@@ -386,14 +420,16 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
       ['.', '0', 'del', _hasOperator ? '=' : 'done'],
     ];
     return Container(
-      height: 280,
+      height: 260,
       color: AppColors.divider,
       child: Column(
-        children: rows.map((row) => Expanded(
-          child: Row(
-            children: row.map((k) => Expanded(child: _numKey(k))).toList(),
-          ),
-        )).toList(),
+        children: rows
+            .map((row) => Expanded(
+                  child: Row(
+                    children: row.map((k) => Expanded(child: _numKey(k))).toList(),
+                  ),
+                ))
+            .toList(),
       ),
     );
   }
@@ -444,9 +480,68 @@ class _RecordSheetState extends ConsumerState<RecordSheet> {
         child: Center(
           child: Text(label,
               style: TextStyle(
-                  fontSize: primary ? 20 : 22,
+                  fontSize: primary ? 18 : 20,
                   fontWeight: FontWeight.bold,
                   color: primary ? Colors.white : AppColors.text)),
+        ),
+      ),
+    );
+  }
+}
+
+class _DatePickerSheet extends StatefulWidget {
+  final DateTime initial;
+  const _DatePickerSheet({required this.initial});
+  @override
+  State<_DatePickerSheet> createState() => _DatePickerSheetState();
+}
+
+class _DatePickerSheetState extends State<_DatePickerSheet> {
+  late DateTime _date;
+
+  @override
+  void initState() {
+    super.initState();
+    _date = widget.initial;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CalendarDatePicker(
+              initialDate: _date,
+              firstDate: DateTime(2000),
+              lastDate: DateTime.now().add(const Duration(days: 1)),
+              currentDate: DateTime.now(),
+              firstDayOfWeek: 1,
+              onDateChanged: (d) => _date = d,
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('取消'),
+                  ),
+                ),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, _date),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryDark,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('确定'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

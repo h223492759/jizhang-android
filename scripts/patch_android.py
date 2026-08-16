@@ -28,9 +28,9 @@ def patch_build_gradle():
     p = "android/app/build.gradle"
     with open(p, encoding="utf-8") as f:
         s = f.read()
-    # 覆盖 AGP 自动生成的 debug signingConfig，使其指向仓库中固定的 PKCS12 签名文件。
-    # release 构建沿用 signingConfigs.debug（始终存在），避免新增 signingConfigs.release
-    # 导致 “Could not get unknown property 'release'” 的 Gradle 错误。
+    # Flutter 模板默认已带 signingConfigs.debug，之前因为 "signingConfigs" 已存在
+    # 没替换，导致 release 仍用模板 debug keystore，签名与 jizhang.p12 不一致。
+    # 这里强制替换整个 signingConfigs 块，并确保 release 使用它。
     signing_block = '''    signingConfigs {
         debug {
             storeFile rootProject.file("../jizhang.p12")
@@ -41,8 +41,14 @@ def patch_build_gradle():
         }
     }
 '''
-    if "signingConfigs" not in s:
-        # 在 android { 后的第一个配置项之前插入 signingConfigs，避免依赖缩进字符串
+    # 替换已有的 signingConfigs { ... } 块
+    s = re.sub(
+        r'    signingConfigs \{[\s\S]*?\n    \}',
+        signing_block.rstrip(),
+        s,
+    )
+    # 兜底：如果没找到（模板结构不同），在 android { 后第一个配置项前插入
+    if "jizhang.p12" not in s:
         idx = s.find("android {")
         if idx != -1:
             rest = s[idx + len("android {"):]
@@ -52,9 +58,16 @@ def patch_build_gradle():
                 s = s[:insert_pos] + signing_block + s[insert_pos:]
             else:
                 s = s.replace("android {", "android {\n" + signing_block, 1)
+    # 确保 release 构建类型使用 signingConfigs.debug
+    if "signingConfig signingConfigs.debug" not in s:
+        s = re.sub(
+            r'(    buildTypes \{[\s\S]*?release \{[\s\S]*?)\n        \}',
+            r'\1            signingConfig signingConfigs.debug\n        \}',
+            s,
+        )
     with open(p, "w", encoding="utf-8") as f:
         f.write(s)
-    print("build.gradle patched (debug signingConfig -> jizhang.p12)")
+    print("build.gradle patched (signingConfig -> jizhang.p12)")
 
 
 def patch_manifest():
