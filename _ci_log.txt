@@ -1,0 +1,367 @@
+﻿2026-08-16T23:28:19.4626056Z Current runner version: '2.336.0'
+2026-08-16T23:28:19.4652805Z ##[group]Runner Image Provisioner
+2026-08-16T23:28:19.4653762Z Hosted Compute Agent
+2026-08-16T23:28:19.4654422Z Version: 20260729.566
+2026-08-16T23:28:19.4655147Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-16T23:28:19.4655893Z Build Date: 2026-07-29T19:17:02Z
+2026-08-16T23:28:19.4656576Z Worker ID: {77bc9396-a974-4d05-a65f-85a46e8ecd73}
+2026-08-16T23:28:19.4657398Z Azure Region: westus3
+2026-08-16T23:28:19.4658067Z ##[endgroup]
+2026-08-16T23:28:19.4660263Z ##[group]Operating System
+2026-08-16T23:28:19.4660994Z Ubuntu
+2026-08-16T23:28:19.4661537Z 24.04.4
+2026-08-16T23:28:19.4662135Z LTS
+2026-08-16T23:28:19.4662703Z ##[endgroup]
+2026-08-16T23:28:19.4663308Z ##[group]Runner Image
+2026-08-16T23:28:19.4663992Z Image: ubuntu-24.04
+2026-08-16T23:28:19.4664588Z Version: 20260810.271.1
+2026-08-16T23:28:19.4665916Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-16T23:28:19.4667500Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+2026-08-16T23:28:19.4669215Z ##[endgroup]
+2026-08-16T23:28:19.4670350Z ##[group]GITHUB_TOKEN Permissions
+2026-08-16T23:28:19.4672632Z Contents: write
+2026-08-16T23:28:19.4673281Z Metadata: read
+2026-08-16T23:28:19.4673920Z ##[endgroup]
+2026-08-16T23:28:19.4676040Z Secret source: Actions
+2026-08-16T23:28:19.4677096Z Prepare workflow directory
+2026-08-16T23:28:19.5081727Z Prepare all required actions
+2026-08-16T23:28:19.5133829Z Getting action download info
+2026-08-16T23:28:19.8380017Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-16T23:28:19.9819952Z Download action repository 'subosito/flutter-action@v2' (SHA:1a449444c387b1966244ae4d4f8c696479add0b2)
+2026-08-16T23:28:20.4157609Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-08-16T23:28:20.5333413Z Download action repository 'softprops/action-gh-release@v2' (SHA:3bb12739c298aeb8a4eeaf626c5b8d85266b0e65)
+2026-08-16T23:28:21.1315535Z Getting action download info
+2026-08-16T23:28:21.2474830Z Download action repository 'actions/cache@v5' (SHA:caa296126883cff596d87d8935842f9db880ef25)
+2026-08-16T23:28:21.4474474Z Complete job name: build
+2026-08-16T23:28:21.5238099Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-16T23:28:21.5246585Z ##[group]Run actions/checkout@v4
+2026-08-16T23:28:21.5247172Z with:
+2026-08-16T23:28:21.5247497Z   repository: h223492759/jizhang-android
+2026-08-16T23:28:21.5250586Z   token: ***
+2026-08-16T23:28:21.5250903Z   ssh-strict: true
+2026-08-16T23:28:21.5251232Z   ssh-user: git
+2026-08-16T23:28:21.5251554Z   persist-credentials: true
+2026-08-16T23:28:21.5251936Z   clean: true
+2026-08-16T23:28:21.5252261Z   sparse-checkout-cone-mode: true
+2026-08-16T23:28:21.5252647Z   fetch-depth: 1
+2026-08-16T23:28:21.5252968Z   fetch-tags: false
+2026-08-16T23:28:21.5253305Z   show-progress: true
+2026-08-16T23:28:21.5253631Z   lfs: false
+2026-08-16T23:28:21.5253973Z   submodules: false
+2026-08-16T23:28:21.5254298Z   set-safe-directory: true
+2026-08-16T23:28:21.5320253Z   allow-unsafe-pr-checkout: false
+2026-08-16T23:28:21.5323397Z ##[endgroup]
+2026-08-16T23:28:21.6360731Z Syncing repository: h223492759/jizhang-android
+2026-08-16T23:28:21.6363229Z ##[group]Getting Git version info
+2026-08-16T23:28:21.6364114Z Working directory is '/home/runner/work/jizhang-android/jizhang-android'
+2026-08-16T23:28:21.6365346Z [command]/usr/bin/git version
+2026-08-16T23:28:21.6451767Z git version 2.54.0
+2026-08-16T23:28:21.6478686Z ##[endgroup]
+2026-08-16T23:28:21.6495561Z Temporarily overriding HOME='/home/runner/work/_temp/f199a623-fb63-4bd9-b354-455c9987bf06' before making global git config changes
+2026-08-16T23:28:21.6497676Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-16T23:28:21.6501845Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/jizhang-android/jizhang-android
+2026-08-16T23:28:21.6562771Z Deleting the contents of '/home/runner/work/jizhang-android/jizhang-android'
+2026-08-16T23:28:21.6568117Z ##[group]Initializing the repository
+2026-08-16T23:28:21.6574859Z [command]/usr/bin/git init /home/runner/work/jizhang-android/jizhang-android
+2026-08-16T23:28:21.6708131Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-16T23:28:21.6709729Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-16T23:28:21.6711102Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-16T23:28:21.6712547Z hint: call:
+2026-08-16T23:28:21.6713251Z hint:
+2026-08-16T23:28:21.6714525Z hint: 	git config --global init.defaultBranch <name>
+2026-08-16T23:28:21.6715416Z hint:
+2026-08-16T23:28:21.6716093Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-16T23:28:21.6717149Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-16T23:28:21.6718062Z hint:
+2026-08-16T23:28:21.6718999Z hint: 	git branch -m <name>
+2026-08-16T23:28:21.6719793Z hint:
+2026-08-16T23:28:21.6720588Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-16T23:28:21.6721975Z Initialized empty Git repository in /home/runner/work/jizhang-android/jizhang-android/.git/
+2026-08-16T23:28:21.6731355Z [command]/usr/bin/git remote add origin https://github.com/h223492759/jizhang-android
+2026-08-16T23:28:21.6781244Z ##[endgroup]
+2026-08-16T23:28:21.6782102Z ##[group]Disabling automatic garbage collection
+2026-08-16T23:28:21.6787200Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-16T23:28:21.6821410Z ##[endgroup]
+2026-08-16T23:28:21.6822844Z ##[group]Setting up auth
+2026-08-16T23:28:21.6829891Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-16T23:28:21.6880576Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-16T23:28:21.7306953Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-16T23:28:21.7345898Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-16T23:28:21.7590868Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-16T23:28:21.7628061Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-16T23:28:21.7858648Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-16T23:28:21.7897924Z ##[endgroup]
+2026-08-16T23:28:21.7899306Z ##[group]Fetching the repository
+2026-08-16T23:28:21.7908775Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +20a5477940c7ae55bcd2efed558aac36fe40c3dc:refs/remotes/origin/main
+2026-08-16T23:28:22.3607406Z From https://github.com/h223492759/jizhang-android
+2026-08-16T23:28:22.3609304Z  * [new ref]         20a5477940c7ae55bcd2efed558aac36fe40c3dc -> origin/main
+2026-08-16T23:28:22.3657606Z ##[endgroup]
+2026-08-16T23:28:22.3659141Z ##[group]Determining the checkout info
+2026-08-16T23:28:22.3661259Z ##[endgroup]
+2026-08-16T23:28:22.3668145Z [command]/usr/bin/git sparse-checkout disable
+2026-08-16T23:28:22.3725375Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-16T23:28:22.3759593Z ##[group]Checking out the ref
+2026-08-16T23:28:22.3765026Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-08-16T23:28:22.3852430Z Switched to a new branch 'main'
+2026-08-16T23:28:22.3855858Z branch 'main' set up to track 'origin/main'.
+2026-08-16T23:28:22.3861639Z ##[endgroup]
+2026-08-16T23:28:22.3906647Z [command]/usr/bin/git log -1 --format=%H
+2026-08-16T23:28:22.3935094Z 20a5477940c7ae55bcd2efed558aac36fe40c3dc
+2026-08-16T23:28:22.4310442Z ##[group]Run subosito/flutter-action@v2
+2026-08-16T23:28:22.4310879Z with:
+2026-08-16T23:28:22.4311191Z   flutter-version: 3.22.3
+2026-08-16T23:28:22.4311532Z   channel: stable
+2026-08-16T23:28:22.4311837Z   architecture: X64
+2026-08-16T23:28:22.4312134Z   cache: false
+2026-08-16T23:28:22.4312439Z   pub-cache-path: default
+2026-08-16T23:28:22.4312771Z   dry-run: false
+2026-08-16T23:28:22.4313157Z   git-source: https://github.com/flutter/flutter.git
+2026-08-16T23:28:22.4313901Z ##[endgroup]
+2026-08-16T23:28:22.4376250Z ##[start-action display=Make yq tool available on Windows runners;id=__subosito_flutter-action.__run]
+2026-08-16T23:28:22.4402290Z ##[end-action id=__subosito_flutter-action.__run;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-08-16T23:28:22.4405096Z ##[start-action display=Make setup script executable;id=__subosito_flutter-action.__run_2]
+2026-08-16T23:28:22.4444257Z ##[group]Run chmod +x "$GITHUB_ACTION_PATH/setup.sh"
+2026-08-16T23:28:22.4444840Z [36;1mchmod +x "$GITHUB_ACTION_PATH/setup.sh"[0m
+2026-08-16T23:28:22.4489109Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-08-16T23:28:22.4489587Z ##[endgroup]
+2026-08-16T23:28:22.4598707Z ##[end-action id=__subosito_flutter-action.__run_2;outcome=success;conclusion=success;duration_ms=19]
+2026-08-16T23:28:22.4601960Z ##[start-action display=Set action inputs;id=__subosito_flutter-action.flutter-action]
+2026-08-16T23:28:22.4645619Z ##[group]Run $GITHUB_ACTION_PATH/setup.sh -p \
+2026-08-16T23:28:22.4646105Z [36;1m$GITHUB_ACTION_PATH/setup.sh -p \[0m
+2026-08-16T23:28:22.4646502Z [36;1m  -n '3.22.3' \[0m
+2026-08-16T23:28:22.4646824Z [36;1m  -f '' \[0m
+2026-08-16T23:28:22.4647146Z [36;1m  -a 'X64' \[0m
+2026-08-16T23:28:22.4647450Z [36;1m  -k '' \[0m
+2026-08-16T23:28:22.4647746Z [36;1m  -c '' \[0m
+2026-08-16T23:28:22.4648037Z [36;1m  -l '' \[0m
+2026-08-16T23:28:22.4648638Z [36;1m  -d 'default' \[0m
+2026-08-16T23:28:22.4649085Z [36;1m  -g 'https://github.com/flutter/flutter.git' \[0m
+2026-08-16T23:28:22.4649534Z [36;1m  stable[0m
+2026-08-16T23:28:22.4687141Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-08-16T23:28:22.4687609Z ##[endgroup]
+2026-08-16T23:28:22.6696078Z ##[end-action id=__subosito_flutter-action.flutter-action;outcome=success;conclusion=success;duration_ms=209]
+2026-08-16T23:28:22.6702390Z ##[start-action display=Cache Flutter;id=__subosito_flutter-action.cache-flutter]
+2026-08-16T23:28:22.6708090Z ##[end-action id=__subosito_flutter-action.cache-flutter;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-08-16T23:28:22.6711110Z ##[start-action display=Cache pub dependencies;id=__subosito_flutter-action.cache-pub]
+2026-08-16T23:28:22.6726244Z ##[end-action id=__subosito_flutter-action.cache-pub;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-08-16T23:28:22.6729117Z ##[start-action display=Run setup script;id=__subosito_flutter-action.__run_3]
+2026-08-16T23:28:22.6768205Z ##[group]Run $GITHUB_ACTION_PATH/setup.sh \
+2026-08-16T23:28:22.6768988Z [36;1m$GITHUB_ACTION_PATH/setup.sh \[0m
+2026-08-16T23:28:22.6769382Z [36;1m  -n '3.22.3' \[0m
+2026-08-16T23:28:22.6769722Z [36;1m  -a 'x64' \[0m
+2026-08-16T23:28:22.6770148Z [36;1m  -c '/opt/hostedtoolcache/flutter/stable-3.22.3-x64' \[0m
+2026-08-16T23:28:22.6770640Z [36;1m  -d '/home/runner/.pub-cache' \[0m
+2026-08-16T23:28:22.6771029Z [36;1m  stable[0m
+2026-08-16T23:28:22.6811297Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-08-16T23:28:22.6811770Z ##[endgroup]
+2026-08-16T23:28:22.8847168Z   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+2026-08-16T23:28:22.8849170Z                                  Dload  Upload   Total   Spent    Left  Speed
+2026-08-16T23:28:22.8850711Z 
+2026-08-16T23:28:23.0415745Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+2026-08-16T23:28:24.0367054Z   0  715M    0 34332    0     0   213k      0  0:57:13 --:--:--  0:57:13  213k
+2026-08-16T23:28:25.0367325Z  19  715M   19  137M    0     0   119M      0  0:00:06  0:00:01  0:00:05  118M
+2026-08-16T23:28:26.0390057Z  39  715M   39  284M    0     0   132M      0  0:00:05  0:00:02  0:00:03  132M
+2026-08-16T23:28:27.0364978Z  63  715M   63  451M    0     0   143M      0  0:00:05  0:00:03  0:00:02  142M
+2026-08-16T23:28:27.6050152Z  85  715M   85  614M    0     0   147M      0  0:00:04  0:00:04 --:--:--  147M
+2026-08-16T23:28:27.6050866Z 100  715M  100  715M    0     0   151M      0  0:00:04  0:00:04 --:--:--  156M
+2026-08-16T23:28:57.3573486Z ##[end-action id=__subosito_flutter-action.__run_3;outcome=success;conclusion=success;duration_ms=34684]
+2026-08-16T23:28:57.3664620Z ##[group]Run flutter create --no-pub --platforms=android _gen_tmp
+2026-08-16T23:28:57.3665244Z [36;1mflutter create --no-pub --platforms=android _gen_tmp[0m
+2026-08-16T23:28:57.3665607Z [36;1mcp -r _gen_tmp/android .[0m
+2026-08-16T23:28:57.3665863Z [36;1mrm -rf _gen_tmp[0m
+2026-08-16T23:28:57.3705338Z shell: /usr/bin/bash -e {0}
+2026-08-16T23:28:57.3705605Z env:
+2026-08-16T23:28:57.3705911Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.22.3-x64/flutter
+2026-08-16T23:28:57.3706325Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-16T23:28:57.3706605Z ##[endgroup]
+2026-08-16T23:28:57.6378385Z 
+2026-08-16T23:28:57.6391310Z   ╔════════════════════════════════════════════════════════════════════════════╗
+2026-08-16T23:28:57.6392513Z   ║                 Welcome to Flutter! - https://flutter.dev                  ║
+2026-08-16T23:28:57.6393634Z   ║                                                                            ║
+2026-08-16T23:28:57.6394800Z   ║ The Flutter tool uses Google Analytics to anonymously report feature usage ║
+2026-08-16T23:28:57.6396039Z   ║ statistics and basic crash reports. This data is used to help improve      ║
+2026-08-16T23:28:57.6397163Z   ║ Flutter tools over time.                                                   ║
+2026-08-16T23:28:57.6398140Z   ║                                                                            ║
+2026-08-16T23:28:57.6399736Z   ║ Flutter tool analytics are not sent on the very first run. To disable      ║
+2026-08-16T23:28:57.6401319Z   ║ reporting, type 'flutter config --no-analytics'. To display the current    ║
+2026-08-16T23:28:57.6402728Z   ║ setting, type 'flutter config'. If you opt out of analytics, an opt-out    ║
+2026-08-16T23:28:57.6404256Z   ║ event will be sent, and then no further information will be sent by the    ║
+2026-08-16T23:28:57.6405519Z   ║ Flutter tool.                                                              ║
+2026-08-16T23:28:57.6406777Z   ║                                                                            ║
+2026-08-16T23:28:57.6408088Z   ║ By downloading the Flutter SDK, you agree to the Google Terms of Service.  ║
+2026-08-16T23:28:57.6409742Z   ║ The Google Privacy Policy describes how data is handled in this service.   ║
+2026-08-16T23:28:57.6410734Z   ║                                                                            ║
+2026-08-16T23:28:57.6411800Z   ║ Moreover, Flutter includes the Dart SDK, which may send usage metrics and  ║
+2026-08-16T23:28:57.6412905Z   ║ crash reports to Google.                                                   ║
+2026-08-16T23:28:57.6413763Z   ║                                                                            ║
+2026-08-16T23:28:57.6414639Z   ║ Read about data we send with crash reports:                                ║
+2026-08-16T23:28:57.6415706Z   ║ https://flutter.dev/docs/reference/crash-reporting                         ║
+2026-08-16T23:28:57.6416613Z   ║                                                                            ║
+2026-08-16T23:28:57.6417570Z   ║ See Google's privacy policy:                                               ║
+2026-08-16T23:28:57.6419268Z   ║ https://policies.google.com/privacy                                        ║
+2026-08-16T23:28:57.6420232Z   ║                                                                            ║
+2026-08-16T23:28:57.6421157Z   ║ To disable animations in this tool, use                                    ║
+2026-08-16T23:28:57.6422209Z   ║ 'flutter config --no-cli-animations'.                                      ║
+2026-08-16T23:28:57.6423277Z   ╚════════════════════════════════════════════════════════════════════════════╝
+2026-08-16T23:28:57.6423729Z 
+2026-08-16T23:29:02.6204818Z Creating project _gen_tmp...
+2026-08-16T23:29:02.7504935Z Wrote 35 files.
+2026-08-16T23:29:02.7505257Z 
+2026-08-16T23:29:02.7505475Z All done!
+2026-08-16T23:29:02.7527614Z You can find general documentation for Flutter at: https://docs.flutter.dev/
+2026-08-16T23:29:02.7530375Z Detailed API documentation is available at: https://api.flutter.dev/
+2026-08-16T23:29:02.7531497Z If you prefer video documentation, consider: https://www.youtube.com/c/flutterdev
+2026-08-16T23:29:02.7532118Z 
+2026-08-16T23:29:02.7532333Z In order to run your application, type:
+2026-08-16T23:29:02.7532680Z 
+2026-08-16T23:29:02.7532830Z   $ cd _gen_tmp
+2026-08-16T23:29:02.7533176Z   $ flutter run
+2026-08-16T23:29:02.7533392Z 
+2026-08-16T23:29:02.7533633Z Your application code is in _gen_tmp/lib/main.dart.
+2026-08-16T23:29:02.7534034Z 
+2026-08-16T23:29:03.9853685Z ##[group]Run python3 scripts/patch_android.py
+2026-08-16T23:29:03.9854062Z [36;1mpython3 scripts/patch_android.py[0m
+2026-08-16T23:29:03.9890779Z shell: /usr/bin/bash -e {0}
+2026-08-16T23:29:03.9891022Z env:
+2026-08-16T23:29:03.9891313Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.22.3-x64/flutter
+2026-08-16T23:29:03.9891685Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-16T23:29:03.9891936Z ##[endgroup]
+2026-08-16T23:29:04.0142905Z version: 1.0.2+1
+2026-08-16T23:29:04.0143558Z build.gradle patched (signingConfig -> jizhang.p12)
+2026-08-16T23:29:04.0144287Z manifest patched
+2026-08-16T23:29:04.0144759Z network_security_config.xml created
+2026-08-16T23:29:04.0145333Z build_info.dart created
+2026-08-16T23:29:04.0202699Z ##[group]Run flutter pub get
+2026-08-16T23:29:04.0202990Z [36;1mflutter pub get[0m
+2026-08-16T23:29:04.0238137Z shell: /usr/bin/bash -e {0}
+2026-08-16T23:29:04.0238699Z env:
+2026-08-16T23:29:04.0239006Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.22.3-x64/flutter
+2026-08-16T23:29:04.0239388Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-16T23:29:04.0239640Z ##[endgroup]
+2026-08-16T23:29:04.3517003Z Resolving dependencies...
+2026-08-16T23:29:05.2616218Z Downloading packages...
+2026-08-16T23:29:08.0017468Z + async 2.11.0 (2.13.1 available)
+2026-08-16T23:29:08.0018614Z + boolean_selector 2.1.1 (2.1.2 available)
+2026-08-16T23:29:08.0019100Z + characters 1.3.0 (1.4.1 available)
+2026-08-16T23:29:08.0042428Z + clock 1.1.1 (1.1.2 available)
+2026-08-16T23:29:08.0058605Z + collection 1.18.0 (1.19.1 available)
+2026-08-16T23:29:08.0059091Z + dio 5.11.0
+2026-08-16T23:29:08.0069015Z + dio_web_adapter 2.2.1
+2026-08-16T23:29:08.0069430Z + equatable 2.1.0
+2026-08-16T23:29:08.0069876Z + fake_async 1.3.1 (1.3.3 available)
+2026-08-16T23:29:08.0070342Z + ffi 2.1.3 (2.2.0 available)
+2026-08-16T23:29:08.0070752Z + file 7.0.1
+2026-08-16T23:29:08.0071102Z + fl_chart 0.68.0 (1.2.0 available)
+2026-08-16T23:29:08.0071542Z + flutter 0.0.0 from sdk flutter
+2026-08-16T23:29:08.0071986Z + flutter_lints 4.0.0 (6.0.0 available)
+2026-08-16T23:29:08.0072491Z + flutter_localizations 0.0.0 from sdk flutter
+2026-08-16T23:29:08.0073013Z + flutter_riverpod 2.6.1 (3.4.2 available)
+2026-08-16T23:29:08.0073497Z + flutter_test 0.0.0 from sdk flutter
+2026-08-16T23:29:08.0073969Z + flutter_web_plugins 0.0.0 from sdk flutter
+2026-08-16T23:29:08.0074430Z + http 1.6.0
+2026-08-16T23:29:08.0074778Z + http_parser 4.0.2 (4.1.2 available)
+2026-08-16T23:29:08.0075218Z + intl 0.19.0 (0.20.3 available)
+2026-08-16T23:29:08.0075633Z + leak_tracker 10.0.4 (11.0.2 available)
+2026-08-16T23:29:08.0076471Z + leak_tracker_flutter_testing 3.0.3 (3.0.10 available)
+2026-08-16T23:29:08.0077034Z + leak_tracker_testing 3.0.1 (3.0.2 available)
+2026-08-16T23:29:08.0077528Z + lints 4.0.0 (6.1.0 available)
+2026-08-16T23:29:08.0077939Z + matcher 0.12.16+1 (0.12.20 available)
+2026-08-16T23:29:08.0078711Z + material_color_utilities 0.8.0 (0.13.1 available)
+2026-08-16T23:29:08.0079226Z + meta 1.12.0 (1.19.0 available)
+2026-08-16T23:29:08.0079635Z + mime 2.0.0
+2026-08-16T23:29:08.0079993Z + package_info_plus 8.3.1 (10.2.1 available)
+2026-08-16T23:29:08.0080605Z + package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+2026-08-16T23:29:08.0081196Z + path 1.9.0 (1.9.1 available)
+2026-08-16T23:29:08.0081646Z + path_provider_linux 2.2.1 (2.2.2 available)
+2026-08-16T23:29:08.0082213Z + path_provider_platform_interface 2.1.2 (2.1.3 available)
+2026-08-16T23:29:08.0082762Z + path_provider_windows 2.3.0
+2026-08-16T23:29:08.0083177Z + platform 3.1.6
+2026-08-16T23:29:08.0083558Z + plugin_platform_interface 2.1.8
+2026-08-16T23:29:08.0084029Z + riverpod 2.6.1 (3.4.2 available)
+2026-08-16T23:29:08.0084491Z + shared_preferences 2.3.3 (2.5.5 available)
+2026-08-16T23:29:08.0085075Z + shared_preferences_android 2.3.2 (2.4.27 available)
+2026-08-16T23:29:08.0085746Z + shared_preferences_foundation 2.5.4 (2.5.6 available)
+2026-08-16T23:29:08.0086317Z + shared_preferences_linux 2.4.1
+2026-08-16T23:29:08.0086888Z + shared_preferences_platform_interface 2.4.1 (2.4.2 available)
+2026-08-16T23:29:08.0087502Z + shared_preferences_web 2.4.3
+2026-08-16T23:29:08.0087961Z + shared_preferences_windows 2.4.1
+2026-08-16T23:29:08.0088702Z + sky_engine 0.0.99 from sdk flutter
+2026-08-16T23:29:08.0089185Z + source_span 1.10.0 (1.10.2 available)
+2026-08-16T23:29:08.0089659Z + stack_trace 1.11.1 (1.12.1 available)
+2026-08-16T23:29:08.0090102Z + state_notifier 1.0.0
+2026-08-16T23:29:08.0090499Z + stream_channel 2.1.2 (2.1.4 available)
+2026-08-16T23:29:08.0090970Z + string_scanner 1.2.0 (1.4.1 available)
+2026-08-16T23:29:08.0091442Z + term_glyph 1.2.1 (1.2.2 available)
+2026-08-16T23:29:08.0091904Z + test_api 0.7.0 (0.7.13 available)
+2026-08-16T23:29:08.0092673Z + typed_data 1.3.2 (1.4.0 available)
+2026-08-16T23:29:08.0093167Z + vector_math 2.1.4 (2.4.2 available)
+2026-08-16T23:29:08.0093631Z + vm_service 14.2.1 (15.2.0 available)
+2026-08-16T23:29:08.0094063Z + web 1.1.1
+2026-08-16T23:29:08.0094406Z + win32 5.5.4 (6.4.0 available)
+2026-08-16T23:29:08.0094816Z + xdg_directories 1.1.0
+2026-08-16T23:29:08.0095201Z Changed 59 dependencies!
+2026-08-16T23:29:08.0095783Z 39 packages have newer versions incompatible with dependency constraints.
+2026-08-16T23:29:08.0096509Z Try `flutter pub outdated` for more information.
+2026-08-16T23:29:08.3012441Z ##[group]Run set -o pipefail
+2026-08-16T23:29:08.3012817Z [36;1mset -o pipefail[0m
+2026-08-16T23:29:08.3013217Z [36;1mflutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log[0m
+2026-08-16T23:29:08.3050951Z shell: /usr/bin/bash -e {0}
+2026-08-16T23:29:08.3051204Z env:
+2026-08-16T23:29:08.3051520Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.22.3-x64/flutter
+2026-08-16T23:29:08.3051899Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-16T23:29:08.3052146Z ##[endgroup]
+2026-08-16T23:29:20.4094186Z Analyzing jizhang-android...                                    
+2026-08-16T23:29:20.4101294Z 
+2026-08-16T23:29:20.4148038Z   error • The named parameter 'firstDayOfWeek' isn't defined • lib/components/simple_date_picker.dart:61:15 • undefined_named_parameter
+2026-08-16T23:29:20.4150144Z warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/assets/assets_page.dart:3:8 • unused_import
+2026-08-16T23:29:20.4151939Z warning • The value of the field '_expenseCats' isn't used • lib/screens/assets/assets_page.dart:23:18 • unused_field
+2026-08-16T23:29:20.4153847Z warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/assets/savings_item_detail_page.dart:3:8 • unused_import
+2026-08-16T23:29:20.4155759Z warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/assets/wallet_detail_page.dart:3:8 • unused_import
+2026-08-16T23:29:20.4157896Z warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/bills/bill_month_detail_page.dart:3:8 • unused_import
+2026-08-16T23:29:20.4160395Z   error • The name 'Flow' is defined in the libraries 'package:flutter/src/widgets/basic.dart' and 'package:jizhang_android/core/models.dart' • lib/screens/bills/bill_month_detail_page.dart:109:17 • ambiguous_import
+2026-08-16T23:29:20.4162333Z warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/bills/bills_page.dart:3:8 • unused_import
+2026-08-16T23:29:20.4163967Z warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/budget/budget_page.dart:3:8 • unused_import
+2026-08-16T23:29:20.4167572Z    info • Unnecessary braces in a string interpolation • lib/screens/budget/budget_page.dart:47:58 • unnecessary_brace_in_string_interps
+2026-08-16T23:29:20.4169491Z warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/charts/charts_page.dart:5:8 • unused_import
+2026-08-16T23:29:20.4170868Z warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/discover/discover_page.dart:3:8 • unused_import
+2026-08-16T23:29:20.4171790Z warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/flows/flow_filter_page.dart:3:8 • unused_import
+2026-08-16T23:29:20.4172652Z warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/home/home_page.dart:4:8 • unused_import
+2026-08-16T23:29:20.4173435Z warning • The value of the field '_loading' isn't used • lib/screens/me/settings_page.dart:18:8 • unused_field
+2026-08-16T23:29:20.4174213Z warning • The value of the field '_presetsLoaded' isn't used • lib/screens/record/record_page.dart:27:8 • unused_field
+2026-08-16T23:29:20.4175325Z    info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/server/server_list_page.dart:71:42 • use_build_context_synchronously
+2026-08-16T23:29:20.4177204Z    info • Use interpolation to compose strings and values • lib/state/session.dart:118:7 • prefer_interpolation_to_compose_strings
+2026-08-16T23:29:20.4177692Z 
+2026-08-16T23:29:20.4348607Z 18 issues found. (ran in 11.4s)
+2026-08-16T23:29:20.4429874Z ##[error]Process completed with exit code 1.
+2026-08-16T23:29:20.4480350Z ##[group]Run {
+2026-08-16T23:29:20.4480604Z [36;1m{[0m
+2026-08-16T23:29:20.4480824Z [36;1m  echo "## ❌ flutter analyze failed:"[0m
+2026-08-16T23:29:20.4481130Z [36;1m  echo '```'[0m
+2026-08-16T23:29:20.4481346Z [36;1m  cat analyze.log[0m
+2026-08-16T23:29:20.4481567Z [36;1m  echo '```'[0m
+2026-08-16T23:29:20.4481778Z [36;1m} >> "$GITHUB_STEP_SUMMARY"[0m
+2026-08-16T23:29:20.4482205Z [36;1mecho "::error::flutter analyze failed: $(cat analyze.log | tr '\n' ' ' | cut -c1-4000)"[0m
+2026-08-16T23:29:20.4519221Z shell: /usr/bin/bash -e {0}
+2026-08-16T23:29:20.4519466Z env:
+2026-08-16T23:29:20.4519761Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.22.3-x64/flutter
+2026-08-16T23:29:20.4520161Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-16T23:29:20.4520416Z ##[endgroup]
+2026-08-16T23:29:20.4640791Z ##[error]flutter analyze failed: Analyzing jizhang-android...                                        error • The named parameter 'firstDayOfWeek' isn't defined • lib/components/simple_date_picker.dart:61:15 • undefined_named_parameter warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/assets/assets_page.dart:3:8 • unused_import warning • The value of the field '_expenseCats' isn't used • lib/screens/assets/assets_page.dart:23:18 • unused_field warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/assets/savings_item_detail_page.dart:3:8 • unused_import warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/assets/wallet_detail_page.dart:3:8 • unused_import warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/bills/bill_month_detail_page.dart:3:8 • unused_import   error • The name 'Flow' is defined in the libraries 'package:flutter/src/widgets/basic.dart' and 'package:jizhang_android/core/models.dart' • lib/screens/bills/bill_month_detail_page.dart:109:17 • ambiguous_import warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/bills/bills_page.dart:3:8 • unused_import warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/budget/budget_page.dart:3:8 • unused_import    info • Unnecessary braces in a string interpolation • lib/screens/budget/budget_page.dart:47:58 • unnecessary_brace_in_string_interps warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/charts/charts_page.dart:5:8 • unused_import warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/discover/discover_page.dart:3:8 • unused_import warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/flows/flow_filter_page.dart:3:8 • unused_import warning • Unused import: 'package:jizhang_android/core/api.dart' • lib/screens/home/home_page.dart:4:8 • unused_import warning • The value of the field '_loading' isn't used • lib/screens/me/settings_page.dart:18:8 • unused_field warning • The value of the field '_presetsLoaded' isn't used • lib/screens/record/record_page.dart:27:8 • unused_field    info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/server/server_list_page.dart:71:42 • use_build_context_synchronously    info • Use interpolation to compose strings and values • lib/state/session.dart:118:7 • prefer_interpolation_to_compose_strings  18 issues found. (ran in 11.4s) 
+2026-08-16T23:29:20.4910405Z Post job cleanup.
+2026-08-16T23:29:20.4994441Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-16T23:29:20.4995948Z Post job cleanup.
+2026-08-16T23:29:20.5869217Z [command]/usr/bin/git version
+2026-08-16T23:29:20.5913196Z git version 2.54.0
+2026-08-16T23:29:20.5989734Z Temporarily overriding HOME='/home/runner/work/_temp/8afe18e8-0160-49cf-920a-1692c79905b1' before making global git config changes
+2026-08-16T23:29:20.5997745Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-16T23:29:20.5999212Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/jizhang-android/jizhang-android
+2026-08-16T23:29:20.6049871Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-16T23:29:20.6089824Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-16T23:29:20.6347347Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-16T23:29:20.6378582Z http.https://github.com/.extraheader
+2026-08-16T23:29:20.6404290Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-08-16T23:29:20.6439953Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-16T23:29:20.6708051Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-16T23:29:20.6750029Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-16T23:29:20.7131567Z Cleaning up orphan processes
+2026-08-16T23:29:20.7385835Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

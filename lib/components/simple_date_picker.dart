@@ -17,7 +17,7 @@ Future<DateTime?> pickSimpleDate(
     builder: (ctx) => _SimpleDatePickerSheet(
       initialDate: initialDate,
       firstDate: firstDate ?? DateTime(2000),
-      lastDate: lastDate ?? DateTime.now().add(const Duration(days: 1)),
+      lastDate: lastDate ?? DateTime.now().add(const Duration(days: 365)),
     ),
   );
 }
@@ -37,30 +37,142 @@ class _SimpleDatePickerSheet extends StatefulWidget {
 }
 
 class _SimpleDatePickerSheetState extends State<_SimpleDatePickerSheet> {
-  late DateTime _date;
+  late DateTime _displayed; // 当前展示的年月
+  late DateTime _selected;
 
   @override
   void initState() {
     super.initState();
-    _date = widget.initialDate;
+    _displayed = DateTime(widget.initialDate.year, widget.initialDate.month, 1);
+    _selected = widget.initialDate;
+  }
+
+  bool _isInRange(DateTime d) =>
+      !d.isBefore(_startOfDay(widget.firstDate)) &&
+      !d.isAfter(_startOfDay(widget.lastDate));
+
+  DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  void _changeMonth(int delta) {
+    setState(() {
+      _displayed = DateTime(_displayed.year, _displayed.month + delta, 1);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final daysInMonth =
+        DateTime(_displayed.year, _displayed.month + 1, 0).day;
+    // Monday 为每周第一天：DateTime.weekday 中 Monday=1, Sunday=7
+    final leadingBlank = (_displayed.weekday - 1) % 7;
+    final totalCells = leadingBlank + daysInMonth;
+    final trailingBlank = (7 - (totalCells % 7)) % 7;
+    final cells = totalCells + trailingBlank;
+
+    final weekTitles = const ['一', '二', '三', '四', '五', '六', '日'];
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CalendarDatePicker(
-              initialDate: _date,
-              firstDate: widget.firstDate,
-              lastDate: widget.lastDate,
-              currentDate: DateTime.now(),
-              firstDayOfWeek: 1,
-              onDateChanged: (d) => _date = d,
+            // 年月切换
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: () => _changeMonth(-1),
+                ),
+                Text(
+                  '${_displayed.year}年${_displayed.month}月',
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: () => _changeMonth(1),
+                ),
+              ],
             ),
+            const SizedBox(height: 8),
+            // 星期表头（周一开头）
+            Row(
+              children: weekTitles
+                  .map((w) => Expanded(
+                        child: Center(
+                          child: Text(
+                            w,
+                            style: TextStyle(
+                              color: w == '六' || w == '日'
+                                  ? Colors.grey
+                                  : Colors.black54,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(height: 4),
+            // 日期网格
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                childAspectRatio: 1,
+              ),
+              itemCount: cells,
+              itemBuilder: (context, index) {
+                if (index < leadingBlank) {
+                  return const SizedBox.shrink();
+                }
+                final day = index - leadingBlank + 1;
+                if (day > daysInMonth) return const SizedBox.shrink();
+                final date =
+                    DateTime(_displayed.year, _displayed.month, day);
+                final enabled = _isInRange(date);
+                final isSelected = _startOfDay(date) == _startOfDay(_selected);
+                final isToday = _startOfDay(date) == _startOfDay(DateTime.now());
+                return InkWell(
+                  onTap: enabled
+                      ? () => setState(() => _selected = date)
+                      : null,
+                  child: Container(
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primaryDark
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                      border: isToday && !isSelected
+                          ? Border.all(color: AppColors.primaryDark, width: 1)
+                          : null,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$day',
+                        style: TextStyle(
+                          color: !enabled
+                              ? Colors.grey.shade300
+                              : isSelected
+                                  ? Colors.white
+                                  : (w_sat_sun(date)
+                                      ? Colors.grey
+                                      : Colors.black87),
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
@@ -71,7 +183,7 @@ class _SimpleDatePickerSheetState extends State<_SimpleDatePickerSheet> {
                 ),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context, _date),
+                    onPressed: () => Navigator.pop(context, _selected),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryDark,
                       foregroundColor: Colors.white,
@@ -86,4 +198,6 @@ class _SimpleDatePickerSheetState extends State<_SimpleDatePickerSheet> {
       ),
     );
   }
+
+  bool w_sat_sun(DateTime d) => d.weekday == 6 || d.weekday == 7;
 }
