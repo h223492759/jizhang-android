@@ -207,7 +207,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       barGroups: _monthly.asMap().entries.map((e) {
         final v = _type == 'expense' ? e.value.expense : e.value.income;
         return BarChartGroupData(x: e.key, barRods: [
-          BarRodData(toY: v, color: color, width: 12, borderRadius: BorderRadius.circular(4)),
+          BarChartRodData(toY: v, color: color, width: 12, borderRadius: BorderRadius.circular(4)),
         ]);
       }).toList(),
       titlesData: FlTitlesData(

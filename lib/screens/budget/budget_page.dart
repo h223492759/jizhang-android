@@ -138,7 +138,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
             ]),
             const SizedBox(height: 8),
             LinearProgressIndicator(
-              value: (d.totalAmount <= 0 ? 0 : d.totalPercent / 100).clamp(0.0, 1.0),
+              value: (d.totalAmount <= 0 ? 0.0 : d.totalPercent / 100).clamp(0.0, 1.0),
               minHeight: 14,
               backgroundColor: AppColors.background,
               valueColor: AlwaysStoppedAnimation(
@@ -166,7 +166,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                 TextButton(onPressed: () => _setBudget(category: c.category), child: const Text('调整')),
               ]),
               LinearProgressIndicator(
-                value: (c.amount <= 0 ? 0 : c.percent / 100).clamp(0.0, 1.0),
+                value: (c.amount <= 0 ? 0.0 : c.percent / 100).clamp(0.0, 1.0),
                 minHeight: 10,
                 backgroundColor: AppColors.background,
                 valueColor: AlwaysStoppedAnimation(

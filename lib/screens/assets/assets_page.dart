@@ -92,7 +92,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               LinearProgressIndicator(
-                value: (s.target <= 0 ? 0 : s.percent / 100).clamp(0.0, 1.0),
+                value: (s.target <= 0 ? 0.0 : s.percent / 100).clamp(0.0, 1.0),
                 minHeight: 12,
                 backgroundColor: AppColors.background,
                 valueColor: AlwaysStoppedAnimation(AppColors.primaryDark),
