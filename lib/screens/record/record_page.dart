@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' hide Flow;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
@@ -75,7 +74,9 @@ class _RecordPageState extends ConsumerState<RecordPage> {
           i++;
         } else {
           int j = i;
-          while (j < expr.length && expr[j] != '+' && expr[j] != '-') j++;
+          while (j < expr.length && expr[j] != '+' && expr[j] != '-') {
+            j++;
+          }
           tokens.add(expr.substring(i, j));
           i = j;
         }
@@ -148,13 +149,15 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showModalBottomSheet<DateTime>(
+    final picked = await showDatePicker(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => _DatePickerSheet(initial: _date),
+      initialDate: _date,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+      locale: const Locale('zh', 'CN'),
+      helpText: '选择日期',
+      cancelText: '取消',
+      confirmText: '确定',
     );
     if (picked != null) setState(() => _date = picked);
   }
@@ -483,65 +486,6 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                   fontSize: primary ? 18 : 20,
                   fontWeight: FontWeight.bold,
                   color: primary ? Colors.white : AppColors.text)),
-        ),
-      ),
-    );
-  }
-}
-
-class _DatePickerSheet extends StatefulWidget {
-  final DateTime initial;
-  const _DatePickerSheet({required this.initial});
-  @override
-  State<_DatePickerSheet> createState() => _DatePickerSheetState();
-}
-
-class _DatePickerSheetState extends State<_DatePickerSheet> {
-  late DateTime _date;
-
-  @override
-  void initState() {
-    super.initState();
-    _date = widget.initial;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CalendarDatePicker(
-              initialDate: _date,
-              firstDate: DateTime(2000),
-              lastDate: DateTime.now().add(const Duration(days: 1)),
-              currentDate: DateTime.now(),
-              firstDayOfWeek: 1,
-              onDateChanged: (d) => _date = d,
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('取消'),
-                  ),
-                ),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context, _date),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryDark,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('确定'),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );
