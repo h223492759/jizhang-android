@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/theme.dart';
-import 'core/util.dart';
-import 'state/session.dart';
-import 'screens/server/server_list_page.dart';
+import 'package:jizhang_android/core/theme.dart';
+import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/screens/server/server_list_page.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});

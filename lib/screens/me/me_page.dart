@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/models.dart';
-import 'core/theme.dart';
-import 'core/util.dart';
-import 'state/session.dart';
-import 'screens/me/settings_page.dart';
-import 'screens/server/server_list_page.dart';
+import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/core/theme.dart';
+import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/screens/me/settings_page.dart';
+import 'package:jizhang_android/screens/server/server_list_page.dart';
 
 class MePage extends ConsumerWidget {
   const MePage({super.key});

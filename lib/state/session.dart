@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/api.dart';
-import 'core/models.dart';
-import 'core/storage.dart';
+import 'package:jizhang_android/core/api.dart';
+import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/core/storage.dart';
 
 class SessionState {
   final String? serverUrl;

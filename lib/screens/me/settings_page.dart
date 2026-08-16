@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/theme.dart';
-import 'core/util.dart';
-import 'state/session.dart';
+import 'package:jizhang_android/core/theme.dart';
+import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/state/session.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});

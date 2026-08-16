@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/storage.dart';
-import 'core/theme.dart';
-import 'core/util.dart';
-import 'state/session.dart';
+import 'package:jizhang_android/core/storage.dart';
+import 'package:jizhang_android/core/theme.dart';
+import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/state/session.dart';
 
 class ServerListPage extends ConsumerStatefulWidget {
   const ServerListPage({super.key});

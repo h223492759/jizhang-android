@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/api.dart';
-import 'core/models.dart';
-import 'core/theme.dart';
-import 'core/util.dart';
-import 'state/session.dart';
+import 'package:jizhang_android/core/api.dart';
+import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/core/theme.dart';
+import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/state/session.dart';
 
 class AssetsPage extends ConsumerStatefulWidget {
   final int initialTab;
@@ -32,10 +32,12 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     setState(() => _loading = true);
     try {
       final api = ref.read(apiProvider);
-      final r = await Future.wait([api.getSavings(), api.getWallets(), api.getCategories()]);
-      _sav = r[0] as SavingsOverview;
-      _wallets = r[1] as WalletsData;
-      _expenseCats = (r[2] as List<Category>).toList();
+      final sav = await api.getSavings();
+      final wallets = await api.getWallets();
+      final cats = await api.getCategories();
+      _sav = sav;
+      _wallets = wallets;
+      _expenseCats = cats;
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     } finally {

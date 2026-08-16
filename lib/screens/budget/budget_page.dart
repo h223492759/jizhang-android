@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/api.dart';
-import 'core/models.dart';
-import 'core/theme.dart';
-import 'core/util.dart';
-import 'state/session.dart';
+import 'package:jizhang_android/core/api.dart';
+import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/core/theme.dart';
+import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/state/session.dart';
 
 class BudgetPage extends ConsumerStatefulWidget {
   const BudgetPage({super.key});

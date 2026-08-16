@@ -198,7 +198,7 @@ class ApiClient {
   }
 
   Future<void> setSavingsGoal({required double target, String? note}) async {
-    final body = {'target': target};
+    final body = <String, dynamic>{'target': target};
     if (note != null) body['note'] = note;
     await _req(() => _dio.put('/savings/goal', data: body));
   }

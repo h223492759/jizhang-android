@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'state/session.dart';
-import 'core/theme.dart';
-import 'core/util.dart';
-import 'screens/server/server_list_page.dart';
-import 'screens/auth/login_page.dart';
-import 'screens/book/book_picker_page.dart';
-import 'screens/home/home_page.dart';
-import 'screens/charts/charts_page.dart';
-import 'screens/discover/discover_page.dart';
-import 'screens/me/me_page.dart';
-import 'screens/record/record_sheet.dart';
+import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/theme.dart';
+import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/screens/server/server_list_page.dart';
+import 'package:jizhang_android/screens/auth/login_page.dart';
+import 'package:jizhang_android/screens/book/book_picker_page.dart';
+import 'package:jizhang_android/screens/home/home_page.dart';
+import 'package:jizhang_android/screens/charts/charts_page.dart';
+import 'package:jizhang_android/screens/discover/discover_page.dart';
+import 'package:jizhang_android/screens/me/me_page.dart';
+import 'package:jizhang_android/screens/record/record_sheet.dart';
 
 class App extends ConsumerWidget {
   const App({super.key});

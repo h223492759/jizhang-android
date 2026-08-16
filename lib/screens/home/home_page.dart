@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'core/api.dart';
-import 'core/models.dart';
-import 'core/theme.dart';
-import 'core/util.dart';
-import 'state/session.dart';
-import 'screens/bills/bills_page.dart';
-import 'screens/budget/budget_page.dart';
-import 'screens/assets/assets_page.dart';
-import 'screens/me/me_page.dart';
+import 'package:jizhang_android/core/api.dart';
+import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/core/theme.dart';
+import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/screens/bills/bills_page.dart';
+import 'package:jizhang_android/screens/budget/budget_page.dart';
+import 'package:jizhang_android/screens/assets/assets_page.dart';
+import 'package:jizhang_android/screens/me/me_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
