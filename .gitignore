@@ -11,3 +11,6 @@ build/
 /android/app/profile/
 /android/app/release/
 /coverage/
+
+# local logs
+ci_log.txt
