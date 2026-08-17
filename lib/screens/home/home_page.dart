@@ -95,30 +95,37 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   // ============ 顶部第一区域：黄底，日期 + 支出 + 收入，高度与第二区域接近 ============
+  // 顶部 SafeArea 留出手机状态栏（信号/WIFI）的高度
   Widget _headerRegion() {
     final ov = _overview;
     return Container(
       color: AppColors.primary,
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          InkWell(
-            onTap: _pickMonth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('${_month.year}',
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                Text('${_month.month}月',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              ],
-            ),
+      child: SafeArea(
+        bottom: false,
+        top: true,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              InkWell(
+                onTap: _pickMonth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${_month.year}',
+                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    Text('${_month.month}月',
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 28),
+              _headStat('支出', ov?.expense ?? 0, AppColors.expense),
+              _headStat('收入', ov?.income ?? 0, AppColors.income),
+            ],
           ),
-          const SizedBox(width: 28),
-          _headStat('支出', ov?.expense ?? 0, AppColors.expense),
-          _headStat('收入', ov?.income ?? 0, AppColors.income),
-        ],
+        ),
       ),
     );
   }
@@ -482,8 +489,6 @@ class _CategoryPickerSheet extends ConsumerStatefulWidget {
 }
 
 class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
-  Category? _sel;
-
   @override
   Widget build(BuildContext context) {
     final cats = widget.cats.where((c) => c.type == widget.type).toList();
@@ -496,7 +501,7 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
             const Text('选择分类', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
               child: GridView.builder(
                 shrinkWrap: true,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -508,18 +513,16 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                 itemCount: cats.length,
                 itemBuilder: (ctx, i) {
                   final c = cats[i];
-                  final sel = _sel?.id == c.id;
+                  // 点击任意分类即直接落库并关闭弹窗（无需再点"确定"）
                   return InkWell(
-                    onTap: () => setState(() => _sel = c),
+                    onTap: () => Navigator.pop(context, c.name),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: sel ? AppColors.primary : AppColors.background,
+                            color: AppColors.background,
                             shape: BoxShape.circle,
-                            border: Border.all(
-                                color: sel ? AppColors.primaryDark : Colors.transparent),
                           ),
                           padding: const EdgeInsets.all(10),
                           child: Text(c.icon, style: const TextStyle(fontSize: 22)),
@@ -534,18 +537,7 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                 },
               ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _sel == null
-                    ? null
-                    : () {
-                        Navigator.pop(context, _sel!.name);
-                      },
-                child: const Text('确定'),
-              ),
-            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -771,6 +763,12 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
     }
   }
 
+  void _clearAll() {
+    if (_expression.isNotEmpty) {
+      setState(() => _expression = '');
+    }
+  }
+
   String _formatComputed(double v) {
     if (v == v.toInt()) return v.toInt().toString();
     return v.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
@@ -786,14 +784,30 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
     if (picked != null) setState(() => _date = picked);
   }
 
+  Future<void> _save() async {
+    var expr = _expression;
+    if (expr.isNotEmpty) {
+      final last = expr[expr.length - 1];
+      if (last == '+' || last == '-') expr = expr.substring(0, expr.length - 1);
+    }
+    final amt = expr.contains('+') || expr.contains('-')
+        ? _compute(expr)
+        : double.tryParse(expr);
+    if (amt == null || amt <= 0) {
+      toast('请输入金额');
+      return;
+    }
+    Navigator.pop(context, _AmountResult(amt, ymd(_date)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final display = _expression.isEmpty ? '0' : _expression;
     final rows = [
       ['7', '8', '9', 'date'],
-      ['4', '5', '6', '+'],
+      ['4', '5', '6', 'back'],
       ['1', '2', '3', '-'],
-      ['.', '0', 'del', 'done'],
+      ['.', '0', 'del', 'save'],
     ];
     return Padding(
       padding: EdgeInsets.only(
@@ -805,24 +819,9 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton.icon(
-                  onPressed: _pickDate,
-                  icon: const Icon(Icons.calendar_today, size: 16),
-                  label: Text('${_date.month}/${_date.day}'),
-                ),
-                const Text('修改金额', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(width: 64),
-              ],
-            ),
-          ),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             color: AppColors.primary,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -847,40 +846,6 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
                   .toList(),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('取消'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      var expr = _expression;
-                      if (expr.isNotEmpty) {
-                        final last = expr[expr.length - 1];
-                        if (last == '+' || last == '-') expr = expr.substring(0, expr.length - 1);
-                      }
-                      final amt = expr.contains('+') || expr.contains('-')
-                          ? _compute(expr)
-                          : double.tryParse(expr);
-                      if (amt == null || amt <= 0) {
-                        toast('请输入金额');
-                        return;
-                      }
-                      Navigator.pop(context, _AmountResult(amt, ymd(_date)));
-                    },
-                    child: const Text('保存'),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -895,9 +860,9 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
         label = '${_date.month}/${_date.day}';
         onTap = _pickDate;
         break;
-      case '+':
-        label = '+';
-        onTap = () => _tapOperator('+');
+      case 'back':
+        label = '«';
+        onTap = _backspace;
         break;
       case '-':
         label = '-';
@@ -905,15 +870,12 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
         break;
       case 'del':
         label = '删除';
-        onTap = _backspace;
+        onTap = _clearAll;
         break;
-      case 'done':
-        label = '=';
+      case 'save':
+        label = '保存';
         primary = true;
-        onTap = () {
-          final v = _computedAmount;
-          if (v != null) setState(() => _expression = _formatComputed(v));
-        };
+        onTap = _save;
         break;
       default:
         label = key;

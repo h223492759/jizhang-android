@@ -11,10 +11,11 @@ import 'package:jizhang_android/screens/record/flow_detail_page.dart';
 import 'package:jizhang_android/screens/flows/owner_flow_page.dart';
 
 /// 分类详情页：用于图表页「分类排行」点击进入。
-/// - 首行：年/月 + 支出/收入
-/// - 第二行：年月滑动选择器（跨月/跨年对比）
-/// - 第三区域：本分类的归属人横向占比条
-/// - 支出排行榜：按金额/按时间切换，列表行含归属底色、名称+百分比、金额、横向条、日期
+/// - 顶部 3 行固定（始终可见）：
+///   - 行 1：月/年 模式切换
+///   - 行 2：年月滑动选择器（跨月/跨年对比）
+///   - 行 3：总支出/总收入 + 平均值
+/// - 下方滚动区：本分类的归属人横向占比条 + 支出排行榜（按金额/按时间）+ 流水明细
 class CategoryDetailPage extends ConsumerStatefulWidget {
   final String category;
   final String type;
@@ -79,6 +80,9 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _centerSelected();
+      });
     }
   }
 
@@ -122,65 +126,68 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
       appBar: AppBar(title: Text(widget.category)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _header(),
-                const SizedBox(height: 8),
-                _modeAndTypeBar(color),
-                const SizedBox(height: 4),
-                _periodSelector(),
+                // PIN 1: 月/年 模式切换
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  child: _modeAndTypeBar(color),
+                ),
+                // PIN 2: 周期选择器（年/月）
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: _periodSelector(),
+                ),
+                // PIN 3: 总支出/总收入 + 平均值
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: _summaryRow(),
+                ),
                 const Divider(height: 1, thickness: 1, color: AppColors.divider),
-                const SizedBox(height: 12),
-                _ownerProportion(color),
-                const SizedBox(height: 16),
-                _rankingHeader(),
-                const SizedBox(height: 8),
-                ..._rankRows(color),
+                // SCROLLABLE: 归属人 + 排行榜 + 流水明细
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    children: [
+                      _ownerProportion(color),
+                      const SizedBox(height: 16),
+                      _rankingHeader(),
+                      const SizedBox(height: 8),
+                      ..._rankRows(color),
+                    ],
+                  ),
+                ),
               ],
             ),
     );
   }
 
-  Widget _header() {
-    double exp = 0, inc = 0;
+  Widget _summaryRow() {
+    // 在当前周期 + 当前分类 + 当前类型下，所有流水的合计
+    double total = 0;
     for (final f in _flows) {
-      if (f.isExpense) exp += f.amount;
-      else inc += f.amount;
+      total += f.amount;
     }
-    return Container(
-      color: AppColors.primary,
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${_period.year}年',
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-              Text(_yearMode ? '全年' : '${_period.month}月',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(width: 28),
-          _headStat('支出', exp, AppColors.expense),
-          _headStat('收入', inc, AppColors.income),
-        ],
-      ),
+    final days = _daysInPeriod;
+    final avg = days > 0 ? total / days : 0.0;
+    final label = widget.type == 'expense' ? '总支出' : '总收入';
+    return Row(
+      children: [
+        Text('$label：¥${fmtMoney(total)}',
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+        const Spacer(),
+        Text('平均值：¥${fmtMoney(avg)}',
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+      ],
     );
   }
 
-  Widget _headStat(String label, double v, Color c) => Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            const SizedBox(height: 4),
-            Text(fmtMoney(v), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c)),
-          ],
-        ),
-      );
+  int get _daysInPeriod {
+    final s = parseYmd(_start());
+    final e = parseYmd(_end());
+    return e.difference(s).inDays + 1;
+  }
 
   Widget _modeAndTypeBar(Color color) {
     return Row(
@@ -267,7 +274,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
   void _centerSelected() {
     final opts = _buildPeriodOpts();
     final idx = opts.indexWhere((o) => o.selected);
-    if (idx < 0 || opts[idx].special || !_periodScroll.hasClients) return;
+    if (idx < 0 || !_periodScroll.hasClients) return;
     const chipW = 64.0;
     final max = _periodScroll.position.maxScrollExtent;
     final target = (idx * (chipW + 8) - (_periodScroll.position.viewportDimension / 2 - chipW / 2))

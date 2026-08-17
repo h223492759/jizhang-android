@@ -80,6 +80,9 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _centerSelected();
+      });
     }
   }
 
@@ -255,7 +258,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
   void _centerSelected() {
     final opts = _buildPeriodOpts();
     final idx = opts.indexWhere((o) => o.selected);
-    if (idx < 0 || opts[idx].special || !_periodScroll.hasClients) return;
+    if (idx < 0 || !_periodScroll.hasClients) return;
     const chipW = 64.0;
     final max = _periodScroll.position.maxScrollExtent;
     final target = (idx * (chipW + 8) - (_periodScroll.position.viewportDimension / 2 - chipW / 2))
