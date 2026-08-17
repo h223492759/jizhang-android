@@ -9,6 +9,7 @@ import 'package:jizhang_android/core/util.dart';
 /// - onNameTap  → 点名称
 /// - onAmountTap → 点金额
 /// 若某项未单独指定，则回退到 onTap（整行通用点击，如查看明细）。
+/// - onLongPress → 整行长按（如首页弹出操作菜单）
 Widget compactFlowTile({
   required Flow f,
   required Color iconBg,
@@ -17,6 +18,7 @@ Widget compactFlowTile({
   VoidCallback? onIconTap,
   VoidCallback? onNameTap,
   VoidCallback? onAmountTap,
+  VoidCallback? onLongPress,
 }) {
   final expense = f.isExpense;
   final name = f.description.isNotEmpty ? f.description : f.category;
@@ -29,34 +31,38 @@ Widget compactFlowTile({
           child: child,
         );
 
+  Widget row = Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      _tap(onIconTap ?? onTap,
+          CircleAvatar(radius: 18, backgroundColor: iconBg, child: Text(iconChar, style: const TextStyle(fontSize: 16)))),
+      const SizedBox(width: 10),
+      Expanded(
+        child: _tap(
+          onNameTap ?? onTap,
+          Text(name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, color: AppColors.text)),
+        ),
+      ),
+      const SizedBox(width: 8),
+      _tap(
+        onAmountTap ?? onTap,
+        Text('${expense ? '-' : '+'}${fmtMoney(f.amount)}',
+            style: TextStyle(
+                color: expense ? AppColors.expense : AppColors.income,
+                fontWeight: FontWeight.bold,
+                fontSize: 14)),
+      ),
+    ],
+  );
+  if (onLongPress != null) {
+    row = GestureDetector(onLongPress: onLongPress, child: row);
+  }
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        _tap(onIconTap ?? onTap,
-            CircleAvatar(radius: 18, backgroundColor: iconBg, child: Text(iconChar, style: const TextStyle(fontSize: 16)))),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _tap(
-            onNameTap ?? onTap,
-            Text(name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14, color: AppColors.text)),
-          ),
-        ),
-        const SizedBox(width: 8),
-        _tap(
-          onAmountTap ?? onTap,
-          Text('${expense ? '-' : '+'}${fmtMoney(f.amount)}',
-              style: TextStyle(
-                  color: expense ? AppColors.expense : AppColors.income,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14)),
-        ),
-      ],
-    ),
+    child: row,
   );
 }
 

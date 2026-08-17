@@ -184,6 +184,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         onIconTap: () => _editCategory(f),
         onNameTap: () => _editName(f),
         onAmountTap: () => _editAmount(f),
+        onLongPress: () => _showFlowMenu(f),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
@@ -562,7 +563,7 @@ class _NameEditorSheet extends ConsumerStatefulWidget {
 
 class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
   late final TextEditingController _name;
-  List<PresetName> _presets = [];
+  PresetsData _presets = PresetsData(presets: [], frequent: [], recent: []);
   bool _loaded = false;
 
   @override
@@ -576,7 +577,7 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
     try {
       _presets = await ref.read(apiProvider).getPresets(type: widget.flow.type, limit: 12);
     } catch (_) {
-      _presets = [];
+      _presets = PresetsData(presets: [], frequent: [], recent: []);
     }
     if (mounted) setState(() => _loaded = true);
   }
@@ -590,8 +591,9 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final chips = <PresetName>[
-      ..._presets,
-      ..._presets,
+      ..._presets.presets,
+      ..._presets.frequent,
+      ..._presets.recent,
     ];
     final unique = <String, PresetName>{};
     for (final p in chips.where((p) => p.name.isNotEmpty)) {
@@ -635,7 +637,7 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
                             label: Text(p.name, style: const TextStyle(fontSize: 12)),
                             backgroundColor: Colors.grey.shade200,
                             side: BorderSide.none,
-                            onPressed: () => _name.setText(p.name),
+                            onPressed: () => _name.text = p.name,
                           ),
                         ))
                     .toList(),

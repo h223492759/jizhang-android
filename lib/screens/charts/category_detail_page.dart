@@ -8,6 +8,7 @@ import 'package:jizhang_android/core/owner_color.dart';
 import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
+import 'package:jizhang_android/screens/flows/owner_flow_page.dart';
 
 /// 分类详情页：用于图表页「分类排行」点击进入。
 /// - 首行：年/月 + 支出/收入

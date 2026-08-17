@@ -96,9 +96,9 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                       valueColor: expense ? AppColors.expense : AppColors.income),
                   const Divider(height: 24),
                   _row('日期', '${ymd(date)} ${weekdayCn(date)}'),
-                  if (flow.description.isNotEmpty) ...[
+                  if (f.description.isNotEmpty) ...[
                     const Divider(height: 24),
-                    _row('名称', flow.description),
+                    _row('名称', f.description),
                   ],
                   const Divider(height: 24),
                   Row(
