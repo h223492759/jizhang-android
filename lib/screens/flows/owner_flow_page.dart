@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart' hide Flow;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/models.dart';
-import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/owner_color.dart';
 import 'package:jizhang_android/components/flow_row.dart';

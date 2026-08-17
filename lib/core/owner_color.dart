@@ -2,7 +2,6 @@ import 'package:flutter/material.dart' hide Flow;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/storage.dart';
-import 'package:jizhang_android/state/session.dart';
 
 /// 归属人（多账号记账）底色：
 /// - 本账号归属人（自己）用灰色；

@@ -10,12 +10,12 @@ void toast(String msg) {
   );
 }
 
-String fmtMoney(double v) {
+String fmtMoney(num v) {
   final f = NumberFormat('#,##0.##', 'zh_CN');
   return f.format(v);
 }
 
-String fmtMoneySigned(double v, {bool expenseRed = false}) {
+String fmtMoneySigned(num v, {bool expenseRed = false}) {
   final sign = v < 0 ? '-' : '';
   return '$sign${fmtMoney(v.abs())}';
 }
