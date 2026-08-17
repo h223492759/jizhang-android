@@ -5,7 +5,9 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/owner_color.dart';
+import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/components/flow_row.dart';
+import 'package:jizhang_android/components/simple_date_picker.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/bills/bills_page.dart';
 import 'package:jizhang_android/screens/budget/budget_page.dart';
@@ -80,92 +82,60 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  String _catIcon(String categoryName) {
-    final c = _cats.cast<Category?>().firstWhere(
-          (c) => c?.name == categoryName,
-          orElse: () => null,
-        );
-    return c?.icon ?? (categoryName.isNotEmpty ? categoryName[0] : '·');
+  Map<String, String> get _iconMap => buildCatIconMap(_cats);
+
+  Future<void> _update(Flow f, Map<String, dynamic> body) async {
+    try {
+      await ref.read(apiProvider).updateFlow(f.id, body);
+      ref.read(dataVersionProvider.notifier).state++;
+      toast('已更新');
+    } catch (e) {
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  // ============ 顶部第一区域：黄底，日期 + 支出 + 收入，高度与第二区域接近 ============
+  Widget _headerRegion() {
     final ov = _overview;
-    final overrides = ref.watch(ownerColorsProvider);
-    final user = ref.watch(sessionProvider).user;
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            backgroundColor: AppColors.primary,
-            expandedHeight: 64,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(color: AppColors.primary),
-              titlePadding: const EdgeInsets.only(left: 16, bottom: 12),
-              title: InkWell(
-                onTap: _pickMonth,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('${_month.year}',
-                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                    const SizedBox(width: 6),
-                    Text('${_month.month}月',
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    const Icon(Icons.arrow_drop_down, size: 20),
-                  ],
-                ),
-              ),
-              centerTitle: false,
-            ),
-            actions: const [],
-          ),
-          SliverToBoxAdapter(child: _summaryCard(ov)),
-          SliverToBoxAdapter(child: _quickModules()),
-          _loading
-              ? const SliverToBoxAdapter(
-                  child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())))
-              : _flowList(overrides, user),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryCard(Overview? ov) {
     return Container(
       color: AppColors.primary,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(14)),
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        child: Row(
-          children: [
-            _stat('支出', ov?.expense ?? 0, AppColors.expense),
-            _stat('收入', ov?.income ?? 0, AppColors.income),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _stat(String label, double value, Color color) {
-    return Expanded(
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          const SizedBox(height: 6),
-          Text(fmtMoney(value),
-              style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
+          InkWell(
+            onTap: _pickMonth,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${_month.year}',
+                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                Text('${_month.month}月',
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 28),
+          _headStat('支出', ov?.expense ?? 0, AppColors.expense),
+          _headStat('收入', ov?.income ?? 0, AppColors.income),
         ],
       ),
     );
   }
 
-  // 第二区域：5 个图标不用圆形底色，压缩高度
+  Widget _headStat(String label, double v, Color c) => Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 4),
+            Text(fmtMoney(v),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c)),
+          ],
+        ),
+      );
+
+  // ============ 第二区域：5 个图标不用圆形底色，压缩高度 ============
   Widget _quickModules() {
     final items = [
       ('账单', Icons.receipt_long, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillsPage()))),
@@ -210,7 +180,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       tileBuilder: (f) => compactFlowTile(
         f: f,
         iconBg: ownerColorFor(f, overrides, user),
-        iconChar: _catIcon(f.category),
+        iconChar: catIconOf(_iconMap, f.category),
+        onIconTap: () => _editCategory(f),
+        onNameTap: () => _editName(f),
+        onAmountTap: () => _editAmount(f),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
@@ -220,6 +193,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     return SliverList(delegate: SliverChildListDelegate(widgets));
   }
 
+  // ============ 长按弹窗 ============
   Future<void> _showFlowMenu(Flow f) async {
     final action = await showModalBottomSheet<String>(
       context: context,
@@ -235,6 +209,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             children: [
               _menuItem('删除', Icons.delete_outline, AppColors.expense, 'delete'),
               _menuItem('修改', Icons.edit_outlined, AppColors.text, 'edit'),
+              _menuItem('更换归属人', Icons.swap_horiz, AppColors.text, 'owner'),
               _menuItem('查看明细', Icons.visibility_outlined, AppColors.text, 'detail'),
             ],
           ),
@@ -272,6 +247,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         context,
         MaterialPageRoute(builder: (_) => RecordPage(initialFlow: f)),
       );
+    } else if (action == 'owner') {
+      if (!mounted) return;
+      _changeOwner(f);
     } else if (action == 'detail') {
       if (!mounted) return;
       Navigator.push(
@@ -281,11 +259,125 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  Future<void> _changeOwner(Flow f) async {
+    final owners = _flows.map((e) => e.attribution).where((a) => a.isNotEmpty).toSet().toList();
+    final ctrl = TextEditingController(text: f.attribution);
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('更换归属人'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (owners.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: owners
+                    .map((o) => ActionChip(
+                          label: Text(o),
+                          backgroundColor: Colors.grey.shade200,
+                          onPressed: () => Navigator.pop(ctx, o),
+                        ))
+                    .toList(),
+              ),
+            if (owners.isNotEmpty) const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              decoration: const InputDecoration(
+                labelText: '归属人名称',
+                hintText: '输入或选择归属人',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (picked == null || picked.isEmpty) return;
+    _update(f, {'attribution': picked});
+  }
+
   Widget _menuItem(String label, IconData icon, Color color, String value) {
     return ListTile(
       leading: Icon(icon, color: color),
       title: Text(label),
       onTap: () => Navigator.pop(context, value),
+    );
+  }
+
+  // ============ 点图标改分类 ============
+  Future<void> _editCategory(Flow f) async {
+    final name = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _CategoryPickerSheet(cats: _cats, type: f.type),
+    );
+    if (name != null && name.isNotEmpty) {
+      _update(f, {'category': name});
+    }
+  }
+
+  // ============ 点名称改名 ============
+  Future<void> _editName(Flow f) async {
+    final name = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _NameEditorSheet(flow: f),
+    );
+    if (name != null && name.isNotEmpty) {
+      _update(f, {'description': name});
+    }
+  }
+
+  // ============ 点金额改金额 + 日期 ============
+  Future<void> _editAmount(Flow f) async {
+    final res = await showModalBottomSheet<_AmountResult>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _AmountEditorSheet(flow: f),
+    );
+    if (res != null) {
+      _update(f, {'amount': res.amount, 'flow_time': res.ymd});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final overrides = ref.watch(ownerColorsProvider);
+    final user = ref.watch(sessionProvider).user;
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _headerRegion()),
+          SliverToBoxAdapter(child: _quickModules()),
+          _loading
+              ? const SliverToBoxAdapter(
+                  child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())))
+              : _flowList(overrides, user),
+        ],
+      ),
     );
   }
 }
@@ -373,6 +465,472 @@ class _YearMonthPickerState extends State<_YearMonthPicker> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryPickerSheet extends ConsumerStatefulWidget {
+  final List<Category> cats;
+  final String type;
+  const _CategoryPickerSheet({required this.cats, required this.type});
+
+  @override
+  ConsumerState<_CategoryPickerSheet> createState() => _CategoryPickerSheetState();
+}
+
+class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
+  Category? _sel;
+
+  @override
+  Widget build(BuildContext context) {
+    final cats = widget.cats.where((c) => c.type == widget.type).toList();
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('选择分类', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+              child: GridView.builder(
+                shrinkWrap: true,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  childAspectRatio: 1.05,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                ),
+                itemCount: cats.length,
+                itemBuilder: (ctx, i) {
+                  final c = cats[i];
+                  final sel = _sel?.id == c.id;
+                  return InkWell(
+                    onTap: () => setState(() => _sel = c),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: sel ? AppColors.primary : AppColors.background,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: sel ? AppColors.primaryDark : Colors.transparent),
+                          ),
+                          padding: const EdgeInsets.all(10),
+                          child: Text(c.icon, style: const TextStyle(fontSize: 22)),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(c.name,
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _sel == null
+                    ? null
+                    : () {
+                        Navigator.pop(context, _sel!.name);
+                      },
+                child: const Text('确定'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NameEditorSheet extends ConsumerStatefulWidget {
+  final Flow flow;
+  const _NameEditorSheet({required this.flow});
+
+  @override
+  ConsumerState<_NameEditorSheet> createState() => _NameEditorSheetState();
+}
+
+class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
+  late final TextEditingController _name;
+  List<PresetName> _presets = [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.flow.description);
+    _loadPresets();
+  }
+
+  Future<void> _loadPresets() async {
+    try {
+      _presets = await ref.read(apiProvider).getPresets(type: widget.flow.type, limit: 12);
+    } catch (_) {
+      _presets = [];
+    }
+    if (mounted) setState(() => _loaded = true);
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <PresetName>[
+      ..._presets,
+      ..._presets,
+    ];
+    final unique = <String, PresetName>{};
+    for (final p in chips.where((p) => p.name.isNotEmpty)) {
+      unique.putIfAbsent(p.name, () => p);
+    }
+    final display = unique.values.take(10).toList();
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 16,
+        right: 16,
+        top: 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('修改名称', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _name,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: '名称',
+              hintText: '请输入名称',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+          if (_loaded && display.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Text('常用名称', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: display
+                    .map((p) => Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          child: ActionChip(
+                            label: Text(p.name, style: const TextStyle(fontSize: 12)),
+                            backgroundColor: Colors.grey.shade200,
+                            side: BorderSide.none,
+                            onPressed: () => _name.setText(p.name),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('取消'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context, _name.text.trim()),
+                  child: const Text('保存'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _AmountResult {
+  final double amount;
+  final String ymd;
+  _AmountResult(this.amount, this.ymd);
+}
+
+class _AmountEditorSheet extends ConsumerStatefulWidget {
+  final Flow flow;
+  const _AmountEditorSheet({required this.flow});
+
+  @override
+  ConsumerState<_AmountEditorSheet> createState() => _AmountEditorSheetState();
+}
+
+class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
+  late String _expression;
+  late DateTime _date;
+
+  @override
+  void initState() {
+    super.initState();
+    _expression = _formatComputed(widget.flow.amount);
+    _date = parseYmd(datePart(widget.flow.flowTime));
+  }
+
+  bool get _hasOperator => _expression.contains('+') || _expression.contains('-');
+
+  double? _compute(String expr) {
+    if (expr.isEmpty) return null;
+    try {
+      final tokens = <String>[];
+      int i = 0;
+      while (i < expr.length) {
+        if (expr[i] == '+' || expr[i] == '-') {
+          tokens.add(expr[i]);
+          i++;
+        } else {
+          int j = i;
+          while (j < expr.length && expr[j] != '+' && expr[j] != '-') j++;
+          tokens.add(expr.substring(i, j));
+          i = j;
+        }
+      }
+      double result = 0;
+      String op = '+';
+      for (final t in tokens) {
+        if (t == '+' || t == '-') {
+          op = t;
+        } else if (t.isNotEmpty) {
+          final v = double.tryParse(t);
+          if (v == null) return null;
+          result = op == '+' ? result + v : result - v;
+        }
+      }
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  double? get _computedAmount => _compute(_expression);
+
+  void _tapDigit(String d) {
+    if (d == '.') {
+      final lastOp = _expression.lastIndexOf(RegExp(r'[+-]'));
+      final current = lastOp == -1 ? _expression : _expression.substring(lastOp + 1);
+      if (current.contains('.')) return;
+      if (current.isEmpty) {
+        setState(() => _expression += '0.');
+        return;
+      }
+    }
+    if (_expression == '0' && d != '.') {
+      setState(() => _expression = d);
+      return;
+    }
+    if (_expression.length >= 12) return;
+    setState(() => _expression += d);
+  }
+
+  void _tapOperator(String op) {
+    if (_expression.isEmpty) return;
+    final last = _expression[_expression.length - 1];
+    if (last == '+' || last == '-') {
+      setState(() => _expression = _expression.substring(0, _expression.length - 1) + op);
+      return;
+    }
+    if (_hasOperator) {
+      final val = _computedAmount;
+      if (val == null) return;
+      setState(() => _expression = '${_formatComputed(val)}$op');
+      return;
+    }
+    setState(() => _expression += op);
+  }
+
+  void _backspace() {
+    if (_expression.isNotEmpty) {
+      setState(() => _expression = _expression.substring(0, _expression.length - 1));
+    }
+  }
+
+  String _formatComputed(double v) {
+    if (v == v.toInt()) return v.toInt().toString();
+    return v.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await pickSimpleDate(
+      context,
+      initialDate: _date,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+    if (picked != null) setState(() => _date = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final display = _expression.isEmpty ? '0' : _expression;
+    final rows = [
+      ['7', '8', '9', 'date'],
+      ['4', '5', '6', '+'],
+      ['1', '2', '3', '-'],
+      ['.', '0', 'del', 'done'],
+    ];
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 0,
+        right: 0,
+        top: 8,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: _pickDate,
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: Text('${_date.month}/${_date.day}'),
+                ),
+                const Text('修改金额', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 64),
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            color: AppColors.primary,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('¥ $display',
+                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: AppColors.text)),
+                if (_hasOperator && _computedAmount != null)
+                  Text('= ${_formatComputed(_computedAmount!)}',
+                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 260,
+            child: Column(
+              children: rows
+                  .map((row) => Expanded(
+                        child: Row(
+                          children: row.map((k) => Expanded(child: _numKey(k))).toList(),
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('取消'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      var expr = _expression;
+                      if (expr.isNotEmpty) {
+                        final last = expr[expr.length - 1];
+                        if (last == '+' || last == '-') expr = expr.substring(0, expr.length - 1);
+                      }
+                      final amt = expr.contains('+') || expr.contains('-')
+                          ? _compute(expr)
+                          : double.tryParse(expr);
+                      if (amt == null || amt <= 0) {
+                        toast('请输入金额');
+                        return;
+                      }
+                      Navigator.pop(context, _AmountResult(amt, ymd(_date)));
+                    },
+                    child: const Text('保存'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _numKey(String key) {
+    String label;
+    VoidCallback? onTap;
+    bool primary = false;
+    switch (key) {
+      case 'date':
+        label = '${_date.month}/${_date.day}';
+        onTap = _pickDate;
+        break;
+      case '+':
+        label = '+';
+        onTap = () => _tapOperator('+');
+        break;
+      case '-':
+        label = '-';
+        onTap = () => _tapOperator('-');
+        break;
+      case 'del':
+        label = '删除';
+        onTap = _backspace;
+        break;
+      case 'done':
+        label = '=';
+        primary = true;
+        onTap = () {
+          final v = _computedAmount;
+          if (v != null) setState(() => _expression = _formatComputed(v));
+        };
+        break;
+      default:
+        label = key;
+        onTap = () => _tapDigit(key);
+    }
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.all(0.5),
+        decoration: BoxDecoration(
+          color: primary ? AppColors.primaryDark : Colors.white,
+          border: Border.all(color: AppColors.divider, width: 0.5),
+        ),
+        child: Center(
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: primary ? 18 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: primary ? Colors.white : AppColors.text)),
         ),
       ),
     );

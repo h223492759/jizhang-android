@@ -6,9 +6,10 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/owner_color.dart';
+import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/state/session.dart';
-import 'package:jizhang_android/screens/flows/flow_filter_page.dart';
 import 'package:jizhang_android/screens/flows/owner_flow_page.dart';
+import 'package:jizhang_android/screens/charts/category_detail_page.dart';
 
 class ChartsPage extends ConsumerStatefulWidget {
   const ChartsPage({super.key});
@@ -26,12 +27,19 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
   List<Flow> _flows = [];
   List<Category> _catMeta = [];
   bool _loading = true;
+  final ScrollController _periodScroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _period = DateTime(DateTime.now().year, DateTime.now().month);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _periodScroll.dispose();
+    super.dispose();
   }
 
   String _start() => _yearMode
@@ -193,48 +201,103 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
     );
   }
 
-  // 左右滑动的日期选择器
-  Widget _periodSelector() {
+  // 左右滑动的日期选择器（无框、小字、选中黑字+黑色下划线、其他灰字；
+  // 未来月/年不显示；非特殊的选中项居中）
+  List<_PeriodOpt> _buildPeriodOpts() {
     final now = DateTime.now();
     final opts = <_PeriodOpt>[];
     if (_yearMode) {
-      for (int y = now.year - 3; y <= now.year + 1; y++) {
+      for (int y = now.year - 3; y <= now.year; y++) {
         String label;
-        if (y == now.year) label = '今年';
-        else if (y == now.year - 1) label = '去年';
-        else label = '${y}年';
-        opts.add(_PeriodOpt(label: label, year: y, month: 1, selected: y == _period.year));
+        bool special;
+        if (y == now.year) {
+          label = '今年';
+          special = true;
+        } else if (y == now.year - 1) {
+          label = '去年';
+          special = true;
+        } else {
+          label = '${y}年';
+          special = false;
+        }
+        opts.add(_PeriodOpt(
+            label: label, year: y, month: 1, special: special, selected: y == _period.year));
       }
     } else {
       final startY = now.year - 2;
-      final endY = now.year + 1;
-      for (int y = startY; y <= endY; y++) {
-        for (int m = 1; m <= 12; m++) {
+      for (int y = startY; y <= now.year; y++) {
+        final maxM = y == now.year ? now.month : 12; // 未来的月份不显示
+        for (int m = 1; m <= maxM; m++) {
           String label;
-          if (y == now.year && m == now.month) label = '本月';
-          else if (y == now.year && m == now.month - 1) label = '上月';
-          else label = '${m}月';
+          bool special;
+          if (y == now.year && m == now.month) {
+            label = '本月';
+            special = true;
+          } else if (y == now.year && m == now.month - 1) {
+            label = '上月';
+            special = true;
+          } else {
+            label = '${m}月';
+            special = false;
+          }
           opts.add(_PeriodOpt(
-              label: label, year: y, month: m, selected: y == _period.year && m == _period.month));
+              label: label,
+              year: y,
+              month: m,
+              special: special,
+              selected: y == _period.year && m == _period.month));
         }
       }
     }
+    return opts;
+  }
+
+  void _centerSelected() {
+    final opts = _buildPeriodOpts();
+    final idx = opts.indexWhere((o) => o.selected);
+    if (idx < 0 || opts[idx].special || !_periodScroll.hasClients) return;
+    const chipW = 64.0;
+    final max = _periodScroll.position.maxScrollExtent;
+    final target = (idx * (chipW + 8) - (_periodScroll.position.viewportDimension / 2 - chipW / 2))
+        .clamp(0.0, max);
+    _periodScroll.animateTo(target, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+  }
+
+  Widget _periodSelector() {
+    final opts = _buildPeriodOpts();
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      controller: _periodScroll,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: opts.map((o) {
-          return Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(o.label),
-              selected: o.selected,
-              onSelected: (_) {
-                setState(() => _period = DateTime(o.year, o.month));
-                _load();
-              },
-              selectedColor: AppColors.primaryDark,
-              labelStyle: TextStyle(
-                color: o.selected ? Colors.white : AppColors.textSecondary,
+          return GestureDetector(
+            onTap: () {
+              setState(() => _period = DateTime(o.year, o.month));
+              _load();
+              WidgetsBinding.instance.addPostFrameCallback((_) => _centerSelected());
+            },
+            child: Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(o.label,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: o.selected ? FontWeight.bold : FontWeight.normal,
+                          color: o.selected ? AppColors.text : AppColors.textSecondary)),
+                  const SizedBox(height: 4),
+                  Container(
+                    height: 3,
+                    width: 18,
+                    decoration: BoxDecoration(
+                      color: o.selected ? AppColors.text : Colors.transparent,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -306,7 +369,10 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
         gridData: const FlGridData(show: false),
-        borderData: FlBorderData(show: false),
+        borderData: FlBorderData(
+          show: true,
+          border: Border(bottom: BorderSide(color: AppColors.divider, width: 1)),
+        ),
       ),
     );
   }
@@ -316,7 +382,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
           (c) => c?.name == name,
           orElse: () => null,
         );
-    return c?.icon ?? (name.isNotEmpty ? name[0] : '·');
+    return c?.icon ?? '💰';
   }
 
   Future<void> _onBarTap(int index) async {
@@ -383,6 +449,10 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
     final selfVal = self.fold(0.0, (s, e) => s + e.value);
     final otherVal = others.fold(0.0, (s, e) => s + e.value);
     final topOther = others.isNotEmpty ? others.first : null;
+    final leftSeg = self.isNotEmpty ? self.first : segs.first;
+    final rightSeg = others.isNotEmpty
+        ? others.first
+        : (segs.length > 1 ? segs[1] : segs.first);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -390,21 +460,30 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text('我  ¥${fmtMoney(selfVal)}  ${(selfVal / total * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(fontSize: 12)),
-              ),
-              Expanded(
-                child: Text(
-                  '${others.isEmpty ? '' : (topOther != null ? topOther.attr : '')}  ¥${fmtMoney(otherVal)}  ${(otherVal / total * 100).toStringAsFixed(0)}%',
-                  style: const TextStyle(fontSize: 12),
-                  textAlign: TextAlign.right,
+          if (segs.length == 1) ...[
+            Text(
+              '${_ownerLabel(segs.first)}  ¥${fmtMoney(segs.first.value)}  ${(segs.first.value / total * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${_ownerLabel(leftSeg)}  ¥${fmtMoney(leftSeg.value)}  ${(leftSeg.value / total * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 ),
-              ),
-            ],
-          ),
+                Expanded(
+                  child: Text(
+                    '${(rightSeg.value / total * 100).toStringAsFixed(0)}%  ¥${fmtMoney(rightSeg.value)}  ${rightSeg.attr.isEmpty ? '其他' : rightSeg.attr}',
+                    style: const TextStyle(fontSize: 12),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 8),
           SizedBox(
             height: 18,
@@ -439,6 +518,8 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
     );
   }
 
+  String _ownerLabel(_OwnerSeg s) => s.isSelf ? '我' : (s.attr.isEmpty ? '我' : s.attr);
+
   void _openOwner(_OwnerSeg seg, {required bool isSelf}) {
     Navigator.push(
       context,
@@ -456,20 +537,21 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
 
   List<Widget> _catRows(Color color) {
     final catTotal = _cats.fold(0.0, (s, c) => s + c.value);
+    final maxVal = _cats.fold(0.0, (s, c) => c.value > s ? c.value : s);
     final iconMap = <String, String>{};
     for (final c in _catMeta) iconMap[c.name] = c.icon;
     return _cats.map((c) {
       final pct = catTotal > 0 ? c.value / catTotal : 0.0;
+      final barPct = maxVal > 0 ? c.value / maxVal : 0.0; // 首条顶格，其余按比例
       return InkWell(
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => FlowFilterPage(
+            builder: (_) => CategoryDetailPage(
               category: c.name,
               type: _type,
               start: _start(),
               end: _end(),
-              title: c.name,
             ),
           ),
         ),
@@ -480,8 +562,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
               CircleAvatar(
                 radius: 18,
                 backgroundColor: AppColors.primarySoft,
-                child: Text(iconMap[c.name] ?? (c.name.isNotEmpty ? c.name[0] : '·'),
-                    style: const TextStyle(fontSize: 16)),
+                child: Text(catIconOf(iconMap, c.name), style: const TextStyle(fontSize: 16)),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -497,7 +578,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
                     ),
                     const SizedBox(height: 4),
                     LinearProgressIndicator(
-                      value: pct,
+                      value: barPct,
                       minHeight: 6,
                       backgroundColor: AppColors.background,
                       valueColor: AlwaysStoppedAnimation(color),
@@ -519,7 +600,13 @@ class _PeriodOpt {
   final int year;
   final int month;
   final bool selected;
-  _PeriodOpt({required this.label, required this.year, required this.month, required this.selected});
+  final bool special;
+  _PeriodOpt(
+      {required this.label,
+      required this.year,
+      required this.month,
+      required this.selected,
+      this.special = false});
 }
 
 class _OwnerSeg {

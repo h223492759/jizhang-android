@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/owner_color.dart';
+import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/components/flow_row.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
@@ -37,13 +38,7 @@ class _FlowFilterPageState extends ConsumerState<FlowFilterPage> {
     _load();
   }
 
-  String _iconOf(String name) {
-    final c = _cats.cast<Category?>().firstWhere(
-          (c) => c?.name == name,
-          orElse: () => null,
-        );
-    return c?.icon ?? (name.isNotEmpty ? name[0] : '·');
-  }
+  String _iconOf(String name) => catIconOf(buildCatIconMap(_cats), name);
 
   Future<void> _load() async {
     try {

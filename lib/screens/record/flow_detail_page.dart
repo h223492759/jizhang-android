@@ -1,16 +1,49 @@
 import 'package:flutter/material.dart' hide Flow;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/core/category_icon.dart';
+import 'package:jizhang_android/core/owner_color.dart';
+import 'package:jizhang_android/state/session.dart';
 
-class FlowDetailPage extends StatelessWidget {
+class FlowDetailPage extends ConsumerStatefulWidget {
   final Flow flow;
   const FlowDetailPage({super.key, required this.flow});
 
   @override
+  ConsumerState<FlowDetailPage> createState() => _FlowDetailPageState();
+}
+
+class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
+  late List<Category> _cats;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cats = [];
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      _cats = await ref.read(apiProvider).getCategories();
+    } catch (_) {
+      _cats = [];
+    }
+    if (mounted) setState(() => _loaded = true);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final expense = flow.isExpense;
-    final date = parseYmd(datePart(flow.flowTime));
+    final f = widget.flow;
+    final expense = f.isExpense;
+    final date = parseYmd(datePart(f.flowTime));
+    final iconMap = buildCatIconMap(_cats);
+    final user = ref.watch(sessionProvider).user;
+    final ownerColor = ownerColorFor(f, ref.watch(ownerColorsProvider), user);
+    final ownerLabel = f.attribution.isEmpty ? '我' : f.attribution;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -38,13 +71,13 @@ class FlowDetailPage extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Text(
-                    flow.category.isNotEmpty ? flow.category[0] : '·',
-                    style: const TextStyle(fontSize: 32, color: AppColors.primaryDark),
+                    catIconOf(iconMap, f.category),
+                    style: const TextStyle(fontSize: 32),
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  flow.category,
+                  f.category,
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -59,7 +92,7 @@ class FlowDetailPage extends StatelessWidget {
                 children: [
                   _row('类型', expense ? '支出' : '收入'),
                   const Divider(height: 24),
-                  _row('金额', '${expense ? '-' : '+'}${fmtMoney(flow.amount)}',
+                  _row('金额', '${expense ? '-' : '+'}${fmtMoney(f.amount)}',
                       valueColor: expense ? AppColors.expense : AppColors.income),
                   const Divider(height: 24),
                   _row('日期', '${ymd(date)} ${weekdayCn(date)}'),
@@ -67,6 +100,35 @@ class FlowDetailPage extends StatelessWidget {
                     const Divider(height: 24),
                     _row('名称', flow.description),
                   ],
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      const Text('归属人',
+                          style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: ownerColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              ownerLabel,
+                              style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.text),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

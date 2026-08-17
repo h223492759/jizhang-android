@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/owner_color.dart';
+import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/components/flow_row.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
@@ -30,6 +31,7 @@ class OwnerFlowPage extends ConsumerStatefulWidget {
 
 class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
   List<Flow> _flows = [];
+  List<Category> _cats = [];
   bool _loading = true;
 
   @override
@@ -40,14 +42,21 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
 
   Future<void> _load() async {
     try {
-      final fp = await ref.read(apiProvider).getFlows(
+      final api = ref.read(apiProvider);
+      final fp = await api.getFlows(
             start: widget.start,
             end: widget.end,
             pageSize: 2000,
           );
+      final cats = await api.getCategories();
       final matched = fp.list.where((f) => f.attribution == widget.attribution).toList();
       matched.sort((a, b) => b.amount.compareTo(a.amount));
-      if (mounted) setState(() => _flows = matched);
+      if (mounted) {
+        setState(() {
+          _flows = matched;
+          _cats = cats;
+        });
+      }
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     } finally {
@@ -59,6 +68,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
   Widget build(BuildContext context) {
     final overrides = ref.watch(ownerColorsProvider);
     final user = ref.watch(sessionProvider).user;
+    final iconMap = buildCatIconMap(_cats);
     return Scaffold(
       appBar: AppBar(title: Text('${widget.title}的流水')),
       body: _loading
@@ -70,7 +80,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
                     return compactFlowTile(
                       f: f,
                       iconBg: ownerColorFor(f, overrides, user),
-                      iconChar: f.category.isNotEmpty ? f.category[0] : '·',
+                      iconChar: catIconOf(iconMap, f.category),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),

@@ -4,32 +4,59 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 
 /// 首页风格的紧凑流水行：左侧分类图标（带归属人底色），名称单行省略，右侧带符号金额。
+/// 图标 / 名称 / 金额 各自可绑定独立的点击行为（无嵌套手势冲突）：
+/// - onIconTap  → 点图标
+/// - onNameTap  → 点名称
+/// - onAmountTap → 点金额
+/// 若某项未单独指定，则回退到 onTap（整行通用点击，如查看明细）。
 Widget compactFlowTile({
   required Flow f,
   required Color iconBg,
   required String iconChar,
-  required VoidCallback onTap,
+  VoidCallback? onTap,
+  VoidCallback? onIconTap,
+  VoidCallback? onNameTap,
+  VoidCallback? onAmountTap,
 }) {
   final expense = f.isExpense;
   final name = f.description.isNotEmpty ? f.description : f.category;
-  return ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-    visualDensity: VisualDensity.compact,
-    leading: CircleAvatar(
-      radius: 18,
-      backgroundColor: iconBg,
-      child: Text(iconChar, style: const TextStyle(fontSize: 16)),
+
+  Widget _tap(VoidCallback? cb, Widget child) => cb == null
+      ? child
+      : GestureDetector(
+          onTap: cb,
+          behavior: HitTestBehavior.opaque,
+          child: child,
+        );
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _tap(onIconTap ?? onTap,
+            CircleAvatar(radius: 18, backgroundColor: iconBg, child: Text(iconChar, style: const TextStyle(fontSize: 16)))),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _tap(
+            onNameTap ?? onTap,
+            Text(name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, color: AppColors.text)),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _tap(
+          onAmountTap ?? onTap,
+          Text('${expense ? '-' : '+'}${fmtMoney(f.amount)}',
+              style: TextStyle(
+                  color: expense ? AppColors.expense : AppColors.income,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14)),
+        ),
+      ],
     ),
-    title: Text(name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 14, color: AppColors.text)),
-    trailing: Text('${expense ? '-' : '+'}${fmtMoney(f.amount)}',
-        style: TextStyle(
-            color: expense ? AppColors.expense : AppColors.income,
-            fontWeight: FontWeight.bold,
-            fontSize: 14)),
-    onTap: onTap,
   );
 }
 
