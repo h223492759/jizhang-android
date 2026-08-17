@@ -7,6 +7,7 @@ import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/build_info.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/me/settings_page.dart';
+import 'package:jizhang_android/screens/me/owner_color_settings_page.dart';
 import 'package:jizhang_android/screens/server/server_list_page.dart';
 
 class MePage extends ConsumerWidget {
@@ -60,6 +61,7 @@ class MePage extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           _tile(Icons.settings, '设置', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()))),
+          _tile(Icons.palette, '归属人底色', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OwnerColorSettingsPage()))),
           _tile(Icons.book, '当前账本', null, subtitle: book?.name ?? '未选择'),
           _tile(Icons.link, '服务器', null, subtitle: s.serverUrl ?? ''),
           _tile(Icons.swap_horiz, '切换服务器', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage()))),

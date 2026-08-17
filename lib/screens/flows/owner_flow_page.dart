@@ -9,28 +9,29 @@ import 'package:jizhang_android/components/flow_row.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
 
-class FlowFilterPage extends ConsumerStatefulWidget {
-  final String? category;
-  final String? type;
-  final String? start;
-  final String? end;
+/// 某个归属人（账户）的流水明细：按金额由高到低降序，
+/// 采用首页紧凑行样式（不显示日期分组）。
+class OwnerFlowPage extends ConsumerStatefulWidget {
+  final String attribution;
   final String title;
-  const FlowFilterPage({
+  final String start;
+  final String end;
+  final bool isSelf;
+  const OwnerFlowPage({
     super.key,
-    this.category,
-    this.type,
-    this.start,
-    this.end,
+    required this.attribution,
     required this.title,
+    required this.start,
+    required this.end,
+    this.isSelf = false,
   });
 
   @override
-  ConsumerState<FlowFilterPage> createState() => _FlowFilterPageState();
+  ConsumerState<OwnerFlowPage> createState() => _OwnerFlowPageState();
 }
 
-class _FlowFilterPageState extends ConsumerState<FlowFilterPage> {
+class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
   List<Flow> _flows = [];
-  List<Category> _cats = [];
   bool _loading = true;
 
   @override
@@ -39,31 +40,16 @@ class _FlowFilterPageState extends ConsumerState<FlowFilterPage> {
     _load();
   }
 
-  String _iconOf(String name) {
-    final c = _cats.cast<Category?>().firstWhere(
-          (c) => c?.name == name,
-          orElse: () => null,
-        );
-    return c?.icon ?? (name.isNotEmpty ? name[0] : '·');
-  }
-
   Future<void> _load() async {
     try {
-      final api = ref.read(apiProvider);
-      final fp = await api.getFlows(
-            category: widget.category,
-            type: widget.type,
+      final fp = await ref.read(apiProvider).getFlows(
             start: widget.start,
             end: widget.end,
-            pageSize: 500,
+            pageSize: 2000,
           );
-      final cats = await api.getCategories();
-      if (mounted) {
-        setState(() {
-          _flows = fp.list;
-          _cats = cats;
-        });
-      }
+      final matched = fp.list.where((f) => f.attribution == widget.attribution).toList();
+      matched.sort((a, b) => b.amount.compareTo(a.amount));
+      if (mounted) setState(() => _flows = matched);
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     } finally {
@@ -76,25 +62,23 @@ class _FlowFilterPageState extends ConsumerState<FlowFilterPage> {
     final overrides = ref.watch(ownerColorsProvider);
     final user = ref.watch(sessionProvider).user;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(title: Text('${widget.title}的流水')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _flows.isEmpty
               ? const Center(child: Text('暂无记录'))
               : ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                  children: buildGroupedFlows(
-                    flows: _flows,
-                    tileBuilder: (f) => compactFlowTile(
+                  children: _flows.map((f) {
+                    return compactFlowTile(
                       f: f,
                       iconBg: ownerColorFor(f, overrides, user),
-                      iconChar: _iconOf(f.category),
+                      iconChar: f.category.isNotEmpty ? f.category[0] : '·',
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
                       ),
-                    ),
-                  ),
+                    );
+                  }).toList(),
                 ),
     );
   }

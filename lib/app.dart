@@ -72,7 +72,9 @@ class _MainShellState extends ConsumerState<MainShell> {
       floatingActionButton: FloatingActionButton(
         onPressed: _openRecord,
         tooltip: '记一笔',
-        child: const Icon(Icons.add, size: 30),
+        shape: const CircleBorder(),
+        elevation: 4,
+        child: const Icon(Icons.add, size: 32),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(

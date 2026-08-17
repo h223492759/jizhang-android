@@ -5,6 +5,8 @@ import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/core/owner_color.dart';
+import 'package:jizhang_android/components/flow_row.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/bills/bills_page.dart';
 import 'package:jizhang_android/screens/budget/budget_page.dart';
@@ -30,7 +32,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   void initState() {
     super.initState();
     _month = DateTime(DateTime.now().year, DateTime.now().month);
-    // 记一笔 / 改删后自动刷新
     ref.listenManual(dataVersionProvider, (_, __) => _load());
     _load();
   }
@@ -47,8 +48,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     try {
       final api = ref.read(apiProvider);
       final ov = await api.getOverview(start: _rangeStart(), end: _rangeEnd());
-      final fp = await api.getFlows(
-          start: _rangeStart(), end: _rangeEnd(), pageSize: 500);
+      final fp = await api.getFlows(start: _rangeStart(), end: _rangeEnd(), pageSize: 500);
       final cats = await api.getCategories();
       if (mounted) {
         setState(() {
@@ -81,57 +81,55 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  Map<String, List<Flow>> get _grouped {
-    final m = <String, List<Flow>>{};
-    for (final f in _flows) {
-      final d = datePart(f.flowTime);
-      (m[d] ??= []).add(f);
-    }
-    final keys = m.keys.toList()..sort((a, b) => b.compareTo(a));
-    return {for (var k in keys) k: m[k]!};
+  String _catIcon(String categoryName) {
+    final c = _cats.cast<Category?>().firstWhere(
+          (c) => c?.name == categoryName,
+          orElse: () => null,
+        );
+    return c?.icon ?? (categoryName.isNotEmpty ? categoryName[0] : '·');
   }
 
   @override
   Widget build(BuildContext context) {
     final ov = _overview;
+    final overrides = ref.watch(ownerColorsProvider);
+    final user = ref.watch(sessionProvider).user;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             backgroundColor: AppColors.primary,
-            expandedHeight: 120,
+            expandedHeight: 64,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(color: AppColors.primary),
+              titlePadding: const EdgeInsets.only(left: 16, bottom: 12),
               title: InkWell(
                 onTap: _pickMonth,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('${_month.year}年${_month.month}月',
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const Icon(Icons.arrow_drop_down),
+                    Text('${_month.year}',
+                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    const SizedBox(width: 6),
+                    Text('${_month.month}月',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const Icon(Icons.arrow_drop_down, size: 20),
                   ],
                 ),
               ),
-              centerTitle: true,
+              centerTitle: false,
             ),
             actions: const [],
           ),
           SliverToBoxAdapter(child: _summaryCard(ov)),
           SliverToBoxAdapter(child: _quickModules()),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Text('明细',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-            ),
-          ),
           _loading
               ? const SliverToBoxAdapter(
                   child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())))
-              : _flowList(),
+              : _flowList(overrides, user),
         ],
       ),
     );
@@ -140,16 +138,15 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _summaryCard(Overview? ov) {
     return Container(
       color: AppColors.primary,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white, borderRadius: BorderRadius.circular(14)),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         child: Row(
           children: [
             _stat('支出', ov?.expense ?? 0, AppColors.expense),
             _stat('收入', ov?.income ?? 0, AppColors.income),
-            _stat('笔数', (ov?.count ?? 0).toDouble(), AppColors.text),
           ],
         ),
       ),
@@ -162,12 +159,14 @@ class _HomePageState extends ConsumerState<HomePage> {
         children: [
           Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           const SizedBox(height: 6),
-          Text(fmtMoney(value), style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(fmtMoney(value),
+              style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
+  // 第二区域：5 个图标不用圆形底色，压缩高度
   Widget _quickModules() {
     final items = [
       ('账单', Icons.receipt_long, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillsPage()))),
@@ -178,10 +177,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     ];
     return Container(
       color: AppColors.primary,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
       child: Container(
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: items
@@ -189,12 +188,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                     onTap: e.$3,
                     child: Column(
                       children: [
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: AppColors.primarySoft,
-                          child: Icon(e.$2, color: AppColors.primaryDark, size: 22),
-                        ),
-                        const SizedBox(height: 6),
+                        Icon(e.$2, color: AppColors.primaryDark, size: 24),
+                        const SizedBox(height: 4),
                         Text(e.$1, style: const TextStyle(fontSize: 12)),
                       ],
                     ),
@@ -205,65 +200,25 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _flowList() {
+  Widget _flowList(Map<String, String> overrides, User? user) {
     if (_flows.isEmpty) {
       return const SliverToBoxAdapter(
         child: Padding(padding: EdgeInsets.all(40), child: Center(child: Text('本月暂无记录'))),
       );
     }
-    final grouped = _grouped;
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (ctx, i) {
-          final entry = grouped.entries.elementAt(i);
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                child: Text(entry.key,
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-              ),
-              ...entry.value.map((f) => _flowTile(f)),
-            ],
-          );
-        },
-        childCount: grouped.length,
-      ),
-    );
-  }
-
-  String _catIcon(String categoryName) {
-    final c = _cats.cast<Category?>().firstWhere(
-          (c) => c?.name == categoryName,
-          orElse: () => null,
-        );
-    return c?.icon ?? (categoryName.isNotEmpty ? categoryName[0] : '·');
-  }
-
-  Widget _flowTile(Flow f) {
-    final expense = f.isExpense;
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
-      ),
-      onLongPress: () => _showFlowMenu(f),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppColors.primarySoft,
-          child: Text(_catIcon(f.category),
-              style: const TextStyle(color: AppColors.primaryDark, fontSize: 18)),
-        ),
-        title: Text(f.category),
-        subtitle: Text(f.description.isNotEmpty ? f.description : (f.attribution.isNotEmpty ? '归属：${f.attribution}' : ''),
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-        trailing: Text(
-          '${expense ? '-' : '+'}${fmtMoney(f.amount)}',
-          style: TextStyle(color: expense ? AppColors.expense : AppColors.income, fontWeight: FontWeight.bold),
+    final widgets = buildGroupedFlows(
+      flows: _flows,
+      tileBuilder: (f) => compactFlowTile(
+        f: f,
+        iconBg: ownerColorFor(f, overrides, user),
+        iconChar: _catIcon(f.category),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
         ),
       ),
     );
+    return SliverList(delegate: SliverChildListDelegate(widgets));
   }
 
   Future<void> _showFlowMenu(Flow f) async {

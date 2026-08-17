@@ -85,4 +85,21 @@ class Storage {
     await s.remove(_kBookId);
     await s.remove(_kBooks);
   }
+
+  // 归属人（多账号记账）底色：owner name -> hex 颜色
+  static const _kOwnerColors = 'owner_colors';
+  static Future<Map<String, String>> getOwnerColors() async {
+    final raw = (await sp).getString(_kOwnerColors);
+    if (raw == null) return {};
+    try {
+      final m = jsonDecode(raw) as Map;
+      return m.map((k, v) => MapEntry(k.toString(), v.toString()));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> setOwnerColors(Map<String, String> m) async {
+    await (await sp).setString(_kOwnerColors, jsonEncode(m));
+  }
 }

@@ -429,6 +429,8 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   }
 
   Widget _nameInput() {
+    // 常用名称：不按分类区分，合并 预设/常用/最近，去重后最多取 10 个，
+    // 用一行横向可滑动的灰色 chip 展示。
     final chips = <PresetName>[
       ..._presets.presets,
       ..._presets.frequent,
@@ -456,17 +458,21 @@ class _RecordPageState extends ConsumerState<RecordPage> {
           ),
           if (display.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: display.map((p) {
-                return ActionChip(
-                  label: Text(p.name, style: const TextStyle(fontSize: 12)),
-                  backgroundColor: AppColors.primarySoft,
-                  side: BorderSide.none,
-                  onPressed: () => _applyPreset(p),
-                );
-              }).toList(),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: display.map((p) {
+                  return Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    child: ActionChip(
+                      label: Text(p.name, style: const TextStyle(fontSize: 12)),
+                      backgroundColor: Colors.grey.shade200,
+                      side: BorderSide.none,
+                      onPressed: () => _applyPreset(p),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ],
         ],
