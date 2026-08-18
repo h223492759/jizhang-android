@@ -6,6 +6,7 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/components/simple_date_picker.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
+import 'package:jizhang_android/state/session.dart';
 
 class WalletDetailPage extends ConsumerStatefulWidget {
   final Wallet wallet;

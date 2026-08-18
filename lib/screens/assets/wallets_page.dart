@@ -7,6 +7,7 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/components/simple_date_picker.dart';
 import 'package:jizhang_android/screens/assets/wallet_detail_page.dart';
+import 'package:jizhang_android/state/session.dart';
 
 const _palette = [
   Colors.blue,
