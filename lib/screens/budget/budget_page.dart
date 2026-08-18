@@ -5,7 +5,7 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
-import 'package:jizhang_android/screens/flows/flow_filter_page.dart';
+import 'package:jizhang_android/screens/charts/category_detail_page.dart';
 
 class BudgetPage extends ConsumerStatefulWidget {
   const BudgetPage({super.key});
@@ -77,44 +77,69 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     // 分类预算总和：把已设置好的各分类预算金额相加
     final catSum =
         _data?.categories.fold<double>(0, (s, c) => s + c.amount) ?? 0;
-    final ctrl = TextEditingController(
-      text: category == null && catSum > 0
-          ? catSum.toStringAsFixed(catSum == catSum.toInt() ? 0 : 2)
-          : '',
-    );
+    // 默认填入当前金额：年度=总预算，分类=该分类已设金额
+    double curAmt = 0;
+    if (category == null) {
+      curAmt = _data?.totalAmount ?? 0;
+    } else {
+      for (final c in _data?.categories ?? <BudgetCat>[]) {
+        if (c.category == category) {
+          curAmt = c.amount;
+          break;
+        }
+      }
+    }
+    final fmtAmt = (double v) =>
+        v == v.toInt() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+    final ctrl = TextEditingController(text: curAmt > 0 ? fmtAmt(curAmt) : '');
     final picked = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(category == null ? '设置年度总预算' : '预算 · ${category}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (category == null && _data != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text('当前：${fmtMoney(_data!.totalAmount)}，已花 ${fmtMoney(_data!.totalSpent)}'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text(category == null ? '设置年度总预算' : '预算 · $category'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (category == null && _data != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text('当前：${fmtMoney(_data!.totalAmount)}，已花 ${fmtMoney(_data!.totalSpent)}'),
+                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: ctrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                          labelText: '预算金额', border: OutlineInputBorder()),
+                      autofocus: true,
+                    ),
+                  ),
+                  if (category == null && catSum > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: TextButton(
+                        onPressed: () =>
+                            setD(() => ctrl.text = fmtAmt(catSum)),
+                        child: const Text('分类预算总和',
+                            style: TextStyle(fontSize: 13)),
+                      ),
+                    ),
+                ],
               ),
-            if (category == null && catSum > 0)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text('分类预算总和：${fmtMoney(catSum)}',
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-              ),
-            TextField(
-              controller: ctrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: '预算金额', border: OutlineInputBorder()),
-              autofocus: true,
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('保存'),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('保存'),
-          ),
-        ],
       ),
     );
     final amt = double.tryParse(picked ?? '');
@@ -211,12 +236,13 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => FlowFilterPage(
-                title: '${c.category} 流水',
+              builder: (_) => CategoryDetailPage(
                 category: c.category,
                 type: 'expense',
                 start: '$_year-01-01',
                 end: '$_year-12-31',
+                initialPeriod: DateTime(_year),
+                initialYearMode: true,
               ),
             ),
           ),

@@ -438,11 +438,18 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   }
 
   Widget _nameInput() {
-    // 常用名称：按当前所选分类筛选（同 web 端逻辑），
-    // 餐饮下的「菜、早餐」与日用下的「纸巾、沐浴露」互不混在一起。
-    // 收藏项始终全局置顶，高频/最近按当前分类筛选
+    // 常用名称：全部分类可见，按当前所选分类置顶（餐饮「菜」排最前，交通「羊城通」紧随其后）；
+    // 高频/最近按当前分类筛选
+    final curCat = _cat?.name ?? '';
+    final ps = _presets.presets;
+    final orderedPresets = curCat.isEmpty
+        ? ps
+        : <PresetName>[
+            ...ps.where((p) => p.category == null || p.category!.isEmpty || p.category == curCat),
+            ...ps.where((p) => p.category != null && p.category!.isNotEmpty && p.category != curCat),
+          ];
     final raw = <PresetName>[
-      ..._presets.presets,
+      ...orderedPresets,
       ..._filterByCat(_presets.frequent),
       ..._filterByCat(_presets.recent),
     ].where((p) => p.name.isNotEmpty).toList();

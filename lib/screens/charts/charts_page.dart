@@ -534,6 +534,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
           isSelf: isSelf,
           type: _type, // 与图表当前类型同步，避免「支出+收入」混着显示
           initialPeriod: _period,
+          initialYearMode: _yearMode,
         ),
       ),
     );

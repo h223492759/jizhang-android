@@ -43,15 +43,55 @@ class _BillsPageState extends ConsumerState<BillsPage> {
   }
 
   Future<void> _pickYear() async {
-    final picked = await showDatePicker(
+    // 只选年份：自建年份网格，避免 showDatePicker 落到具体日期
+    final now = DateTime.now();
+    final years = <int>[for (var y = now.year; y >= 2000; y--) y];
+    final picked = await showDialog<int>(
       context: context,
-      initialDate: DateTime(_year),
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-      helpText: '选择年份',
+      builder: (ctx) => Dialog(
+        child: Container(
+          width: 300,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('选择年份',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Flexible(
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4, mainAxisSpacing: 8, crossAxisSpacing: 8),
+                  itemCount: years.length,
+                  itemBuilder: (_, i) {
+                    final y = years[i];
+                    final active = y == _year;
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => Navigator.pop(ctx, y),
+                      child: Container(
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: active ? AppColors.primary : AppColors.background,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('$y',
+                            style: TextStyle(
+                                fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                                color: active ? AppColors.text : AppColors.textSecondary)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
-    if (picked != null) {
-      setState(() => _year = picked.year);
+    if (picked != null && picked != _year) {
+      setState(() => _year = picked);
       _load();
     }
   }
@@ -90,8 +130,8 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                     if (!_yearMode)
                       TextButton.icon(
                         onPressed: _pickYear,
-                        icon: const Icon(Icons.calendar_today),
-                        label: Text('$_year年'),
+                        icon: const Icon(Icons.calendar_today, size: 18),
+                        label: Text('$_year'),
                       ),
                   ],
                 ),
@@ -107,20 +147,21 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                   ),
                   child: Row(
                     children: [
-                      Expanded(
-                          flex: 2,
-                          child: Text(head[0],
-                              style: _headStyle())),
+                      SizedBox(
+                          width: 56,
+                          child: Text(head[0], style: _headStyle())),
                       Expanded(
                           child: Text(head[1],
                               style: _headStyle(), textAlign: TextAlign.right)),
+                      const SizedBox(width: 10),
                       Expanded(
                           child: Text(head[2],
                               style: _headStyle(), textAlign: TextAlign.right)),
+                      const SizedBox(width: 10),
                       Expanded(
                           child: Text(head[3],
                               style: _headStyle(), textAlign: TextAlign.right)),
-                      const SizedBox(width: 24),
+                      const SizedBox(width: 22),
                     ],
                   ),
                 ),
@@ -154,6 +195,12 @@ class _BillsPageState extends ConsumerState<BillsPage> {
         ]),
       );
 
+  // 月份/年份只显示数字：后端 label 是 "8月"/"2026年"，剥掉后缀
+  String _trimLabel(BillRow r) {
+    final s = r.label.isEmpty ? '${r.year}' : r.label;
+    return s.replaceAll('月', '').replaceAll('年', '');
+  }
+
   Widget _row(BillRow r) => Card(
         child: InkWell(
           onTap: () {
@@ -173,26 +220,54 @@ class _BillsPageState extends ConsumerState<BillsPage> {
             }
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                Expanded(
-                  flex: 2,
+                SizedBox(
+                  width: 56,
                   child: Text(
-                    r.label.isEmpty ? '${r.year}年' : r.label,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    _trimLabel(r),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.text),
                   ),
                 ),
                 Expanded(
-                  child: Text(fmtMoney(r.income),
-                      style: TextStyle(color: AppColors.income), textAlign: TextAlign.right)),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(fmtMoney(r.income),
+                        style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.income,
+                            fontWeight: FontWeight.w500)),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Text(fmtMoney(r.expense),
-                      style: TextStyle(color: AppColors.expense), textAlign: TextAlign.right)),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(fmtMoney(r.expense),
+                        style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.expense,
+                            fontWeight: FontWeight.w500)),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Text(fmtMoney(r.balance), textAlign: TextAlign.right)),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(fmtMoney(r.balance),
+                        style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.text,
+                            fontWeight: FontWeight.w500)),
+                  ),
+                ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+                const Icon(Icons.chevron_right, size: 20, color: AppColors.textSecondary),
               ],
             ),
           ),

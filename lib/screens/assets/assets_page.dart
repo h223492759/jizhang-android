@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
@@ -61,7 +62,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         title: const SizedBox(),
         bottom: TabBar(
           controller: _tab,
-          tabs: const [Tab(text: '存款目标'), Tab(text: '资金细则')],
+          tabs: const [Tab(text: '目标'), Tab(text: '资金细则')],
           indicatorColor: AppColors.text,
           labelColor: AppColors.text,
         ),
@@ -220,25 +221,29 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
       return Text(expired ? '无' : '还没有资金细则。点「新增细则」把现金、微信余额、信用卡账单等逐项加进来。',
           style: const TextStyle(color: AppColors.textSecondary, fontSize: 13));
     }
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      childAspectRatio: 1.8,
-      children: items.map((it) => _itemTile(it, expired)).toList(),
+    // Wrap 两列自适应高度：GridView 固定 childAspectRatio 会裁切卡片内容（图四问题）
+    return LayoutBuilder(
+      builder: (ctx, cons) {
+        final w = (cons.maxWidth - 10) / 2;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: items.map((it) => SizedBox(width: w, child: _itemTile(it, expired))).toList(),
+        );
+      },
     );
   }
 
   Widget _itemTile(SavingsItem it, bool expired) {
     final color = it.isLiability ? AppColors.expense : AppColors.income;
     return Card(
+      margin: EdgeInsets.zero,
       color: expired ? Colors.grey[100] : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(children: [
               Expanded(child: Text(it.name, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
@@ -269,7 +274,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
                 ),
               ),
-            const Spacer(),
+            const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -288,11 +293,19 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
 
   Widget _historyBarChart(SavingsOverview s) {
     final list = [...s.months].reversed.toList(); // 最新月在上
-    double maxAbs = 0;
-    for (final m in list) maxAbs = maxAbs < m.net.abs() ? m.net.abs() : maxAbs;
-    if (maxAbs <= 0) maxAbs = 1;
+    if (list.isEmpty) return const SizedBox();
+    final vals = list.map((m) => m.net).toList();
+    double minV = vals.reduce((a, b) => a < b ? a : b);
+    double maxV = vals.reduce((a, b) => a > b ? a : b);
+    final span = (maxV - minV).abs().clamp(1.0, double.infinity);
+    // 起始值：按 5 的倍数（步长分档，与网页端一致）向下取整，且比最低净资产低
+    int step = 50000;
+    if (span <= 100000) step = 10000;
+    else if (span <= 500000) step = 50000;
+    else step = 100000;
+    final yMin = (minV / step).floorToDouble() * step;
+    final yMax = maxV > 0 ? maxV * 1.12 : maxV * 0.88 + step;
     final hasTarget = s.target > 0;
-    final targetFrac = hasTarget ? (s.target / maxAbs).clamp(0.0, 1.0) : 0.0;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
@@ -302,57 +315,80 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
           if (hasTarget)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: Text('目标基线 ¥${fmtMoney(s.target)}（右侧为达成率 %）',
+              child: Text('目标基线 ¥${fmtMoney(s.target)}（虚线）',
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             ),
-          ...list.map((m) {
-            final frac = (m.net.abs() / maxAbs).clamp(0.02, 1.0);
-            final c = m.net < 0
-                ? AppColors.expense
-                : (s.target > 0 && m.net >= s.target ? AppColors.income : AppColors.primaryDark);
-            final ym = m.ymd.length >= 7 ? m.ymd.substring(0, 7) : m.ymd;
-            final pct = hasTarget ? (m.net / s.target * 100) : (m.net.abs() / maxAbs * 100);
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              child: Row(children: [
-                SizedBox(width: 52, child: Text(ym, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (ctx, constraints) {
-                      final w = constraints.maxWidth;
-                      return Stack(
-                        children: [
-                          FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: frac,
-                            child: Container(
-                              height: 18,
-                              decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(4)),
-                            ),
-                          ),
-                          if (hasTarget)
-                            Positioned(
-                              left: targetFrac * w,
-                              top: 0,
-                              bottom: 0,
-                              child: Container(width: 2, color: AppColors.text),
-                            ),
-                        ],
+          SizedBox(
+            height: 240,
+            child: BarChart(
+              BarChartData(
+                minY: yMin,
+                maxY: yMax,
+                alignment: BarChartAlignment.spaceAround,
+                barGroups: list.asMap().entries.map((e) {
+                  final m = e.value;
+                  final c = m.net < 0
+                      ? AppColors.expense
+                      : (hasTarget && m.net >= s.target ? AppColors.income : AppColors.primaryDark);
+                  return BarChartGroupData(x: e.key, barRods: [
+                    BarChartRodData(
+                        toY: m.net, color: c, width: 14, borderRadius: BorderRadius.circular(3)),
+                  ]);
+                }).toList(),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 56,
+                    getTitlesWidget: (v, _) {
+                      if (v == yMin || v == yMax) return const SizedBox.shrink();
+                      final wan = v / 10000;
+                      return Text(
+                        wan >= 10
+                            ? '${(wan / 10).toStringAsFixed(0)}万'
+                            : '${wan.toStringAsFixed(wan == wan.toInt() ? 0 : 1)}万',
+                        style: const TextStyle(fontSize: 10, color: AppColors.textSecondary));
+                    },
+                  )),
+                  bottomTitles: AxisTitles(sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (v, _) {
+                      final i = v.toInt();
+                      if (i < 0 || i >= list.length) return const SizedBox.shrink();
+                      if (list.length > 8 && i % 2 != 0) return const SizedBox.shrink();
+                      final ym = list[i].ymd.length >= 7 ? list[i].ymd.substring(0, 7) : list[i].ymd;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(ym,
+                            style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
                       );
                     },
-                  ),
+                  )),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 72,
-                  child: Text('${pct.toStringAsFixed(2)}%',
-                      textAlign: TextAlign.end,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
-                          color: AppColors.textSecondary)),
-                ),
-              ]),
-            );
-          }).toList(),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                extraLinesData: ExtraLinesData(horizontalLines: [
+                  if (hasTarget)
+                    HorizontalLine(
+                      y: s.target,
+                      color: AppColors.text,
+                      strokeWidth: 1.5,
+                      dashArray: [6, 4],
+                      label: HorizontalLineLabel(
+                        show: true,
+                        alignment: Alignment.centerRight,
+                        labelResolver: (_) => '目标 ${fmtMoney(s.target)}',
+                        style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                      ),
+                    ),
+                ]),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text('说明：Y 轴起始值取 5 的倍数且低于最低净资产，如最低 59 万则从 55 万起',
+              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
         ],
       ),
     );

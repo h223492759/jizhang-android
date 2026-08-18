@@ -158,7 +158,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       ('账单', Icons.receipt_long, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillsPage()))),
       ('预算', Icons.savings, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetPage()))),
       ('存款目标', Icons.flag, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssetsPage(initialTab: 0)))),
-      ('分类钱包', Icons.account_balance_wallet, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletsPage()))),
+      ('钱包', Icons.account_balance_wallet, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletsPage()))),
       ('更多', Icons.grid_view, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MePage()))),
     ];
     return Container(
@@ -607,10 +607,18 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // 收藏的常用名称(presets)始终全局置顶，不受当前分类影响；
-    // 只有高频/最近(frequent/recent)才按当前分类筛选，与网页端一致。
+    // 收藏的常用名称全部分类可见，按当前流水所属分类置顶（餐饮「菜」排最前，交通「羊城通」紧随其后）；
+    // 高频/最近按当前分类筛选，与网页端一致
+    final curCat = _curCategory;
+    final ps = _presets.presets;
+    final orderedPresets = curCat.isEmpty
+        ? ps
+        : <PresetName>[
+            ...ps.where((p) => p.category == null || p.category!.isEmpty || p.category == curCat),
+            ...ps.where((p) => p.category != null && p.category!.isNotEmpty && p.category != curCat),
+          ];
     final raw = <PresetName>[
-      ..._presets.presets,
+      ...orderedPresets,
       ..._filterByCat(_presets.frequent),
       ..._filterByCat(_presets.recent),
     ];

@@ -25,6 +25,8 @@ class OwnerFlowPage extends ConsumerStatefulWidget {
   final DateTime? initialPeriod;
   /// 可选：限定到某个分类（分类详情页点归属人时传，实现"该分类+该归属人+当期"过滤）。
   final String? category;
+  /// 进入时默认的模式（月/年）；不传则默认月模式。
+  final bool initialYearMode;
   const OwnerFlowPage({
     super.key,
     required this.attribution,
@@ -35,6 +37,7 @@ class OwnerFlowPage extends ConsumerStatefulWidget {
     this.type,
     this.initialPeriod,
     this.category,
+    this.initialYearMode = false,
   });
 
   @override
@@ -44,6 +47,7 @@ class OwnerFlowPage extends ConsumerStatefulWidget {
 class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
   late DateTime _period;
   late String _typeFilter; // expense | income | all
+  bool _yearMode = false;
   List<Flow> _flows = [];
   List<Category> _cats = [];
   bool _loading = true;
@@ -54,6 +58,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
   void initState() {
     super.initState();
     _typeFilter = widget.type ?? 'all';
+    _yearMode = widget.initialYearMode;
     final init = widget.initialPeriod;
     if (init != null) {
       _period = DateTime(init.year, init.month);
@@ -74,8 +79,12 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
     super.dispose();
   }
 
-  String _start() => DateFormat('yyyy-MM-01').format(_period);
-  String _end() => DateFormat('yyyy-MM-dd').format(DateTime(_period.year, _period.month + 1, 0));
+  String _start() => _yearMode
+      ? DateFormat('yyyy-01-01').format(_period)
+      : DateFormat('yyyy-MM-01').format(_period);
+  String _end() => _yearMode
+      ? DateFormat('yyyy-12-31').format(_period)
+      : DateFormat('yyyy-MM-dd').format(DateTime(_period.year, _period.month + 1, 0));
 
   Future<void> _load() async {
     setState(() => _loading = true);
@@ -137,10 +146,33 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
     return list;
   }
 
-  // 周期选择器（最新 3 年 x 本年月份，未来月份不显示）
+  // 周期选择器（月模式：近 3 年逐月；年模式：近 4 年；未来不显示）
   List<_PeriodOpt> _buildPeriodOpts() {
     final now = DateTime.now();
     final opts = <_PeriodOpt>[];
+    if (_yearMode) {
+      for (int y = now.year - 3; y <= now.year; y++) {
+        String label;
+        bool special;
+        if (y == now.year) {
+          label = '今年';
+          special = true;
+        } else if (y == now.year - 1) {
+          label = '去年';
+          special = true;
+        } else {
+          label = '${y}年';
+          special = false;
+        }
+        opts.add(_PeriodOpt(
+            label: label,
+            year: y,
+            month: 1,
+            special: special,
+            selected: y == _period.year));
+      }
+      return opts;
+    }
     final startY = now.year - 2;
     for (int y = startY; y <= now.year; y++) {
       final maxM = y == now.year ? now.month : 12;
@@ -190,9 +222,14 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // PIN 1: 周期选择器
+                // PIN 1a: 月/年 单选
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  child: _modeBar(),
+                ),
+                // PIN 1b: 周期选择器
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: _periodSelector(),
                 ),
                 // PIN 2: 总额/平均值
@@ -228,6 +265,41 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
         Text('平均值：¥${fmtMoney(avg)}',
             style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
       ],
+    );
+  }
+
+  Widget _modeBar() {
+    return Row(
+      children: [
+        _seg(['月', '年'], _yearMode ? 1 : 0, (i) {
+          setState(() => _yearMode = i == 1);
+          _load();
+          WidgetsBinding.instance.addPostFrameCallback((_) => _centerSelected());
+        }),
+      ],
+    );
+  }
+
+  Widget _seg(List<String> labels, int sel, void Function(int) onTap) {
+    return Container(
+      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        children: labels.asMap().entries.map((e) {
+          final active = e.key == sel;
+          return GestureDetector(
+            onTap: () => onTap(e.key),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              decoration: BoxDecoration(
+                color: active ? AppColors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(e.value,
+                  style: TextStyle(color: active ? AppColors.text : AppColors.textSecondary)),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 

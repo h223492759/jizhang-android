@@ -78,7 +78,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
   Widget build(BuildContext context) {
     final d = _data;
     return Scaffold(
-      appBar: AppBar(title: const Text('分类钱包')),
+      appBar: AppBar(title: const Text('钱包')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : d == null
@@ -97,7 +97,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                         const Padding(
                           padding: EdgeInsets.only(top: 16),
                           child: Text(
-                              '还没有分类钱包。点右下角「＋」新增养娃、买房等专项金，每月存一笔即可（记录带日期、金额与操作人）。',
+                              '还没有钱包。点右下角「＋」新增养娃、买房等专项金，每月存一笔即可（记录带日期、金额与操作人）。',
                               style: TextStyle(color: AppColors.textSecondary)),
                         ),
                       const SizedBox(height: 24),
@@ -111,19 +111,14 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
     );
   }
 
-  // 总余额 + 总目标 一行
+  // 总余额一行（总目标/达成率已按要求删除）
   Widget _header(WalletsData d) {
-    final pct = d.totalTarget > 0
-        ? (d.totalBalance / d.totalTarget * 100).round().clamp(0, 999)
-        : 0;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
           _col('总余额', '¥${fmtMoney(d.totalBalance)}', true),
-          _col('总目标', d.totalTarget > 0 ? '¥${fmtMoney(d.totalTarget)}' : '未设'),
-          _col('达成率', d.totalTarget > 0 ? '$pct%' : '—'),
         ],
       ),
     );
@@ -318,7 +313,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (c, set) => AlertDialog(
-          title: const Text('新增分类钱包'),
+          title: const Text('新增钱包'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
