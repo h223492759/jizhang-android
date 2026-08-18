@@ -596,29 +596,20 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
   // 当前流水所属的分类名称（用于按分类筛选常用名）
   String get _curCategory => widget.flow.category;
 
-  // 按分类筛选：每组里只保留「未指定分类」或「匹配当前分类」的项。
-  // 如果筛选后整组都为空，回退到不过滤（避免误以为没有常用名）。
+  // 按分类筛选：仅保留「未指定分类」或「匹配当前分类」的项；严格过滤，不回退。
   List<PresetName> _filterByCat(List<PresetName> src) {
     final cat = _curCategory;
     if (cat.isEmpty) return src;
-    final out = src.where((p) => p.category == null || p.category!.isEmpty || p.category == cat).toList();
-    return out.isEmpty ? src : out;
+    return src.where((p) => p.category == null || p.category!.isEmpty || p.category == cat).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    // 收藏的常用名称全部分类可见，按当前流水所属分类置顶（餐饮「菜」排最前，交通「羊城通」紧随其后）；
-    // 高频/最近按当前分类筛选，与网页端一致
-    final curCat = _curCategory;
-    final ps = _presets.presets;
-    final orderedPresets = curCat.isEmpty
-        ? ps
-        : <PresetName>[
-            ...ps.where((p) => p.category == null || p.category!.isEmpty || p.category == curCat),
-            ...ps.where((p) => p.category != null && p.category!.isNotEmpty && p.category != curCat),
-          ];
+    // 常用名称：收藏(★) 与高频/最近都严格按当前分类过滤——
+    // 只显示「未绑定分类」或「当前分类」的收藏/高频/最近，其他分类的收藏不可见；
+    // 未选分类时显示全部。收藏排最前，高频/最近随后，与网页端一致。
     final raw = <PresetName>[
-      ...orderedPresets,
+      ..._filterByCat(_presets.presets),
       ..._filterByCat(_presets.frequent),
       ..._filterByCat(_presets.recent),
     ];

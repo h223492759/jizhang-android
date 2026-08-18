@@ -428,28 +428,20 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     });
   }
 
-  // 按分类筛选：仅保留「未指定分类」或「匹配当前分类」；整组为空时回退原集合。
+  // 按分类筛选：仅保留「未指定分类」或「匹配当前分类」的项；严格过滤，不回退。
   List<PresetName> _filterByCat(List<PresetName> src) {
     if (_cat == null) return src;
     final cat = _cat!.name;
     if (cat.isEmpty) return src;
-    final out = src.where((p) => p.category == null || p.category!.isEmpty || p.category == cat).toList();
-    return out.isEmpty ? src : out;
+    return src.where((p) => p.category == null || p.category!.isEmpty || p.category == cat).toList();
   }
 
   Widget _nameInput() {
-    // 常用名称：全部分类可见，按当前所选分类置顶（餐饮「菜」排最前，交通「羊城通」紧随其后）；
-    // 高频/最近按当前分类筛选
-    final curCat = _cat?.name ?? '';
-    final ps = _presets.presets;
-    final orderedPresets = curCat.isEmpty
-        ? ps
-        : <PresetName>[
-            ...ps.where((p) => p.category == null || p.category!.isEmpty || p.category == curCat),
-            ...ps.where((p) => p.category != null && p.category!.isNotEmpty && p.category != curCat),
-          ];
+    // 常用名称：收藏(★) 与高频/最近都严格按当前分类过滤——
+    // 只显示「未绑定分类」或「当前分类」的收藏/高频/最近，其他分类的收藏不可见；
+    // 未选分类时显示全部。收藏排最前，高频/最近随后。
     final raw = <PresetName>[
-      ...orderedPresets,
+      ..._filterByCat(_presets.presets),
       ..._filterByCat(_presets.frequent),
       ..._filterByCat(_presets.recent),
     ].where((p) => p.name.isNotEmpty).toList();
