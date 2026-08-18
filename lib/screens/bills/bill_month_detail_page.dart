@@ -258,7 +258,19 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
         ),
       );
 
-  Widget _compareBar(List list, bool isExpense) {
+  // 年账单的「各月对比」只显示已到月份：现在是 2026-08 时，9-12 月不显示（历史年份不受影响）
+  List _futureFiltered(List list) {
+    if (!widget.isYear) return list;
+    final now = DateTime.now();
+    final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    return list.where((m) {
+      final ym = (m as Map?)?['ym']?.toString() ?? '';
+      return ym.isEmpty || ym.compareTo(curYm) <= 0;
+    }).toList();
+  }
+
+  Widget _compareBar(List rawList, bool isExpense) {
+    final list = _futureFiltered(rawList);
     if (list.isEmpty) {
       return const Text('暂无数据', style: TextStyle(color: AppColors.textSecondary));
     }

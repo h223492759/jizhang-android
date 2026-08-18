@@ -312,6 +312,25 @@ class ApiClient {
     return d as Map<String, dynamic>;
   }
 
+  // 直接设置某细则当前金额并记一条历史（资金细则「新增记录」）
+  Future<void> setSavingsItemAmount(int id,
+      {required double amount, String note = ''}) async {
+    await _req(() => _dio.post('/savings/items/$id/set-amount',
+        data: {'amount': amount, 'note': note}));
+  }
+
+  // 修改某细则的一条历史记录
+  Future<void> updateSavingsItemHistory(int id, int hid,
+      {required double amount, String note = ''}) async {
+    await _req(() => _dio.put('/savings/items/$id/history/$hid',
+        data: {'amount': amount, 'note': note}));
+  }
+
+  // 删除某细则的一条历史记录
+  Future<void> deleteSavingsItemHistory(int id, int hid) async {
+    await _req(() => _dio.delete('/savings/items/$id/history/$hid'));
+  }
+
   Future<void> deleteSavingsHistory(String ymd) async {
     await _req(() => _dio.delete('/savings/history/$ymd'));
   }

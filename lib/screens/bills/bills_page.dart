@@ -43,9 +43,11 @@ class _BillsPageState extends ConsumerState<BillsPage> {
   }
 
   Future<void> _pickYear() async {
-    // 只选年份：自建年份网格，避免 showDatePicker 落到具体日期
-    final now = DateTime.now();
-    final years = <int>[for (var y = now.year; y >= 2000; y--) y];
+    // 只选年份：只显示有流水记录的年份（后端 years 字段，倒序），避免无记录年份可选
+    final years = (_monthly?.years.isNotEmpty ?? false)
+        ? _monthly!.years
+        : <int>[DateTime.now().year];
+    if (years.length <= 1) return; // 只有一个年份无需选择
     final picked = await showDialog<int>(
       context: context,
       builder: (ctx) => Dialog(
@@ -100,15 +102,12 @@ class _BillsPageState extends ConsumerState<BillsPage> {
   Widget build(BuildContext context) {
     final summary = _yearMode ? _yearly?.summary : _monthly?.summary;
     final sourceRows = _yearMode ? _yearly?.rows ?? [] : _monthly?.rows ?? [];
-    // 月账单：月份由高到低显示，未到的月份不显示
+    // 月账单：月份由高到低显示，未到的月份不显示（month 形如 "2026-08"，字典序即时间序）
     final now = DateTime.now();
     final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final rows = _yearMode
         ? sourceRows
-        : sourceRows.where((r) {
-            if (r.year == now.year && r.month.compareTo(curYm) > 0) return false;
-            return true;
-          }).toList()
+        : sourceRows.where((r) => r.month.compareTo(curYm) <= 0).toList()
       ..sort((a, b) => b.month.compareTo(a.month));
     final head = _yearMode
         ? ['年份', '年收入', '年支出', '年结余']

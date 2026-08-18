@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
@@ -62,7 +61,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         title: const SizedBox(),
         bottom: TabBar(
           controller: _tab,
-          tabs: const [Tab(text: '目标'), Tab(text: '资金细则')],
+          tabs: const [Tab(text: '存款'), Tab(text: '资金细则')],
           indicatorColor: AppColors.text,
           labelColor: AppColors.text,
         ),
@@ -239,7 +238,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     return Card(
       margin: EdgeInsets.zero,
       color: expired ? Colors.grey[100] : Colors.white,
-      child: Padding(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showItemHistory(it),
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,6 +289,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -304,8 +307,11 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     else if (span <= 500000) step = 50000;
     else step = 100000;
     final yMin = (minV / step).floorToDouble() * step;
-    final yMax = maxV > 0 ? maxV * 1.12 : maxV * 0.88 + step;
+    final range = (maxV - yMin).abs().clamp(1.0, double.infinity);
     final hasTarget = s.target > 0;
+    final targetFrac = hasTarget
+        ? ((s.target - yMin) / range).clamp(0.0, 1.0)
+        : 0.0;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
@@ -318,76 +324,64 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
               child: Text('目标基线 ¥${fmtMoney(s.target)}（虚线）',
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             ),
-          SizedBox(
-            height: 240,
-            child: BarChart(
-              BarChartData(
-                minY: yMin,
-                maxY: yMax,
-                alignment: BarChartAlignment.spaceAround,
-                barGroups: list.asMap().entries.map((e) {
-                  final m = e.value;
-                  final c = m.net < 0
-                      ? AppColors.expense
-                      : (hasTarget && m.net >= s.target ? AppColors.income : AppColors.primaryDark);
-                  return BarChartGroupData(x: e.key, barRods: [
-                    BarChartRodData(
-                        toY: m.net, color: c, width: 14, borderRadius: BorderRadius.circular(3)),
-                  ]);
-                }).toList(),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 56,
-                    getTitlesWidget: (v, _) {
-                      if (v == yMin || v == yMax) return const SizedBox.shrink();
-                      final wan = v / 10000;
-                      return Text(
-                        wan >= 10
-                            ? '${(wan / 10).toStringAsFixed(0)}万'
-                            : '${wan.toStringAsFixed(wan == wan.toInt() ? 0 : 1)}万',
-                        style: const TextStyle(fontSize: 10, color: AppColors.textSecondary));
-                    },
-                  )),
-                  bottomTitles: AxisTitles(sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (v, _) {
-                      final i = v.toInt();
-                      if (i < 0 || i >= list.length) return const SizedBox.shrink();
-                      if (list.length > 8 && i % 2 != 0) return const SizedBox.shrink();
-                      final ym = list[i].ymd.length >= 7 ? list[i].ymd.substring(0, 7) : list[i].ymd;
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(ym,
-                            style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+          ...list.map((m) {
+            // 横向条：从起始值 yMin 起画到该月净值，长度 = (net-yMin)/range
+            final frac = ((m.net - yMin) / range).clamp(0.0, 1.0);
+            final c = m.net < 0
+                ? AppColors.expense
+                : (hasTarget && m.net >= s.target ? AppColors.income : AppColors.primaryDark);
+            final ym = m.ymd.length >= 7 ? m.ymd.substring(0, 7) : m.ymd;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(children: [
+                SizedBox(width: 52, child: Text(ym, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (ctx, constraints) {
+                      final w = constraints.maxWidth;
+                      return Stack(
+                        children: [
+                          // 轨道底色
+                          Container(
+                            height: 18,
+                            decoration: BoxDecoration(
+                                color: AppColors.background,
+                                borderRadius: BorderRadius.circular(4)),
+                          ),
+                          // 值条（从 yMin 基准起）
+                          FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: frac,
+                            child: Container(
+                              height: 18,
+                              decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(4)),
+                            ),
+                          ),
+                          if (hasTarget)
+                            Positioned(
+                              left: targetFrac * w,
+                              top: 0,
+                              bottom: 0,
+                              child: Container(width: 2, color: AppColors.text),
+                            ),
+                        ],
                       );
                     },
-                  )),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
                 ),
-                gridData: const FlGridData(show: false),
-                borderData: FlBorderData(show: false),
-                extraLinesData: ExtraLinesData(horizontalLines: [
-                  if (hasTarget)
-                    HorizontalLine(
-                      y: s.target,
-                      color: AppColors.text,
-                      strokeWidth: 1.5,
-                      dashArray: [6, 4],
-                      label: HorizontalLineLabel(
-                        show: true,
-                        alignment: Alignment.centerRight,
-                        labelResolver: (_) => '目标 ${fmtMoney(s.target)}',
-                        style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
-                      ),
-                    ),
-                ]),
-              ),
-            ),
-          ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 100,
+                  child: Text('¥${fmtMoney(m.net)}',
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
+                          color: AppColors.textSecondary)),
+                ),
+              ]),
+            );
+          }).toList(),
           const SizedBox(height: 8),
-          Text('说明：Y 轴起始值取 5 的倍数且低于最低净资产，如最低 59 万则从 55 万起',
+          Text('说明：柱状图起始值取 5 的倍数且低于最低净资产，如最低 59 万则从 55 万起',
               style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
         ],
       ),
@@ -525,6 +519,14 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     }
+  }
+
+  // 点击资金细则卡片：弹窗查看该细则的历史记录，可新增记录 / 修改 / 删除历史
+  Future<void> _showItemHistory(SavingsItem it) async {
+    await showDialog(
+      context: context,
+      builder: (_) => _ItemHistoryDialog(item: it, onChanged: _load),
+    );
   }
 
   Future<void> _setGoal() async {
@@ -721,5 +723,243 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
       toast(e.toString().replaceFirst('ApiException: ', ''));
     }
   }
+}
 
+// 资金细则历史弹窗：查看该细则的所有历史记录，可新增记录 / 修改 / 删除历史
+class _ItemHistoryDialog extends ConsumerStatefulWidget {
+  final SavingsItem item;
+  final VoidCallback onChanged;
+  const _ItemHistoryDialog({required this.item, required this.onChanged});
+
+  @override
+  ConsumerState<_ItemHistoryDialog> createState() => _ItemHistoryDialogState();
+}
+
+class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
+  List<Map<String, dynamic>> _rows = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
   }
+
+  Future<void> _load() async {
+    try {
+      final d = await ref.read(apiProvider).getSavingsItemHistory(widget.item.id);
+      if (mounted) {
+        setState(() {
+          _rows = (d['rows'] as List? ?? [])
+              .map((e) => e as Map<String, dynamic>)
+              .toList();
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
+  }
+
+  Future<void> _addRecord() async {
+    final amount = TextEditingController();
+    final note = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('新增记录 · ${widget.item.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('新记录会把该细则当前金额设为输入值，并记一条今天的记录。',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: amount,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: '金额', border: OutlineInputBorder()),
+              autofocus: true,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: note,
+              decoration: const InputDecoration(labelText: '备注（可选）', border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final amt = double.tryParse(amount.text.trim());
+    if (amt == null) {
+      toast('请填写金额');
+      return;
+    }
+    try {
+      await ref.read(apiProvider).setSavingsItemAmount(
+          widget.item.id, amount: amt, note: note.text.trim());
+      toast('已保存');
+      widget.onChanged();
+      _load();
+    } catch (e) {
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
+  }
+
+  Future<void> _edit(Map<String, dynamic> h) async {
+    final amount = TextEditingController(text: (h['amount'] ?? 0).toString());
+    final note = TextEditingController(text: (h['note'] ?? '').toString());
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('修改历史 · ${h['ymd']}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amount,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: '金额', border: OutlineInputBorder()),
+              autofocus: true,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: note,
+              decoration: const InputDecoration(labelText: '备注（可选）', border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final amt = double.tryParse(amount.text.trim());
+    if (amt == null) {
+      toast('请填写金额');
+      return;
+    }
+    try {
+      await ref.read(apiProvider).updateSavingsItemHistory(
+        widget.item.id,
+        (h['id'] as num).toInt(),
+        amount: amt,
+        note: note.text.trim(),
+      );
+      toast('已保存');
+      widget.onChanged();
+      _load();
+    } catch (e) {
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
+  }
+
+  Future<void> _del(Map<String, dynamic> h) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除历史'),
+        content: Text('确定删除 ${h['ymd']} 这条记录？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(apiProvider)
+          .deleteSavingsItemHistory(widget.item.id, (h['id'] as num).toInt());
+      toast('已删除');
+      widget.onChanged();
+      _load();
+    } catch (e) {
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.item.isLiability ? AppColors.expense : AppColors.income;
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 520),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+              child: Row(children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.item.name,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('当前 ¥${fmtMoney(widget.item.amount)}',
+                          style: TextStyle(fontSize: 13, color: color)),
+                    ],
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _addRecord,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('新增记录'),
+                ),
+              ]),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _rows.isEmpty
+                      ? const Center(child: Text('暂无历史记录', style: TextStyle(color: AppColors.textSecondary)))
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          itemCount: _rows.length,
+                          itemBuilder: (ctx, i) {
+                            final h = _rows[i];
+                            final amt = (h['amount'] ?? 0).toDouble();
+                            final note = (h['note'] ?? '').toString();
+                            final op = (h['op_user'] ?? '').toString();
+                            final ymd = (h['ymd'] ?? '').toString();
+                            return ListTile(
+                              dense: true,
+                              title: Row(children: [
+                                Expanded(child: Text(ymd, style: const TextStyle(fontWeight: FontWeight.bold))),
+                                Text('¥${fmtMoney(amt)}',
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+                              ]),
+                              subtitle: Text(
+                                [if (note.isNotEmpty) note, if (op.isNotEmpty) '操作人：$op']
+                                    .join(' · '),
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 18),
+                                  onPressed: () => _edit(h),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 18),
+                                  color: AppColors.expense,
+                                  onPressed: () => _del(h),
+                                ),
+                              ]),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
