@@ -1,6 +1,6 @@
 # 记账本 (jizhang-android)
 
-安卓端记账 App，UI / 交互高保真复刻「鲨鱼记账」，对接 [jizhang](https://github.com/h223492759/jizhang) 后端 REST API。
+安卓端记账 App，对接 [jizhang](https://github.com/h223492759/jizhang) 后端 REST API。
 
 ## 功能
 - 多服务器配置（内网 / 外网地址）、登录、账本切换
