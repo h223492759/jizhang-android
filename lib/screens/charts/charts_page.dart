@@ -133,6 +133,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
     final color = _type == 'expense' ? AppColors.expense : AppColors.income;
     return Scaffold(
       backgroundColor: AppColors.background,
+      extendBody: false,
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -261,9 +262,11 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
     if (idx < 0 || !_periodScroll.hasClients) return;
     const chipW = 64.0;
     final max = _periodScroll.position.maxScrollExtent;
+    // 选中项无论是否"special"，一律居中。
     final target = (idx * (chipW + 8) - (_periodScroll.position.viewportDimension / 2 - chipW / 2))
         .clamp(0.0, max);
-    _periodScroll.animateTo(target, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+    // 用 jumpTo 取代 animateTo，避免「先左移再居中」这种先飘再对位的视觉抖动。
+    _periodScroll.jumpTo(target);
   }
 
   Widget _periodSelector() {
@@ -490,30 +493,27 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
           const SizedBox(height: 8),
           SizedBox(
             height: 18,
-            child: Row(
-              children: [
-                if (self.isNotEmpty)
-                  Expanded(
-                    flex: selfVal.round(),
-                    child: GestureDetector(
-                      onTap: () => _openOwner(self.first, isSelf: true),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(6), bottomLeft: Radius.circular(6)),
-                        ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.all(Radius.circular(6)),
+              child: Row(
+                children: [
+                  if (self.isNotEmpty)
+                    Expanded(
+                      flex: selfVal.round(),
+                      child: GestureDetector(
+                        onTap: () => _openOwner(self.first, isSelf: true),
+                        child: Container(color: Colors.grey.shade100),
                       ),
                     ),
-                  ),
-                ...others.map((o) => Expanded(
-                      flex: o.value.round(),
-                      child: GestureDetector(
-                        onTap: () => _openOwner(o, isSelf: false),
-                        child: Container(color: o.color),
-                      ),
-                    )),
-              ],
+                  ...others.map((o) => Expanded(
+                        flex: o.value.round(),
+                        child: GestureDetector(
+                          onTap: () => _openOwner(o, isSelf: false),
+                          child: Container(color: o.color),
+                        ),
+                      )),
+                ],
+              ),
             ),
           ),
         ],
@@ -533,6 +533,8 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
           start: _start(),
           end: _end(),
           isSelf: isSelf,
+          type: _type, // 与图表当前类型同步，避免「支出+收入」混着显示
+          initialPeriod: _period,
         ),
       ),
     );
@@ -555,6 +557,8 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
               type: _type,
               start: _start(),
               end: _end(),
+              initialPeriod: _period, // 进入时直接跳到图表当前选中的月/年
+              initialYearMode: _yearMode,
             ),
           ),
         ),

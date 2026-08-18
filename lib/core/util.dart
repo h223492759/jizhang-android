@@ -5,9 +5,19 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
 void toast(String msg) {
-  scaffoldMessengerKey.currentState?.showSnackBar(
-    SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
-  );
+  // 用 floating SnackBar + 底部 margin 把 toast 抬到中心 FAB 之上，
+  // 避免默认 SnackBar 紧贴底栏导致 FAB 短暂上移。
+  scaffoldMessengerKey.currentState
+    ?..clearSnackBars()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
 }
 
 String fmtMoney(num v) {

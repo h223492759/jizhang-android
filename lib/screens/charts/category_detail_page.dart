@@ -21,12 +21,18 @@ class CategoryDetailPage extends ConsumerStatefulWidget {
   final String type;
   final String start;
   final String end;
+  /// 由图表页传入的当前选中 period（年月），用于初始化时跳到图表上选中的月/年。
+  /// 不传则默认为本月。
+  final DateTime? initialPeriod;
+  final bool initialYearMode;
   const CategoryDetailPage({
     super.key,
     required this.category,
     required this.type,
     required this.start,
     required this.end,
+    this.initialPeriod,
+    this.initialYearMode = false,
   });
 
   @override
@@ -45,8 +51,14 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _period = DateTime(now.year, now.month);
+    final init = widget.initialPeriod;
+    if (init != null) {
+      _period = DateTime(init.year, init.month);
+      _yearMode = widget.initialYearMode;
+    } else {
+      final now = DateTime.now();
+      _period = DateTime(now.year, now.month);
+    }
     _load();
   }
 
@@ -277,9 +289,11 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
     if (idx < 0 || !_periodScroll.hasClients) return;
     const chipW = 64.0;
     final max = _periodScroll.position.maxScrollExtent;
+    // 选中项无论是否"special"，一律居中。
     final target = (idx * (chipW + 8) - (_periodScroll.position.viewportDimension / 2 - chipW / 2))
         .clamp(0.0, max);
-    _periodScroll.animateTo(target, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+    // 用 jumpTo 取代 animateTo，避免「先左移再居中」这种先飘再对位的视觉抖动。
+    _periodScroll.jumpTo(target);
   }
 
   Widget _periodSelector() {
@@ -457,30 +471,27 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
           const SizedBox(height: 8),
           SizedBox(
             height: 18,
-            child: Row(
-              children: [
-                if (self.isNotEmpty)
-                  Expanded(
-                    flex: selfVal.round(),
-                    child: GestureDetector(
-                      onTap: () => _openOwner(self.first, isSelf: true),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(6), bottomLeft: Radius.circular(6)),
-                        ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.all(Radius.circular(6)),
+              child: Row(
+                children: [
+                  if (self.isNotEmpty)
+                    Expanded(
+                      flex: selfVal.round(),
+                      child: GestureDetector(
+                        onTap: () => _openOwner(self.first, isSelf: true),
+                        child: Container(color: Colors.grey.shade100),
                       ),
                     ),
-                  ),
-                ...others.map((o) => Expanded(
-                      flex: o.value.round(),
-                      child: GestureDetector(
-                        onTap: () => _openOwner(o, isSelf: false),
-                        child: Container(color: o.color),
-                      ),
-                    )),
-              ],
+                  ...others.map((o) => Expanded(
+                        flex: o.value.round(),
+                        child: GestureDetector(
+                          onTap: () => _openOwner(o, isSelf: false),
+                          child: Container(color: o.color),
+                        ),
+                      )),
+                ],
+              ),
             ),
           ),
         ],
@@ -498,6 +509,8 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
           start: _start(),
           end: _end(),
           isSelf: isSelf,
+          type: widget.type, // 与分类详情页当前 type 同步
+          initialPeriod: _period,
         ),
       ),
     );

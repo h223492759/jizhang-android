@@ -428,16 +428,25 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     });
   }
 
+  // 按分类筛选：仅保留「未指定分类」或「匹配当前分类」；整组为空时回退原集合。
+  List<PresetName> _filterByCat(List<PresetName> src) {
+    if (_cat == null) return src;
+    final cat = _cat!.name;
+    if (cat.isEmpty) return src;
+    final out = src.where((p) => p.category == null || p.category!.isEmpty || p.category == cat).toList();
+    return out.isEmpty ? src : out;
+  }
+
   Widget _nameInput() {
-    // 常用名称：不按分类区分，合并 预设/常用/最近，去重后最多取 10 个，
-    // 用一行横向可滑动的灰色 chip 展示。
-    final chips = <PresetName>[
-      ..._presets.presets,
-      ..._presets.frequent,
-      ..._presets.recent,
+    // 常用名称：按当前所选分类筛选（同 web 端逻辑），
+    // 餐饮下的「菜、早餐」与日用下的「纸巾、沐浴露」互不混在一起。
+    final raw = <PresetName>[
+      ..._filterByCat(_presets.presets),
+      ..._filterByCat(_presets.frequent),
+      ..._filterByCat(_presets.recent),
     ].where((p) => p.name.isNotEmpty).toList();
     final unique = <String, PresetName>{};
-    for (final p in chips) {
+    for (final p in raw) {
       unique.putIfAbsent(p.name, () => p);
     }
     final display = unique.values.take(10).toList();
@@ -457,7 +466,14 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             ),
           ),
           if (display.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
+            Text(
+              _cat == null || _cat!.name.isEmpty
+                  ? '常用名称'
+                  : '常用名称（按「${_cat!.name}」分类筛选）',
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 4),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(

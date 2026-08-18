@@ -68,6 +68,9 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // 明确不延伸主体到底栏后面：避免 body 内容偶尔穿透 BottomAppBar 的 notch
+      // 导致 FAB 看起来跑到屏幕中间并被 body 文字覆盖的问题。
+      extendBody: false,
       body: _pages[_idx],
       floatingActionButton: FloatingActionButton(
         onPressed: _openRecord,
@@ -77,18 +80,23 @@ class _MainShellState extends ConsumerState<MainShell> {
         child: const Icon(Icons.add, size: 32),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonAnimator: FloatingActionButtonAnimator.noAnimation,
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
         color: Colors.white,
-        child: Row(
-          children: [
-            _navItem(0, Icons.receipt_long, '明细'),
-            _navItem(1, Icons.pie_chart, '图表'),
-            const SizedBox(width: 56),
-            _navItem(2, Icons.auto_awesome, '发现'),
-            _navItem(3, Icons.person_outline, '我的'),
-          ],
+        child: SizedBox(
+          height: 56,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _navItem(0, Icons.receipt_long, '明细'),
+              _navItem(1, Icons.pie_chart, '图表'),
+              const SizedBox(width: 56),
+              _navItem(2, Icons.auto_awesome, '发现'),
+              _navItem(3, Icons.person_outline, '我的'),
+            ],
+          ),
         ),
       ),
     );

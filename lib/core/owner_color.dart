@@ -68,7 +68,7 @@ Color _hashColor(String s) {
 Color ownerColorFor(
     Flow f, Map<String, String> overrides, User? user) {
   if (isSelfAttribution(f.attribution, user)) {
-    return Colors.grey.shade300;
+    return Colors.grey.shade100; // 浅一些（grey.shade300 太深）
   }
   final ov = overrides[f.attribution];
   if (ov != null && ov.isNotEmpty) return parseColor(ov);

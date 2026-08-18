@@ -110,17 +110,26 @@ class _HomePageState extends ConsumerState<HomePage> {
             children: [
               InkWell(
                 onTap: _pickMonth,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text('${_month.year}',
-                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                    Text('${_month.month}月',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('${_month.year}',
+                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        Text('${_month.month}月',
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down, size: 20, color: AppColors.textSecondary),
                   ],
                 ),
               ),
-              const SizedBox(width: 28),
+              const SizedBox(width: 40),
               _headStat('支出', ov?.expense ?? 0, AppColors.expense),
               _headStat('收入', ov?.income ?? 0, AppColors.income),
             ],
@@ -376,6 +385,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final user = ref.watch(sessionProvider).user;
     return Scaffold(
       backgroundColor: AppColors.background,
+      extendBody: false,
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _headerRegion()),
@@ -580,15 +590,27 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
     super.dispose();
   }
 
+  // 当前流水所属的分类名称（用于按分类筛选常用名）
+  String get _curCategory => widget.flow.category;
+
+  // 按分类筛选：每组里只保留「未指定分类」或「匹配当前分类」的项。
+  // 如果筛选后整组都为空，回退到不过滤（避免误以为没有常用名）。
+  List<PresetName> _filterByCat(List<PresetName> src) {
+    final cat = _curCategory;
+    if (cat.isEmpty) return src;
+    final out = src.where((p) => p.category == null || p.category!.isEmpty || p.category == cat).toList();
+    return out.isEmpty ? src : out;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final chips = <PresetName>[
-      ..._presets.presets,
-      ..._presets.frequent,
-      ..._presets.recent,
+    final raw = <PresetName>[
+      ..._filterByCat(_presets.presets),
+      ..._filterByCat(_presets.frequent),
+      ..._filterByCat(_presets.recent),
     ];
     final unique = <String, PresetName>{};
-    for (final p in chips.where((p) => p.name.isNotEmpty)) {
+    for (final p in raw.where((p) => p.name.isNotEmpty)) {
       unique.putIfAbsent(p.name, () => p);
     }
     final display = unique.values.take(10).toList();
@@ -617,7 +639,10 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
           ),
           if (_loaded && display.isNotEmpty) ...[
             const SizedBox(height: 10),
-            const Text('常用名称', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            Text(
+              '常用名称（按${_curCategory.isEmpty ? "当前流水" : "「$_curCategory」分类"}筛选）',
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
             const SizedBox(height: 6),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -678,12 +703,17 @@ class _AmountEditorSheet extends ConsumerStatefulWidget {
 class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
   late String _expression;
   late DateTime _date;
+  /// 用户是否已经按过「=」把表达式算出结果。
+  /// - false：表达式仍含 operator，键位显示「=」
+  /// - true ：表达式已被替换为纯数字结果，键位显示「保存」
+  bool _equalsShown = false;
 
   @override
   void initState() {
     super.initState();
     _expression = _formatComputed(widget.flow.amount);
     _date = parseYmd(datePart(widget.flow.flowTime));
+    _equalsShown = false;
   }
 
   bool get _hasOperator => _expression.contains('+') || _expression.contains('-');
@@ -729,44 +759,80 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
       final current = lastOp == -1 ? _expression : _expression.substring(lastOp + 1);
       if (current.contains('.')) return;
       if (current.isEmpty) {
-        setState(() => _expression += '0.');
+        setState(() {
+          _expression += '0.';
+          _equalsShown = false;
+        });
         return;
       }
     }
     if (_expression == '0' && d != '.') {
-      setState(() => _expression = d);
+      setState(() {
+        _expression = d;
+        _equalsShown = false;
+      });
       return;
     }
     if (_expression.length >= 12) return;
-    setState(() => _expression += d);
+    setState(() {
+      _expression += d;
+      _equalsShown = false;
+    });
   }
 
   void _tapOperator(String op) {
     if (_expression.isEmpty) return;
     final last = _expression[_expression.length - 1];
     if (last == '+' || last == '-') {
-      setState(() => _expression = _expression.substring(0, _expression.length - 1) + op);
+      setState(() {
+        _expression = _expression.substring(0, _expression.length - 1) + op;
+        _equalsShown = false;
+      });
       return;
     }
     if (_hasOperator) {
       final val = _computedAmount;
       if (val == null) return;
-      setState(() => _expression = '${_formatComputed(val)}$op');
+      setState(() {
+        _expression = '${_formatComputed(val)}$op';
+        _equalsShown = false;
+      });
       return;
     }
-    setState(() => _expression += op);
+    setState(() {
+      _expression += op;
+      _equalsShown = false;
+    });
   }
 
   void _backspace() {
     if (_expression.isNotEmpty) {
-      setState(() => _expression = _expression.substring(0, _expression.length - 1));
+      setState(() {
+        _expression = _expression.substring(0, _expression.length - 1);
+        _equalsShown = false;
+      });
     }
   }
 
   void _clearAll() {
     if (_expression.isNotEmpty) {
-      setState(() => _expression = '');
+      setState(() {
+        _expression = '';
+        _equalsShown = false;
+      });
     }
+  }
+
+  /// 「=」键：把 `表达式 + 计算结果` 折成一个干净数字写入 _expression，
+  /// 之后底部键位自动从「=」切回「保存」。
+  void _equals() {
+    if (!_hasOperator) return;
+    final val = _computedAmount;
+    if (val == null) return;
+    setState(() {
+      _expression = _formatComputed(val);
+      _equalsShown = true;
+    });
   }
 
   String _formatComputed(double v) {
@@ -803,11 +869,16 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final display = _expression.isEmpty ? '0' : _expression;
+    // 键盘布局（按用户要求）：
+    //   [7  8  9  date]
+    //   [4  5  6  back]    « 单字退格
+    //   [1  2  3  +]       + 在 - 的上方
+    //   [.  0  -  save]    整段清空 / 减号 / 保存键
     final rows = [
       ['7', '8', '9', 'date'],
       ['4', '5', '6', 'back'],
-      ['1', '2', '3', '-'],
-      ['.', '0', 'del', 'save'],
+      ['1', '2', '3', '+'],
+      ['.', '0', '-', 'save'],
     ];
     return Padding(
       padding: EdgeInsets.only(
@@ -864,6 +935,10 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
         label = '«';
         onTap = _backspace;
         break;
+      case '+':
+        label = '+';
+        onTap = () => _tapOperator('+');
+        break;
       case '-':
         label = '-';
         onTap = () => _tapOperator('-');
@@ -873,9 +948,19 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
         onTap = _clearAll;
         break;
       case 'save':
-        label = '保存';
-        primary = true;
-        onTap = _save;
+        // 输入了 +/- 且还没点击「=」时，键位显示「=」点击后表达式变成计算结果；
+        // 其余状态下显示「保存」点击直接落库并关闭。
+        if (_hasOperator && _equalsShown) {
+          label = '保存';
+          onTap = _save;
+        } else if (_hasOperator) {
+          label = '=';
+          primary = true;
+          onTap = _equals;
+        } else {
+          label = '保存';
+          onTap = _save;
+        }
         break;
       default:
         label = key;

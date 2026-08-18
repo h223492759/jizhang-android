@@ -263,6 +263,48 @@ class ApiClient {
     await _req(() => _dio.post('/savings/items', data: body));
   }
 
+  Future<void> updateSavingsItem({
+    required int id,
+    required String name,
+    required double amount,
+    required int sign,
+    String? asOf,
+    String? asOfEnd,
+    String? note,
+  }) async {
+    final body = <String, dynamic>{'name': name, 'amount': amount, 'sign': sign};
+    if (asOf != null) body['as_of'] = asOf;
+    if (asOfEnd != null) body['as_of_end'] = asOfEnd;
+    if (note != null) body['note'] = note;
+    await _req(() => _dio.put('/savings/items/$id', data: body));
+  }
+
+  Future<void> deleteSavingsItem(int id) async {
+    await _req(() => _dio.delete('/savings/items/$id'));
+  }
+
+  Future<void> bulkUpdateSavingsItems({
+    required List<Map<String, dynamic>> items,
+    String? ymd,
+  }) async {
+    final body = <String, dynamic>{'items': items};
+    if (ymd != null && ymd.isNotEmpty) body['ymd'] = ymd;
+    await _req(() => _dio.post('/savings/items/bulk', data: body));
+  }
+
+  Future<void> deleteSavingsHistory(String ymd) async {
+    await _req(() => _dio.delete('/savings/history/$ymd'));
+  }
+
+  Future<void> updateSavingsHistory({
+    required String ymd,
+    required double asset,
+    required double liability,
+  }) async {
+    await _req(() => _dio.put('/savings/history/$ymd',
+        data: {'asset': asset, 'liability': liability}));
+  }
+
   Future<void> addWallet({
     required String name,
     double target = 0,
