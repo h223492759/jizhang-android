@@ -511,6 +511,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
           isSelf: isSelf,
           type: widget.type, // 与分类详情页当前 type 同步
           initialPeriod: _period,
+          category: widget.category, // 限定到当前分类：该分类 + 该归属人 + 当期
         ),
       ),
     );

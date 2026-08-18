@@ -59,7 +59,20 @@ class _BillsPageState extends ConsumerState<BillsPage> {
   @override
   Widget build(BuildContext context) {
     final summary = _yearMode ? _yearly?.summary : _monthly?.summary;
-    final rows = _yearMode ? _yearly?.rows ?? [] : _monthly?.rows ?? [];
+    final sourceRows = _yearMode ? _yearly?.rows ?? [] : _monthly?.rows ?? [];
+    // 月账单：月份由高到低显示，未到的月份不显示
+    final now = DateTime.now();
+    final curYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final rows = _yearMode
+        ? sourceRows
+        : sourceRows.where((r) {
+            if (r.year == now.year && r.month.compareTo(curYm) > 0) return false;
+            return true;
+          }).toList()
+      ..sort((a, b) => b.month.compareTo(a.month));
+    final head = _yearMode
+        ? ['年份', '年收入', '年支出', '年结余']
+        : ['月份', '月收入', '月支出', '月结余'];
     return Scaffold(
       appBar: AppBar(title: const Text('账单')),
       body: _loading
@@ -85,11 +98,41 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                 const SizedBox(height: 12),
                 if (summary != null) _summary(summary),
                 const SizedBox(height: 12),
+                // 表头
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                          flex: 2,
+                          child: Text(head[0],
+                              style: _headStyle())),
+                      Expanded(
+                          child: Text(head[1],
+                              style: _headStyle(), textAlign: TextAlign.right)),
+                      Expanded(
+                          child: Text(head[2],
+                              style: _headStyle(), textAlign: TextAlign.right)),
+                      Expanded(
+                          child: Text(head[3],
+                              style: _headStyle(), textAlign: TextAlign.right)),
+                      const SizedBox(width: 24),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
                 ...rows.map((r) => _row(r)),
               ],
             ),
     );
   }
+
+  TextStyle _headStyle() => const TextStyle(
+      fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.bold);
 
   Widget _summary(BillRow s) => Container(
         padding: const EdgeInsets.all(16),
@@ -112,22 +155,47 @@ class _BillsPageState extends ConsumerState<BillsPage> {
       );
 
   Widget _row(BillRow r) => Card(
-        child: ListTile(
-          title: Text(r.label.isEmpty ? '${r.year}年' : r.label),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text('收 ${fmtMoney(r.income)}', style: TextStyle(color: AppColors.income, fontSize: 12)),
-              Text('支 ${fmtMoney(r.expense)}', style: TextStyle(color: AppColors.expense, fontSize: 12)),
-            ],
+        child: InkWell(
+          onTap: () {
+            if (_yearMode) {
+              if (r.year > 0) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => BillMonthDetailPage(isYear: true, year: r.year)),
+                );
+              }
+            } else if (r.month.isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => BillMonthDetailPage(ym: r.month)),
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    r.label.isEmpty ? '${r.year}年' : r.label,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Expanded(
+                  child: Text(fmtMoney(r.income),
+                      style: TextStyle(color: AppColors.income), textAlign: TextAlign.right)),
+                Expanded(
+                  child: Text(fmtMoney(r.expense),
+                      style: TextStyle(color: AppColors.expense), textAlign: TextAlign.right)),
+                Expanded(
+                  child: Text(fmtMoney(r.balance), textAlign: TextAlign.right)),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+              ],
+            ),
           ),
-          onTap: r.month.isNotEmpty
-              ? () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => BillMonthDetailPage(ym: r.month)),
-                  )
-              : null,
         ),
       );
 

@@ -23,6 +23,8 @@ class OwnerFlowPage extends ConsumerStatefulWidget {
   final String? type;
   /// 进入时默认选中的 period（年月）；不传则按 start 解析。
   final DateTime? initialPeriod;
+  /// 可选：限定到某个分类（分类详情页点归属人时传，实现"该分类+该归属人+当期"过滤）。
+  final String? category;
   const OwnerFlowPage({
     super.key,
     required this.attribution,
@@ -32,6 +34,7 @@ class OwnerFlowPage extends ConsumerStatefulWidget {
     this.isSelf = false,
     this.type,
     this.initialPeriod,
+    this.category,
   });
 
   @override
@@ -78,7 +81,12 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
     setState(() => _loading = true);
     try {
       final api = ref.read(apiProvider);
-      final fp = await api.getFlows(start: _start(), end: _end(), pageSize: 2000);
+      final fp = await api.getFlows(
+        start: _start(),
+        end: _end(),
+        pageSize: 2000,
+        category: widget.category,
+      );
       final cats = await api.getCategories();
       var matched = fp.list.where((f) => f.attribution == widget.attribution).toList();
       if (_typeFilter != 'all') {
@@ -176,7 +184,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
     final color = _typeFilter == 'income' ? AppColors.income : AppColors.expense;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('${widget.title}的流水')),
+      appBar: AppBar(title: Text(widget.category != null ? '${widget.category} · ${widget.title}' : '${widget.title}的流水')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(

@@ -440,8 +440,9 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   Widget _nameInput() {
     // 常用名称：按当前所选分类筛选（同 web 端逻辑），
     // 餐饮下的「菜、早餐」与日用下的「纸巾、沐浴露」互不混在一起。
+    // 收藏项始终全局置顶，高频/最近按当前分类筛选
     final raw = <PresetName>[
-      ..._filterByCat(_presets.presets),
+      ..._presets.presets,
       ..._filterByCat(_presets.frequent),
       ..._filterByCat(_presets.recent),
     ].where((p) => p.name.isNotEmpty).toList();
@@ -466,14 +467,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             ),
           ),
           if (display.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              _cat == null || _cat!.name.isEmpty
-                  ? '常用名称'
-                  : '常用名称（按「${_cat!.name}」分类筛选）',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -519,7 +513,8 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   }
 
   Widget _numKey(String key) {
-    String label;
+    String label = '';
+    IconData? icon;
     VoidCallback? onTap;
     bool primary = false;
     switch (key) {
@@ -536,7 +531,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         onTap = () => _onNumpad('-');
         break;
       case 'del':
-        label = '删除';
+        icon = Icons.backspace; // 改成电脑键盘式「退格」图标
         onTap = () => _onNumpad('del');
         break;
       case 'done':
@@ -562,11 +557,13 @@ class _RecordPageState extends ConsumerState<RecordPage> {
           border: Border.all(color: AppColors.divider, width: 0.5),
         ),
         child: Center(
-          child: Text(label,
-              style: TextStyle(
-                  fontSize: primary ? 18 : 20,
-                  fontWeight: FontWeight.bold,
-                  color: primary ? Colors.white : AppColors.text)),
+          child: icon != null
+              ? Icon(icon, size: 22, color: primary ? Colors.white : AppColors.text)
+              : Text(label,
+                  style: TextStyle(
+                      fontSize: primary ? 18 : 20,
+                      fontWeight: FontWeight.bold,
+                      color: primary ? Colors.white : AppColors.text)),
         ),
       ),
     );

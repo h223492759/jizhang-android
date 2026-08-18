@@ -39,8 +39,49 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     }
   }
 
+  Future<void> _pickYear() async {
+    int y = _year;
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateD) => AlertDialog(
+          title: const Text('选择年份'),
+          content: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: () => setStateD(() => y--)),
+              Text('$y 年',
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: () => setStateD(() => y++)),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, y), child: const Text('确定')),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) {
+      setState(() => _year = picked);
+      _load();
+    }
+  }
+
   Future<void> _setBudget({String? category}) async {
-    final ctrl = TextEditingController();
+    // 分类预算总和：把已设置好的各分类预算金额相加
+    final catSum =
+        _data?.categories.fold<double>(0, (s, c) => s + c.amount) ?? 0;
+    final ctrl = TextEditingController(
+      text: category == null && catSum > 0
+          ? catSum.toStringAsFixed(catSum == catSum.toInt() ? 0 : 2)
+          : '',
+    );
     final picked = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -52,6 +93,12 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text('当前：${fmtMoney(_data!.totalAmount)}，已花 ${fmtMoney(_data!.totalSpent)}'),
+              ),
+            if (category == null && catSum > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text('分类预算总和：${fmtMoney(catSum)}',
+                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               ),
             TextField(
               controller: ctrl,
@@ -99,25 +146,13 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                   Text('$_year 年度', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const Spacer(),
                   TextButton.icon(
-                    onPressed: () async {
-                      final p = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime(_year),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                        helpText: '选择年份',
-                      );
-                      if (p != null) {
-                        setState(() => _year = p.year);
-                        _load();
-                      }
-                    },
+                    onPressed: _loading ? null : _pickYear,
                     icon: const Icon(Icons.calendar_today),
-                    label: const Text('切换'),
+                    label: const Text('切换年份'),
                   ),
                 ]),
                 const SizedBox(height: 12),
-                _totalCard(d),
+                d.totalAmount > 0 ? _totalCard(d) : _emptyTotal(),
                 const SizedBox(height: 16),
                 const Text('分类预算', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 8),
@@ -126,6 +161,22 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
             ),
     );
   }
+
+  Widget _emptyTotal() => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          children: [
+            const Text('暂无年度预算', style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () => _setBudget(),
+              icon: const Icon(Icons.add),
+              label: const Text('添加年度预算'),
+            ),
+          ],
+        ),
+      );
 
   Widget _totalCard(BudgetData d) => Container(
         padding: const EdgeInsets.all(16),

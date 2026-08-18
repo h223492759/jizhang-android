@@ -12,6 +12,7 @@ import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/bills/bills_page.dart';
 import 'package:jizhang_android/screens/budget/budget_page.dart';
 import 'package:jizhang_android/screens/assets/assets_page.dart';
+import 'package:jizhang_android/screens/assets/wallets_page.dart';
 import 'package:jizhang_android/screens/me/me_page.dart';
 import 'package:jizhang_android/screens/record/record_page.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
@@ -157,7 +158,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       ('账单', Icons.receipt_long, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillsPage()))),
       ('预算', Icons.savings, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetPage()))),
       ('存款目标', Icons.flag, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssetsPage(initialTab: 0)))),
-      ('分类钱包', Icons.account_balance_wallet, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssetsPage(initialTab: 1)))),
+      ('分类钱包', Icons.account_balance_wallet, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletsPage()))),
       ('更多', Icons.grid_view, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MePage()))),
     ];
     return Container(
@@ -167,16 +168,18 @@ class _HomePageState extends ConsumerState<HomePage> {
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: items
-              .map((e) => InkWell(
-                    onTap: e.$3,
-                    child: Column(
-                      children: [
-                        Icon(e.$2, color: AppColors.primaryDark, size: 24),
-                        const SizedBox(height: 4),
-                        Text(e.$1, style: const TextStyle(fontSize: 12)),
-                      ],
+              .map((e) => Expanded(
+                    child: InkWell(
+                      onTap: e.$3,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(e.$2, color: AppColors.primaryDark, size: 24),
+                          const SizedBox(height: 4),
+                          Text(e.$1, style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
                     ),
                   ))
               .toList(),
@@ -604,16 +607,18 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // 收藏的常用名称(presets)始终全局置顶，不受当前分类影响；
+    // 只有高频/最近(frequent/recent)才按当前分类筛选，与网页端一致。
     final raw = <PresetName>[
-      ..._filterByCat(_presets.presets),
+      ..._presets.presets,
       ..._filterByCat(_presets.frequent),
       ..._filterByCat(_presets.recent),
     ];
     final unique = <String, PresetName>{};
     for (final p in raw.where((p) => p.name.isNotEmpty)) {
-      unique.putIfAbsent(p.name, () => p);
+      unique.putIfAbsent(p.name, () => p); // presets 在前，重名时保留收藏项
     }
-    final display = unique.values.take(10).toList();
+    final display = unique.values.take(12).toList();
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -639,11 +644,6 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
           ),
           if (_loaded && display.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(
-              '常用名称（按${_curCategory.isEmpty ? "当前流水" : "「$_curCategory」分类"}筛选）',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 6),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -871,14 +871,14 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
     final display = _expression.isEmpty ? '0' : _expression;
     // 键盘布局（按用户要求）：
     //   [7  8  9  date]
-    //   [4  5  6  back]    « 单字退格
-    //   [1  2  3  +]       + 在 - 的上方
-    //   [.  0  -  save]    整段清空 / 减号 / 保存键
+    //   [4  5  6  - ]    减号键上移到右上（与回退键互换）
+    //   [1  2  3  + ]
+    //   [.  0  «  save]  回退一位键(⌫)下移到原减号位置
     final rows = [
       ['7', '8', '9', 'date'],
-      ['4', '5', '6', 'back'],
+      ['4', '5', '6', '-'],
       ['1', '2', '3', '+'],
-      ['.', '0', '-', 'save'],
+      ['.', '0', 'back', 'save'],
     ];
     return Padding(
       padding: EdgeInsets.only(
@@ -923,7 +923,8 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
   }
 
   Widget _numKey(String key) {
-    String label;
+    String label = '';
+    IconData? icon;
     VoidCallback? onTap;
     bool primary = false;
     switch (key) {
@@ -932,7 +933,7 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
         onTap = _pickDate;
         break;
       case 'back':
-        label = '«';
+        icon = Icons.backspace; // 电脑键盘式「退格」图标
         onTap = _backspace;
         break;
       case '+':
@@ -975,11 +976,13 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
           border: Border.all(color: AppColors.divider, width: 0.5),
         ),
         child: Center(
-          child: Text(label,
-              style: TextStyle(
-                  fontSize: primary ? 18 : 20,
-                  fontWeight: FontWeight.bold,
-                  color: primary ? Colors.white : AppColors.text)),
+          child: icon != null
+              ? Icon(icon, size: 22, color: primary ? Colors.white : AppColors.text)
+              : Text(label,
+                  style: TextStyle(
+                      fontSize: primary ? 18 : 20,
+                      fontWeight: FontWeight.bold,
+                      color: primary ? Colors.white : AppColors.text)),
         ),
       ),
     );

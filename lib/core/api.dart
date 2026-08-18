@@ -222,6 +222,12 @@ class ApiClient {
     return d as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getBillYearDetail(int year) async {
+    final d = await _req(
+        () => _dio.get('/bills/year-detail', queryParameters: {'year': year}));
+    return d as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getSavingsItemHistory(int id) async {
     final d = await _req(() => _dio.get('/savings/items/$id/history'));
     return d as Map<String, dynamic>;
@@ -230,6 +236,12 @@ class ApiClient {
   Future<Map<String, dynamic>> getWalletTxns(int id) async {
     final d = await _req(() => _dio.get('/wallets/$id/txns'));
     return d as Map<String, dynamic>;
+  }
+
+  Future<void> addWalletTxn(int id,
+      {required double amount, required String direction, required String ymd, String note = ''}) async {
+    await _req(() => _dio.post('/wallets/$id/txns',
+        data: {'amount': amount, 'direction': direction, 'ymd': ymd, 'note': note}));
   }
 
   Future<SavingsOverview> getSavings() async {
@@ -286,10 +298,18 @@ class ApiClient {
   Future<void> bulkUpdateSavingsItems({
     required List<Map<String, dynamic>> items,
     String? ymd,
+    String? mode,
   }) async {
     final body = <String, dynamic>{'items': items};
     if (ymd != null && ymd.isNotEmpty) body['ymd'] = ymd;
+    if (mode != null && mode.isNotEmpty) body['mode'] = mode;
     await _req(() => _dio.post('/savings/items/bulk', data: body));
+  }
+
+  Future<Map<String, dynamic>> getSavingsMonthItems(String ym) async {
+    final d = await _req(
+        () => _dio.get('/savings/items/history-month', queryParameters: {'ym': ym}));
+    return d as Map<String, dynamic>;
   }
 
   Future<void> deleteSavingsHistory(String ymd) async {
@@ -305,19 +325,61 @@ class ApiClient {
         data: {'asset': asset, 'liability': liability}));
   }
 
-  Future<void> addWallet({
+  Future<int> addWallet({
     required String name,
+    String icon = '👛',
     double target = 0,
+    String linkCategory = '',
+    String linkFrom = '',
+    String note = '',
+  }) async {
+    final body = {
+      'name': name,
+      'icon': icon,
+      'target': target,
+      'link_category': linkCategory,
+      'link_from': linkFrom,
+      'note': note,
+    };
+    final d = await _req(() => _dio.post('/wallets', data: body));
+    return (d['id'] as num).toInt();
+  }
+
+  Future<void> updateWallet({
+    required int id,
+    required String name,
+    String icon = '👛',
+    double target = 0,
+    String note = '',
     String linkCategory = '',
     String linkFrom = '',
   }) async {
     final body = {
       'name': name,
+      'icon': icon,
       'target': target,
+      'note': note,
       'link_category': linkCategory,
       'link_from': linkFrom,
     };
-    await _req(() => _dio.post('/wallets', data: body));
+    await _req(() => _dio.put('/wallets/$id', data: body));
+  }
+
+  Future<void> deleteWallet(int id) async {
+    await _req(() => _dio.delete('/wallets/$id'));
+  }
+
+  Future<void> updateWalletTxn(int id,
+      {required double amount,
+      required String direction,
+      required String ymd,
+      String note = ''}) async {
+    await _req(() => _dio.put('/wallets/txns/$id',
+        data: {'amount': amount, 'direction': direction, 'ymd': ymd, 'note': note}));
+  }
+
+  Future<void> deleteWalletTxn(int id) async {
+    await _req(() => _dio.delete('/wallets/txns/$id'));
   }
 
   Future<AiStatus> getAiStatus() async {

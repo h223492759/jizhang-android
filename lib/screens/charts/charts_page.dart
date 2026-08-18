@@ -344,7 +344,6 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
               toY: _val(e.value),
               color: color,
               width: _yearMode ? 14 : 8,
-              borderRadius: BorderRadius.circular(4),
             ),
           ]);
         }).toList(),
