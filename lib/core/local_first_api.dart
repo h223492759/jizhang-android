@@ -259,6 +259,10 @@ class LocalFirstApi {
     return SavingsOverview.fromJson(jsonDecode(j));
   }
 
+  // 日期范围归一：与 db.dart 同口径，避免漏月末当天
+  String _normStart(String s) => s.length <= 10 ? '$s 00:00:00' : s;
+  String _normEnd(String s) => s.length <= 10 ? '$s 23:59:59' : s;
+
   Flow _flowFromRow(Map<String, Object?> r) => Flow(
         id: (r['id'] as num).toInt(),
         type: (r['type'] ?? 'expense') as String,
@@ -514,13 +518,6 @@ class LocalFirstApi {
   Future<int> generateRecurring() => _api.generateRecurring();
   Future<List<AttributionMember>> getAttributions() =>
       _api.getAttributions();
-  Future<List<CatStat>> getCategoryStat(
-          {String? start, String? end, String? type}) =>
-      _api.getCategoryStat(start: start, end: end, type: type);
-  Future<List<DailyStat>> getDaily({String? start, String? end}) =>
-      _api.getDaily(start: start, end: end);
-  Future<List<MonthlyStat>> getMonthly({int? year, String? category}) =>
-      _api.getMonthly(year: year, category: category);
 
   // ---- 定期模板：读本地 / 写离线 ----
   Future<List<Recurring>> getRecurring() async {
@@ -757,17 +754,241 @@ class LocalFirstApi {
           online: () => _api.deleteWalletTxn(id),
           body: {'id': id}, summary: '删除钱包记录', refresh: _refreshWallets);
 
-  Future<BillMonthly> getBillMonthly({int? year}) =>
-      _api.getBillMonthly(year: year);
-  Future<BillYearly> getBillYearly() => _api.getBillYearly();
-  Future<Map<String, dynamic>> getBillMonthDetail(String ym) =>
-      _api.getBillMonthDetail(ym);
-  Future<Map<String, dynamic>> getBillYearDetail(int year) =>
-      _api.getBillYearDetail(year);
   Future<Map<String, dynamic>> getSavingsItemHistory(int id) =>
       _api.getSavingsItemHistory(id);
   Future<Map<String, dynamic>> getWalletTxns(int id) =>
       _api.getWalletTxns(id);
+
+  // ================ 派生统计（账单/图表）本地聚合（离线可用） ================
+  // 照搬后端 bills/stats SQL 同口径：直接读本地 flows 在 Dart 内聚合
+  Future<List<Map<String, Object?>>> _flowsInRange(int bookId,
+      {String? start, String? end, String? type}) async {
+    final flows = await LocalDb.instance.allFlows(bookId);
+    final s = start == null || start.isEmpty ? null : _normStart(start);
+    final e = end == null || end.isEmpty ? null : _normEnd(end);
+    final t = type;
+    return flows.where((f) {
+      if (t != null && (f['type'] ?? '') != t) return false;
+      final ft = (f['flow_time'] as String? ?? '');
+      if (s != null && ft.compareTo(s) < 0) return false;
+      if (e != null && ft.compareTo(e) > 0) return false;
+      return true;
+    }).toList();
+  }
+
+  Future<List<CatStat>> getCategoryStat(
+      {String? start, String? end, String? type}) async {
+    final bookId = await _curBook();
+    final rows = await _flowsInRange(bookId, start: start, end: end, type: type);
+    final sum = <String, double>{};
+    final cnt = <String, int>{};
+    for (final f in rows) {
+      final c = ((f['category'] as String?) ?? '未标注');
+      sum[c] = (sum[c] ?? 0) + ((f['amount'] as num?) ?? 0).toDouble();
+      cnt[c] = (cnt[c] ?? 0) + 1;
+    }
+    final list = sum.entries
+        .map((e) => CatStat(name: e.key, value: e.value, count: cnt[e.key] ?? 0))
+        .toList();
+    list.sort((a, b) => b.value.compareTo(a.value));
+    return list;
+  }
+
+  Future<List<DailyStat>> getDaily({String? start, String? end}) async {
+    final bookId = await _curBook();
+    final rows = await _flowsInRange(bookId, start: start, end: end);
+    final byDate = <String, List<Map<String, Object?>>>{};
+    for (final f in rows) {
+      final d = ((f['flow_time'] as String?) ?? '').substring(0, 10);
+      if (d.isEmpty) continue;
+      byDate.putIfAbsent(d, () => []).add(f);
+    }
+    final list = byDate.entries.map((e) {
+      double inc = 0, exp = 0;
+      final groups = <String, List<Map<String, Object?>>>{};
+      for (final f in e.value) {
+        final t = (f['type'] ?? '') as String;
+        final amt = ((f['amount'] as num?) ?? 0).toDouble();
+        if (t == 'income') inc += amt; else exp += amt;
+        groups.putIfAbsent(t, () => []).add(f);
+      }
+      final top = <String, List<DailyTopItem>>{};
+      groups.forEach((t, g) {
+        g.sort((a, b) => ((b['amount'] as num?) ?? 0).compareTo((a['amount'] as num?) ?? 0));
+        top[t] = g.take(3).map((f) => DailyTopItem(
+              amount: ((f['amount'] as num?) ?? 0).toDouble(),
+              category: f['category'] as String?,
+              description: f['description'] as String?,
+            )).toList();
+      });
+      return DailyStat(date: e.key, expense: exp, income: inc, top: top);
+    }).toList();
+    list.sort((a, b) => b.date.compareTo(a.date));
+    return list;
+  }
+
+  Future<List<MonthlyStat>> getMonthly({int? year, String? category}) async {
+    final bookId = await _curBook();
+    final y = year ?? DateTime.now().year;
+    final all = await LocalDb.instance.allFlows(bookId);
+    final list = <MonthlyStat>[];
+    for (var m = 1; m <= 12; m++) {
+      final key = '$y-${m.toString().padLeft(2, '0')}';
+      double inc = 0, exp = 0;
+      for (final f in all) {
+        final ft = (f['flow_time'] as String? ?? '');
+        if (!ft.startsWith(key)) continue;
+        if (category != null && category.isNotEmpty &&
+            ((f['category'] as String?) ?? '') != category) continue;
+        final t = (f['type'] ?? '') as String;
+        final amt = ((f['amount'] as num?) ?? 0).toDouble();
+        if (t == 'income') inc += amt; else exp += amt;
+      }
+      list.add(MonthlyStat(month: key, expense: exp, income: inc));
+    }
+    return list;
+  }
+
+  Future<BillMonthly> getBillMonthly({int? year}) async {
+    final bookId = await _curBook();
+    final y = year ?? DateTime.now().year;
+    final all = await LocalDb.instance.allFlows(bookId);
+    final byMonth = <String, List<Map<String, Object?>>>{};
+    for (final f in all) {
+      final ft = (f['flow_time'] as String? ?? '');
+      if (!ft.startsWith('$y')) continue;
+      final k = ft.substring(0, 7);
+      byMonth.putIfAbsent(k, () => []).add(f);
+    }
+    final rows = <BillRow>[];
+    double ti = 0, te = 0;
+    int tc = 0;
+    for (var m = 1; m <= 12; m++) {
+      final k = '$y-${m.toString().padLeft(2, '0')}';
+      final list = byMonth[k] ?? [];
+      double inc = 0, exp = 0;
+      int cnt = 0;
+      for (final f in list) {
+        final t = (f['type'] ?? '') as String;
+        final amt = ((f['amount'] as num?) ?? 0).toDouble();
+        if (t == 'income') inc += amt; else exp += amt;
+        cnt++;
+      }
+      rows.add(BillRow(
+          month: k, label: '$m月',
+          income: inc, expense: exp, balance: inc - exp,
+          count: cnt, year: y));
+      ti += inc; te += exp; tc += cnt;
+    }
+    // years：本地全部流水涉及的年份（倒序）
+    final years = <int>{};
+    for (final f in all) {
+      final ft = (f['flow_time'] as String? ?? '');
+      if (ft.length >= 4) years.add(int.tryParse(ft.substring(0, 4)) ?? 0);
+    }
+    final ys = years.where((x) => x > 0).toList()..sort((a, b) => b.compareTo(a));
+    return BillMonthly(
+      year: y,
+      years: ys,
+      summary: BillRow(
+          month: '$y', label: '$y年',
+          income: ti, expense: te, balance: ti - te,
+          count: tc, year: y),
+      rows: rows,
+    );
+  }
+
+  Future<BillYearly> getBillYearly() async {
+    final bookId = await _curBook();
+    final all = await LocalDb.instance.allFlows(bookId);
+    final byYear = <int, List<Map<String, Object?>>>{};
+    for (final f in all) {
+      final ft = (f['flow_time'] as String? ?? '');
+      if (ft.length < 4) continue;
+      final y = int.tryParse(ft.substring(0, 4));
+      if (y == null) continue;
+      byYear.putIfAbsent(y, () => []).add(f);
+    }
+    final list = byYear.entries.toList()..sort((a, b) => b.key.compareTo(a.key));
+    final rows = <BillRow>[];
+    double ti = 0, te = 0;
+    int tc = 0;
+    for (final e in list) {
+      double inc = 0, exp = 0;
+      int cnt = 0;
+      for (final f in e.value) {
+        final t = (f['type'] ?? '') as String;
+        final amt = ((f['amount'] as num?) ?? 0).toDouble();
+        if (t == 'income') inc += amt; else exp += amt;
+        cnt++;
+      }
+      rows.add(BillRow(
+          month: '${e.key}', label: '${e.key}年',
+          income: inc, expense: exp, balance: inc - exp,
+          count: cnt, year: e.key));
+      ti += inc; te += exp; tc += cnt;
+    }
+    return BillYearly(
+      summary: BillRow(
+          month: 'all', label: '全部',
+          income: ti, expense: te, balance: ti - te,
+          count: tc, year: 0),
+      rows: rows,
+    );
+  }
+
+  Future<Map<String, dynamic>> getBillMonthDetail(String ym) async {
+    // 离线版：返回本月基础聚合 + 分类 top + 日趋势；衍生字段（对比上月/历史窗口）填 0 或省略
+    final bookId = await _curBook();
+    final all = await LocalDb.instance.allFlows(bookId);
+    final map = <String, double>{'income': 0, 'expense': 0};
+    final cat = <String, double>{};
+    final days = <String, double>{};
+    for (final f in all) {
+      final ft = (f['flow_time'] as String? ?? '');
+      if (!ft.startsWith(ym)) continue;
+      final t = (f['type'] ?? '') as String;
+      final amt = ((f['amount'] as num?) ?? 0).toDouble();
+      map[t] = (map[t] ?? 0) + amt;
+      final c = ((f['category'] as String?) ?? '未标注');
+      cat[c] = (cat[c] ?? 0) + amt;
+      final d = ft.substring(0, 10);
+      days[d] = (days[d] ?? 0) + (t == 'expense' ? amt : 0);
+    }
+    return {
+      'ym': ym,
+      'income': map['income'] ?? 0,
+      'expense': map['expense'] ?? 0,
+      'balance': (map['income'] ?? 0) - (map['expense'] ?? 0),
+      'topExpense': cat.entries.map((e) => {
+            'category': e.key, 'value': e.value,
+            'count': 0,
+          }).toList()..sort((a, b) => (b['value'] as double).compareTo(a['value'] as double)),
+      'dailyExpense': days.entries
+          .map((e) => {'date': e.key, 'value': e.value})
+          .toList()
+        ..sort((a, b) => (a['date'] as String).compareTo(b['date'] as String)),
+    };
+  }
+
+  Future<Map<String, dynamic>> getBillYearDetail(int year) async {
+    final bookId = await _curBook();
+    final all = await LocalDb.instance.allFlows(bookId);
+    final months = List.generate(12, (m) {
+      final k = '$year-${(m + 1).toString().padLeft(2, '0')}';
+      return <String, dynamic>{'month': k, 'income': 0.0, 'expense': 0.0};
+    });
+    for (final f in all) {
+      final ft = (f['flow_time'] as String? ?? '');
+      if (!ft.startsWith('$year')) continue;
+      final mm = int.tryParse(ft.substring(5, 7));
+      if (mm == null || mm < 1 || mm > 12) continue;
+      final t = (f['type'] ?? '') as String;
+      final amt = ((f['amount'] as num?) ?? 0).toDouble();
+      months[mm - 1][t] = ((months[mm - 1][t] ?? 0) as double) + amt;
+    }
+    return {'year': year, 'months': months};
+  }
 
   Future<AiStatus> getAiStatus() => _api.getAiStatus();
   Future<AiParseResult> parseText(String text) => _api.parseText(text);
