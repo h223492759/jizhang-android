@@ -89,11 +89,13 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: _msgs.length,
-              itemBuilder: (_, i) => _bubble(_msgs[i]),
-            ),
+            child: _msgs.isEmpty
+                ? _emptyGuide()
+                : ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: _msgs.length,
+                    itemBuilder: (_, i) => _bubble(_msgs[i]),
+                  ),
           ),
           if (_busy) const LinearProgressIndicator(),
           Container(
@@ -116,6 +118,59 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                 FloatingActionButton.small(onPressed: _send, child: const Icon(Icons.send)),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyGuide() {
+    final examples = [
+      '午饭花了38元',
+      '8月15号工资到账12000',
+      '滴滴打车22.5，从公司回家',
+      '这个月奶茶一共花了多少',
+    ];
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('👋 用自然语言记账 & 问账',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.text)),
+                SizedBox(height: 6),
+                Text('直接说一句，比如「午饭花了38元」，AI 会自动识别金额、分类、时间，确认后即可入账。',
+                    style: TextStyle(fontSize: 13, color: AppColors.text)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('试试这些：', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: examples
+                .map((e) => ActionChip(
+                      label: Text(e, style: const TextStyle(fontSize: 13)),
+                      backgroundColor: Colors.white,
+                      side: BorderSide(color: AppColors.divider),
+                      onPressed: () {
+                        _ctrl.text = e;
+                        _send();
+                      },
+                    ))
+                .toList(),
           ),
         ],
       ),

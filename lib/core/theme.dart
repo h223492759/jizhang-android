@@ -29,6 +29,9 @@ class AppTheme {
           foregroundColor: AppColors.text,
           elevation: 0,
           centerTitle: true,
+          // 统一缩小顶部标题字号（默认 Material3 约 22 偏大）
+          titleTextStyle: TextStyle(
+              fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.text),
         ),
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppColors.primary,

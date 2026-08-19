@@ -937,6 +937,21 @@ class LocalFirstApi {
     );
   }
 
+  // 整个账簿最早一笔流水的日期（YYYY-MM-DD）；用于「从 X 起已记账 N 天」
+  // 与后端 bills.js 的 SELECT MIN(flow_time) 同口径（账簿整体，而非当前月/年）。
+  // 注意：db.allFlows 默认按 flow_time DESC 排序，all.first 取到的是最新一笔，
+  // 因此必须显式求最小值，不能再用 all.first。
+  String _wholeBookFirstFlow(List<Map<String, Object?>> all) {
+    String? min;
+    for (final f in all) {
+      final ft = (f['flow_time'] as String? ?? '');
+      if (ft.isEmpty) continue;
+      if (min == null || ft.compareTo(min) < 0) min = ft;
+    }
+    if (min == null || min.length < 10) return '';
+    return min.substring(0, 10);
+  }
+
   Future<Map<String, dynamic>> getBillMonthDetail(String ym) async {
     // 照搬后端 bills /month-detail 输出（与网页端同口径），离线版
     final m = RegExp(r'^(\d{4})-(\d{2})$').firstMatch(ym);
@@ -950,8 +965,8 @@ class LocalFirstApi {
     final monthLastDay = DateTime(yy, mm + 1, 0).day;
     final elapsed = isCurrent ? (now.day.clamp(1, monthLastDay)) : monthLastDay;
 
-    // 首笔流水
-    final firstFlow = all.isEmpty ? '' : (all.first['flow_time'] as String? ?? '').substring(0, 10);
+    // 首笔流水（整个账簿最早日）
+    final firstFlow = _wholeBookFirstFlow(all);
     final firstDate = firstFlow.isNotEmpty ? DateTime.tryParse(firstFlow) : null;
     int startDayCount = 0;
     if (firstDate != null) {
@@ -1134,8 +1149,8 @@ class LocalFirstApi {
     final isCurrent = year == now.year;
     final elapsedMonths = isCurrent ? now.month + 1 : 12;
 
-    // 首笔流水
-    final firstFlow = all.isEmpty ? '' : (all.first['flow_time'] as String? ?? '').substring(0, 10);
+    // 首笔流水（整个账簿最早日）
+    final firstFlow = _wholeBookFirstFlow(all);
     final firstDate = firstFlow.isNotEmpty ? DateTime.tryParse(firstFlow) : null;
     int startDayCount = 0;
     if (firstDate != null) {

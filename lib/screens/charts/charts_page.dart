@@ -354,6 +354,18 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
               _onBarTap(response.spot!.touchedBarGroupIndex);
             }
           },
+          // 触摸提示：用 fmtMoney 格式化，避免裸 double 显示很多位小数
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              final label = _yearMode
+                  ? '${group.x.toInt() + 1}月'
+                  : '${group.x.toInt() + 1}日';
+              return BarTooltipItem(
+                '$label  ¥${fmtMoney(rod.toY)}',
+                const TextStyle(color: Colors.white, fontSize: 12),
+              );
+            },
+          ),
         ),
         titlesData: FlTitlesData(
           bottomTitles: AxisTitles(sideTitles: SideTitles(

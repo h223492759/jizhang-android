@@ -114,7 +114,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
                 ? '这是 ${d['year']} 年的年度账单'
                 : '这是 ${d['year']} 年 ${d['month']} 月的月度账单',
             style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.text),
+                fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.text),
           ),
           if (first.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -138,7 +138,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             Text(fmtMoney((d['lastMonthBalance'] ?? 0).toDouble()),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -315,6 +315,19 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
           borderData: FlBorderData(
             show: true,
             border: Border(bottom: BorderSide(color: AppColors.divider, width: 1)),
+          ),
+          // 触摸提示：用 fmtMoney 格式化，避免裸 double 显示很多位小数
+          barTouchData: BarTouchData(
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final m = list[group.x.toInt()] as Map;
+                final label = (m['label'] ?? '').toString();
+                return BarTooltipItem(
+                  '$label  ¥${fmtMoney(rod.toY)}',
+                  const TextStyle(color: Colors.white, fontSize: 12),
+                );
+              },
+            ),
           ),
         ),
       ),
