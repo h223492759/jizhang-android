@@ -110,6 +110,38 @@ class ApiClient {
     return Category.listFrom(d);
   }
 
+  // ---------------- 定期记账 ----------------
+  Future<List<Recurring>> getRecurring() async {
+    final d = await _req(() => _dio.get('/recurring'));
+    return Recurring.listFrom(d);
+  }
+
+  Future<int> addRecurring(Map<String, dynamic> body) async {
+    final d = await _req(() => _dio.post('/recurring', data: body));
+    return (d as Map<String, dynamic>)['id'] as int;
+  }
+
+  Future<void> updateRecurring(int id, Map<String, dynamic> body) async {
+    await _req(() => _dio.put('/recurring/$id', data: body));
+  }
+
+  Future<void> deleteRecurring(int id) async {
+    await _req(() => _dio.delete('/recurring/$id'));
+  }
+
+  // 把到期待生成的模板落成真实流水，返回生成笔数
+  Future<int> generateRecurring() async {
+    final d = await _req(() => _dio.post('/recurring/generate'));
+    return (d as Map<String, dynamic>)['generated'] as int? ?? 0;
+  }
+
+  // 账本成员（定期模板归属下拉用）
+  Future<List<AttributionMember>> getAttributions() async {
+    final d = await _req(() => _dio.get('/flows/attributions'));
+    final m = (d as Map<String, dynamic>)['members'] as List? ?? [];
+    return m.map((e) => AttributionMember.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
   Future<FlowPage> getFlows({
     String? start,
     String? end,

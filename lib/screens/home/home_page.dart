@@ -13,6 +13,7 @@ import 'package:jizhang_android/screens/bills/bills_page.dart';
 import 'package:jizhang_android/screens/budget/budget_page.dart';
 import 'package:jizhang_android/screens/assets/assets_page.dart';
 import 'package:jizhang_android/screens/assets/wallets_page.dart';
+import 'package:jizhang_android/screens/flows/recurring_page.dart';
 import 'package:jizhang_android/screens/me/me_page.dart';
 import 'package:jizhang_android/screens/record/record_page.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
@@ -159,7 +160,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       ('预算', Icons.savings, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetPage()))),
       ('目标', Icons.flag, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssetsPage(initialTab: 0)))),
       ('钱包', Icons.account_balance_wallet, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletsPage()))),
-      ('更多', Icons.grid_view, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MePage()))),
+      ('定期', Icons.watch_later_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecurringPage()))),
     ];
     return Container(
       color: AppColors.primary,

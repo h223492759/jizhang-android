@@ -653,3 +653,65 @@ class PresetsData {
         recent: PresetName.listFrom(j['recent']),
       );
 }
+
+/// 定期记账模板
+class Recurring {
+  final int id;
+  final String type; // expense | income
+  final String category;
+  final String description;
+  final double amount;
+  final String paymentMethod;
+  final String freq; // monthly | yearly
+  final int dayOfMonth;
+  final int monthOfYear;
+  final String note;
+  final String nextRun;
+  final int? attributionUid;
+  final String attribution;
+  Recurring({
+    required this.id,
+    required this.type,
+    required this.category,
+    required this.description,
+    required this.amount,
+    required this.paymentMethod,
+    required this.freq,
+    required this.dayOfMonth,
+    required this.monthOfYear,
+    required this.note,
+    required this.nextRun,
+    this.attributionUid,
+    this.attribution = '',
+  });
+  factory Recurring.fromJson(Map<String, dynamic> j) => Recurring(
+        id: j['id'],
+        type: j['type'] ?? 'expense',
+        category: j['category'] ?? '',
+        description: j['description'] ?? '',
+        amount: (j['amount'] ?? 0).toDouble(),
+        paymentMethod: j['payment_method'] ?? '',
+        freq: j['freq'] ?? 'monthly',
+        dayOfMonth: j['day_of_month'] ?? 1,
+        monthOfYear: j['month_of_year'] ?? 1,
+        note: j['note'] ?? '',
+        nextRun: j['next_run'] ?? '',
+        attributionUid: j['attribution_uid'],
+        attribution: j['attribution'] ?? '',
+      );
+  static List<Recurring> listFrom(dynamic v) =>
+      (v as List? ?? []).map((e) => Recurring.fromJson(e as Map<String, dynamic>)).toList();
+  bool get isExpense => type == 'expense';
+  String get freqText => freq == 'yearly'
+      ? '每年 $monthOfYear 月 $dayOfMonth 号'
+      : '每月 $dayOfMonth 号';
+}
+
+/// 账本成员（归属下拉用）
+class AttributionMember {
+  final int id;
+  final String nickname;
+  AttributionMember({required this.id, required this.nickname});
+  factory AttributionMember.fromJson(Map<String, dynamic> j) =>
+      AttributionMember(id: j['id'], nickname: j['nickname'] ?? '');
+}
