@@ -312,11 +312,11 @@ class ApiClient {
     return d as Map<String, dynamic>;
   }
 
-  // 直接设置某细则当前金额并记一条历史（资金细则「新增记录」）
+  // 直接设置某细则当前金额并记一条历史（资金细则「新增记录」，可指定日期 ymd）
   Future<void> setSavingsItemAmount(int id,
-      {required double amount, String note = ''}) async {
+      {required double amount, String note = '', String ymd = ''}) async {
     await _req(() => _dio.post('/savings/items/$id/set-amount',
-        data: {'amount': amount, 'note': note}));
+        data: {'amount': amount, 'note': note, if (ymd.isNotEmpty) 'ymd': ymd}));
   }
 
   // 修改某细则的一条历史记录

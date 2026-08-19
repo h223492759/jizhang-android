@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:jizhang_android/components/simple_date_picker.dart';
 import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
@@ -309,6 +311,11 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     final yMin = (minV / step).floorToDouble() * step;
     final range = (maxV - yMin).abs().clamp(1.0, double.infinity);
     final hasTarget = s.target > 0;
+    double maxAbs = 0;
+    for (final m in list) {
+      if (maxAbs < m.net.abs()) maxAbs = m.net.abs();
+    }
+    if (maxAbs <= 0) maxAbs = 1;
     final targetFrac = hasTarget
         ? ((s.target - yMin) / range).clamp(0.0, 1.0)
         : 0.0;
@@ -372,10 +379,8 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 const SizedBox(width: 10),
                 SizedBox(
                   width: 100,
-                  child: Text('¥${fmtMoney(m.net)}',
-                      textAlign: TextAlign.end,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
-                          color: AppColors.textSecondary)),
+                  child: _pctText(
+                    hasTarget ? (m.net / s.target * 100) : (m.net.abs() / maxAbs * 100)),
                 ),
               ]),
             );
@@ -385,6 +390,26 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
               style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
         ],
       ),
+    );
+  }
+
+  // 百分比文本：2 位小数，整数部分正常字号，小数点+小数+% 用小字号
+  Widget _pctText(double pct) {
+    final str = pct.toStringAsFixed(2);
+    final dot = str.indexOf('.');
+    final intPart = dot > 0 ? str.substring(0, dot) : str;
+    final fracPart = dot > 0 ? str.substring(dot) : '.00';
+    return Text.rich(
+      TextSpan(children: [
+        TextSpan(
+            text: intPart,
+            style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+        TextSpan(
+            text: '$fracPart%',
+            style: const TextStyle(fontSize: 9, color: AppColors.textSecondary)),
+      ]),
+      textAlign: TextAlign.end,
     );
   }
 
@@ -534,7 +559,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     final v = await showDialog<double>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('修改存款目标'),
+        title: const Text('修改目标'),
         content: TextField(
           controller: ctrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -765,33 +790,62 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
   Future<void> _addRecord() async {
     final amount = TextEditingController();
     final note = TextEditingController();
+    DateTime date = DateTime.now();
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('新增记录 · ${widget.item.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('新记录会把该细则当前金额设为输入值，并记一条今天的记录。',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: amount,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: '金额', border: OutlineInputBorder()),
-              autofocus: true,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: note,
-              decoration: const InputDecoration(labelText: '备注（可选）', border: OutlineInputBorder()),
-            ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text('新增记录 · ${widget.item.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('新记录会把该细则当前金额设为输入值，并记一条记录。',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              const SizedBox(height: 8),
+              // 日期录入：点击弹日历选择
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () async {
+                  final picked = await pickSimpleDate(
+                    context,
+                    initialDate: date,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setD(() => date = picked);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.divider),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Row(children: [
+                    const Icon(Icons.calendar_today, size: 16, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
+                    Text('日期：${DateFormat('yyyy-MM-dd').format(date)}',
+                        style: const TextStyle(fontSize: 14)),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: amount,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: '金额', border: OutlineInputBorder()),
+                autofocus: true,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: note,
+                decoration: const InputDecoration(labelText: '备注（可选）', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('保存')),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('保存')),
-        ],
       ),
     );
     if (ok != true) return;
@@ -802,7 +856,10 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
     }
     try {
       await ref.read(apiProvider).setSavingsItemAmount(
-          widget.item.id, amount: amt, note: note.text.trim());
+          widget.item.id,
+          amount: amt,
+          note: note.text.trim(),
+          ymd: DateFormat('yyyy-MM-dd').format(date));
       toast('已保存');
       widget.onChanged();
       _load();
@@ -943,14 +1000,13 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
                                 style: const TextStyle(fontSize: 12),
                               ),
                               trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 18),
+                                TextButton(
                                   onPressed: () => _edit(h),
+                                  child: const Text('改'),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 18),
-                                  color: AppColors.expense,
+                                TextButton(
                                   onPressed: () => _del(h),
+                                  child: const Text('删', style: TextStyle(color: AppColors.expense)),
                                 ),
                               ]),
                             );
