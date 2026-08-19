@@ -88,6 +88,14 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     final s = _sav;
     if (s == null) return const SizedBox();
     final hasTarget = s.target > 0;
+    // 第一区域优先显示最新月份的历史快照（与下方柱状图一致），否则 fallback 到实时合计
+    final latest = s.months.isNotEmpty ? s.months.last : null;
+    final showNet = latest?.net ?? s.net;
+    final showAsset = latest?.asset ?? s.asset;
+    final showLiability = latest?.liability ?? s.liability;
+    final showPercent =
+        hasTarget ? ((showNet / s.target) * 100).round() : 0;
+    final showRemaining = hasTarget ? (s.target - showNet) : 0.0;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -102,11 +110,11 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 const Text('当前净资产', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('¥${fmtMoney(s.net)}',
+                  child: Text('¥${fmtMoney(showNet)}',
                       style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: s.net >= 0 ? AppColors.income : AppColors.expense)),
+                          color: showNet >= 0 ? AppColors.income : AppColors.expense)),
                 ),
               ]),
               const SizedBox(height: 8),
@@ -114,33 +122,33 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 spacing: 8,
                 runSpacing: 4,
                 children: [
-                  Text('资产 ${fmtMoney(s.asset)}',
+                  Text('资产 ${fmtMoney(showAsset)}',
                       style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                   const Text('｜', style: TextStyle(color: AppColors.textSecondary)),
-                  Text('负债 ${fmtMoney(s.liability)}',
+                  Text('负债 ${fmtMoney(showLiability)}',
                       style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                   if (hasTarget) ...[
                     const Text('｜', style: TextStyle(color: AppColors.textSecondary)),
                     Text(
-                        s.remaining > 0
-                            ? '还差 ¥${fmtMoney(s.remaining)}'
-                            : '已超 ¥${fmtMoney(-s.remaining)}',
+                        showRemaining > 0
+                            ? '还差 ¥${fmtMoney(showRemaining)}'
+                            : '已超 ¥${fmtMoney(-showRemaining)}',
                         style: TextStyle(
                             fontSize: 13,
-                            color: s.remaining > 0 ? AppColors.expense : AppColors.income)),
+                            color: showRemaining > 0 ? AppColors.expense : AppColors.income)),
                   ],
                 ],
               ),
               if (hasTarget) ...[
                 const SizedBox(height: 12),
                 LinearProgressIndicator(
-                  value: (s.percent / 100).clamp(0.0, 1.0),
+                  value: (showPercent / 100).clamp(0.0, 1.0),
                   minHeight: 12,
                   backgroundColor: AppColors.background,
-                  valueColor: AlwaysStoppedAnimation(s.net >= s.target ? AppColors.income : AppColors.primaryDark),
+                  valueColor: AlwaysStoppedAnimation(showNet >= s.target ? AppColors.income : AppColors.primaryDark),
                 ),
                 const SizedBox(height: 6),
-                Text('已达成 ${s.percent}% · 目标 ¥${fmtMoney(s.target)}',
+                Text('已达成 $showPercent% · 目标 ¥${fmtMoney(s.target)}',
                     style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               ] else
                 const Padding(
@@ -376,12 +384,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                     },
                   ),
                 ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 100,
-                  child: _pctText(
+                const SizedBox(width: 8),
+                // 百分比紧贴条末端（小间距），不再固定 100px 宽右对齐
+                _pctText(
                     hasTarget ? (m.net / s.target * 100) : (m.net.abs() / maxAbs * 100)),
-                ),
               ]),
             );
           }).toList(),
