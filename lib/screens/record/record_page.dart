@@ -312,7 +312,8 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             child: Text(label,
                 style: TextStyle(
                     color: active ? Colors.white : AppColors.text,
-                    fontWeight: FontWeight.bold)),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14)),
           ),
         ),
       ),
@@ -484,6 +485,10 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                 }).toList(),
               ),
             ),
+          ] else if (_cat != null) ...[
+            const SizedBox(height: 6),
+            Text('该分类暂无常用名，可直接在下方输入',
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
           ],
         ],
       ),

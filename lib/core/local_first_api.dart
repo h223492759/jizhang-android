@@ -938,56 +938,341 @@ class LocalFirstApi {
   }
 
   Future<Map<String, dynamic>> getBillMonthDetail(String ym) async {
-    // 离线版：返回本月基础聚合 + 分类 top + 日趋势；衍生字段（对比上月/历史窗口）填 0 或省略
+    // 照搬后端 bills /month-detail 输出（与网页端同口径），离线版
+    final m = RegExp(r'^(\d{4})-(\d{2})$').firstMatch(ym);
+    if (m == null) return {'year': 0, 'month': 0, 'ym': ym};
+    final yy = int.parse(m.group(1)!);
+    final mm = int.parse(m.group(2)!);
     final bookId = await _curBook();
     final all = await LocalDb.instance.allFlows(bookId);
-    final map = <String, double>{'income': 0, 'expense': 0};
-    final cat = <String, double>{};
-    final days = <String, double>{};
+    final now = DateTime.now();
+    final isCurrent = yy == now.year && mm == now.month;
+    final monthLastDay = DateTime(yy, mm + 1, 0).day;
+    final elapsed = isCurrent ? (now.day.clamp(1, monthLastDay)) : monthLastDay;
+
+    // 首笔流水
+    final firstFlow = all.isEmpty ? '' : (all.first['flow_time'] as String? ?? '').substring(0, 10);
+    final firstDate = firstFlow.isNotEmpty ? DateTime.tryParse(firstFlow) : null;
+    int startDayCount = 0;
+    if (firstDate != null) {
+      final ref = isCurrent ? now : DateTime(yy, mm, monthLastDay);
+      if (!ref.isBefore(firstDate)) startDayCount = ref.difference(firstDate).inDays + 1;
+    }
+
+    // 本月 / 上一月 / 整体聚合
+    final thisRows = <Map<String, Object?>>[];
+    final prevRows = <Map<String, Object?>>[];
     for (final f in all) {
       final ft = (f['flow_time'] as String? ?? '');
-      if (!ft.startsWith(ym)) continue;
+      if (!ft.startsWith(ym)) {
+        final py = yy * 12 + mm - 1;
+        final fy = int.tryParse(ft.substring(0, 4)) ?? 0;
+        final fm = int.tryParse(ft.substring(5, 7)) ?? 0;
+        if (fy * 12 + fm == py) prevRows.add(f);
+        continue;
+      }
+      thisRows.add(f);
+    }
+    double monthIncome = 0, monthExpense = 0;
+    final cat = <String, double>{};
+    final dayExpense = <String, double>{};
+    for (final f in thisRows) {
       final t = (f['type'] ?? '') as String;
       final amt = ((f['amount'] as num?) ?? 0).toDouble();
-      map[t] = (map[t] ?? 0) + amt;
       final c = ((f['category'] as String?) ?? '未标注');
-      cat[c] = (cat[c] ?? 0) + amt;
-      final d = ft.substring(0, 10);
-      days[d] = (days[d] ?? 0) + (t == 'expense' ? amt : 0);
+      if (t == 'income') monthIncome += amt;
+      else { monthExpense += amt; cat[c] = (cat[c] ?? 0) + amt; }
+      final d = (f['flow_time'] as String).substring(0, 10);
+      dayExpense[d] = (dayExpense[d] ?? 0) + (t == 'expense' ? amt : 0);
     }
+    double lastMonthBalance = 0;
+    for (final f in prevRows) {
+      final t = (f['type'] ?? '') as String;
+      final amt = ((f['amount'] as num?) ?? 0).toDouble();
+      lastMonthBalance += (t == 'income' ? amt : -amt);
+    }
+
+    // 支出分类（含 percent）+ 收入/支出 top3
+    final expenseByCategory = cat.entries
+        .map((e) => {
+              'category': e.key,
+              'amount': e.value,
+              'percent': monthExpense > 0 ? (e.value / monthExpense * 1000).round() / 10 : 0,
+            })
+        .toList()
+      ..sort((a, b) => (b['amount'] as double).compareTo(a['amount'] as double));
+    Map<String, Object?> _flowRowToMap(Map<String, Object?> f) => {
+          'id': f['id'],
+          'flow_time': f['flow_time'],
+          'amount': f['amount'],
+          'category': f['category'],
+          'description': f['description'],
+          'payment_method': f['payment_method'],
+        };
+    final expenseList = thisRows.where((f) => (f['type'] ?? '') == 'expense').toList()
+      ..sort((a, b) => ((b['amount'] as num?) ?? 0).compareTo((a['amount'] as num?) ?? 0));
+    final topExpenses = expenseList.take(3).map(_flowRowToMap).toList();
+    final incomeList = thisRows.where((f) => (f['type'] ?? '') == 'income').toList()
+      ..sort((a, b) => ((b['amount'] as num?) ?? 0).compareTo((a['amount'] as num?) ?? 0));
+    final topIncomes = incomeList.take(3).map(_flowRowToMap).toList();
+
+    // 单日最高支出 + 日均
+    final sortedDays = dayExpense.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final highestDay = sortedDays.isNotEmpty
+        ? {'date': sortedDays.first.key, 'amount': sortedDays.first.value}
+        : {'date': '', 'amount': 0};
+    final dailyAvgExpense = elapsed > 0 ? monthExpense / elapsed : 0;
+
+    // 对比窗口（前后各 2 月）
+    final allMonths = <String>{};
+    for (final f in all) {
+      final ft = (f['flow_time'] as String? ?? '');
+      if (ft.length >= 7) allMonths.add(ft.substring(0, 7));
+    }
+    final sortedMonths = allMonths.toList()..sort();
+    final idx = sortedMonths.indexOf(ym);
+    Map<String, double> _monthAgg(String m) {
+      double i = 0, e = 0;
+      for (final f in all) {
+        final ft = (f['flow_time'] as String? ?? '');
+        if (!ft.startsWith(m)) continue;
+        final t = (f['type'] ?? '') as String;
+        final a = ((f['amount'] as num?) ?? 0).toDouble();
+        if (t == 'income') i += a; else e += a;
+      }
+      return {'income': i, 'expense': e};
+    }
+
+    List<Map<String, Object?>> compare;
+    if (idx < 0) {
+      compare = [];
+    } else {
+      int lo = idx - 2, hi = idx + 2;
+      if (hi > sortedMonths.length - 1) {
+        hi = sortedMonths.length - 1;
+        lo = (hi - 4).clamp(0, hi);
+      }
+      lo = lo.clamp(0, hi);
+      compare = sortedMonths.sublist(lo, hi + 1).map((m) {
+        final a = _monthAgg(m);
+        return {
+          'ym': m,
+          'label': m.substring(5, 7),
+          'income': a['income'] ?? 0,
+          'expense': a['expense'] ?? 0,
+        };
+      }).toList();
+    }
+
+    // 对比上月分类变化 top3
+    Map<String, double> _catSums(String m, String type) {
+      final r = <String, double>{};
+      for (final f in all) {
+        final ft = (f['flow_time'] as String? ?? '');
+        if (!ft.startsWith(m)) continue;
+        if ((f['type'] ?? '') != type) continue;
+        final c = ((f['category'] as String?) ?? '未标注');
+        r[c] = (r[c] ?? 0) + ((f['amount'] as num?) ?? 0).toDouble();
+      }
+      return r;
+    }
+
+    List<Map<String, Object?>> diffTop(String type) {
+      if (idx < 1) return [];
+      final prev = _catSums(sortedMonths[idx - 1], type);
+      final cur = _catSums(ym, type);
+      final names = <String>{...prev.keys, ...cur.keys};
+      final list = <Map<String, Object?>>[];
+      for (final c in names) {
+        final p = prev[c] ?? 0;
+        final k = cur[c] ?? 0;
+        final delta = (k - p).round() / 100;
+        if (delta.abs() < 0.005) continue;
+        list.add({
+          'category': c,
+          'prev': p,
+          'cur': k,
+          'delta': delta,
+          'dir': delta > 0 ? 'up' : 'down',
+        });
+      }
+      list.sort((a, b) => ((b['delta'] as double).abs()).compareTo((a['delta'] as double).abs()));
+      return list.take(3).toList();
+    }
+
     return {
+      'year': yy,
+      'month': mm,
       'ym': ym,
-      'income': map['income'] ?? 0,
-      'expense': map['expense'] ?? 0,
-      'balance': (map['income'] ?? 0) - (map['expense'] ?? 0),
-      'topExpense': cat.entries.map((e) => {
-            'category': e.key, 'value': e.value,
-            'count': 0,
-          }).toList()..sort((a, b) => (b['value'] as double).compareTo(a['value'] as double)),
-      'dailyExpense': days.entries
-          .map((e) => {'date': e.key, 'value': e.value})
-          .toList()
-        ..sort((a, b) => (a['date'] as String).compareTo(b['date'] as String)),
+      'isYear': false,
+      'startDayCount': startDayCount,
+      'firstFlow': firstFlow,
+      'thisMonth': {
+        'income': monthIncome,
+        'expense': monthExpense,
+        'balance': monthIncome - monthExpense,
+      },
+      'lastMonthBalance': lastMonthBalance,
+      'expenseByCategory': expenseByCategory,
+      'topExpenses': topExpenses,
+      'highestDayExpense': highestDay,
+      'dailyAvgExpense': dailyAvgExpense,
+      'expenseCompare': compare,
+      'expenseChangeVsPrev': diffTop('expense'),
+      'monthIncome': monthIncome,
+      'topIncomes': topIncomes,
+      'incomeCompare': compare,
+      'incomeChangeVsPrev': diffTop('income'),
     };
   }
 
   Future<Map<String, dynamic>> getBillYearDetail(int year) async {
     final bookId = await _curBook();
     final all = await LocalDb.instance.allFlows(bookId);
-    final months = List.generate(12, (m) {
-      final k = '$year-${(m + 1).toString().padLeft(2, '0')}';
-      return <String, dynamic>{'month': k, 'income': 0.0, 'expense': 0.0};
-    });
+    final now = DateTime.now();
+    final isCurrent = year == now.year;
+    final elapsedMonths = isCurrent ? now.month + 1 : 12;
+
+    // 首笔流水
+    final firstFlow = all.isEmpty ? '' : (all.first['flow_time'] as String? ?? '').substring(0, 10);
+    final firstDate = firstFlow.isNotEmpty ? DateTime.tryParse(firstFlow) : null;
+    int startDayCount = 0;
+    if (firstDate != null) {
+      final ref = isCurrent ? now : DateTime(year, 12, 31);
+      if (!ref.isBefore(firstDate)) startDayCount = ref.difference(firstDate).inDays + 1;
+    }
+
+    // 全年 / 上年聚合
+    final yearRows = <Map<String, Object?>>[];
+    final prevYearRows = <Map<String, Object?>>[];
     for (final f in all) {
       final ft = (f['flow_time'] as String? ?? '');
-      if (!ft.startsWith('$year')) continue;
-      final mm = int.tryParse(ft.substring(5, 7));
-      if (mm == null || mm < 1 || mm > 12) continue;
+      if (!ft.startsWith('$year')) {
+        if (ft.startsWith('${year - 1}')) prevYearRows.add(f);
+        continue;
+      }
+      yearRows.add(f);
+    }
+    double yearIncome = 0, yearExpense = 0;
+    final cat = <String, double>{};
+    final monthExpense = <String, double>{};
+    for (final f in yearRows) {
       final t = (f['type'] ?? '') as String;
       final amt = ((f['amount'] as num?) ?? 0).toDouble();
-      months[mm - 1][t] = ((months[mm - 1][t] ?? 0) as double) + amt;
+      final c = ((f['category'] as String?) ?? '未标注');
+      if (t == 'income') yearIncome += amt;
+      else { yearExpense += amt; cat[c] = (cat[c] ?? 0) + amt; }
+      final m = (f['flow_time'] as String).substring(0, 7);
+      monthExpense[m] = (monthExpense[m] ?? 0) + (t == 'expense' ? amt : 0);
     }
-    return {'year': year, 'months': months};
+    double lastYearBalance = 0;
+    for (final f in prevYearRows) {
+      final t = (f['type'] ?? '') as String;
+      final amt = ((f['amount'] as num?) ?? 0).toDouble();
+      lastYearBalance += (t == 'income' ? amt : -amt);
+    }
+
+    final expenseByCategory = cat.entries
+        .map((e) => {
+              'category': e.key,
+              'amount': e.value,
+              'percent': yearExpense > 0 ? (e.value / yearExpense * 1000).round() / 10 : 0,
+            })
+        .toList()
+      ..sort((a, b) => (b['amount'] as double).compareTo(a['amount'] as double));
+    Map<String, Object?> _flowRowToMap(Map<String, Object?> f) => {
+          'id': f['id'],
+          'flow_time': f['flow_time'],
+          'amount': f['amount'],
+          'category': f['category'],
+          'description': f['description'],
+          'payment_method': f['payment_method'],
+        };
+    final expenseList = yearRows.where((f) => (f['type'] ?? '') == 'expense').toList()
+      ..sort((a, b) => ((b['amount'] as num?) ?? 0).compareTo((a['amount'] as num?) ?? 0));
+    final topExpenses = expenseList.take(3).map(_flowRowToMap).toList();
+    final incomeList = yearRows.where((f) => (f['type'] ?? '') == 'income').toList()
+      ..sort((a, b) => ((b['amount'] as num?) ?? 0).compareTo((a['amount'] as num?) ?? 0));
+    final topIncomes = incomeList.take(3).map(_flowRowToMap).toList();
+
+    final sortedMonths = monthExpense.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final highestMonth = sortedMonths.isNotEmpty
+        ? {'date': sortedMonths.first.key, 'amount': sortedMonths.first.value}
+        : {'date': '', 'amount': 0};
+    final monthlyAvgExpense = elapsedMonths > 0 ? yearExpense / elapsedMonths : 0;
+
+    final compare = List.generate(12, (m) {
+      final k = '$year-${(m + 1).toString().padLeft(2, '0')}';
+      double i = 0, e = 0;
+      for (final f in yearRows) {
+        if (!(f['flow_time'] as String).startsWith(k)) continue;
+        final t = (f['type'] ?? '') as String;
+        final a = ((f['amount'] as num?) ?? 0).toDouble();
+        if (t == 'income') i += a; else e += a;
+      }
+      return {'ym': k, 'label': (m + 1).toString(), 'income': i, 'expense': e};
+    });
+
+    Map<String, double> _catSums(int y, String type) {
+      final r = <String, double>{};
+      for (final f in all) {
+        final ft = (f['flow_time'] as String? ?? '');
+        if (!ft.startsWith('$y')) continue;
+        if ((f['type'] ?? '') != type) continue;
+        final c = ((f['category'] as String?) ?? '未标注');
+        r[c] = (r[c] ?? 0) + ((f['amount'] as num?) ?? 0).toDouble();
+      }
+      return r;
+    }
+
+    List<Map<String, Object?>> diffTop(String type) {
+      final prev = _catSums(year - 1, type);
+      final cur = _catSums(year, type);
+      final names = <String>{...prev.keys, ...cur.keys};
+      final list = <Map<String, Object?>>[];
+      for (final c in names) {
+        final p = prev[c] ?? 0;
+        final k = cur[c] ?? 0;
+        final delta = (k - p).round() / 100;
+        if (delta.abs() < 0.005) continue;
+        list.add({
+          'category': c,
+          'prev': p,
+          'cur': k,
+          'delta': delta,
+          'dir': delta > 0 ? 'up' : 'down',
+        });
+      }
+      list.sort((a, b) => ((b['delta'] as double).abs()).compareTo((a['delta'] as double).abs()));
+      return list.take(3).toList();
+    }
+
+    return {
+      'year': year,
+      'month': 0,
+      'ym': '$year',
+      'isYear': true,
+      'startDayCount': startDayCount,
+      'firstFlow': firstFlow,
+      'thisMonth': {
+        'income': yearIncome,
+        'expense': yearExpense,
+        'balance': yearIncome - yearExpense,
+      },
+      'lastMonthBalance': lastYearBalance,
+      'expenseByCategory': expenseByCategory,
+      'topExpenses': topExpenses,
+      'highestDayExpense': highestMonth,
+      'dailyAvgExpense': monthlyAvgExpense,
+      'expenseCompare': compare,
+      'expenseChangeVsPrev': diffTop('expense'),
+      'monthIncome': yearIncome,
+      'topIncomes': topIncomes,
+      'incomeCompare': compare,
+      'incomeChangeVsPrev': diffTop('income'),
+    };
   }
 
   Future<AiStatus> getAiStatus() => _api.getAiStatus();

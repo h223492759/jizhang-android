@@ -44,5 +44,14 @@ class AppTheme {
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
+        // 弹窗全局尺寸：标题/正文/按钮统一偏小，避免截图偏大看着拥挤
+        dialogTheme: DialogTheme(
+          titleTextStyle: const TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.text),
+          contentTextStyle: const TextStyle(
+              fontSize: 13, color: AppColors.text),
+          // 内容过长时可滚动（避免弹出被屏幕截断）
+          // 配合各 showDialog 调用在 content 用 SingleChildScrollView 包裹
+        ),
       );
 }

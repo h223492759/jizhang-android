@@ -97,7 +97,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
           ),
           if (_busy) const LinearProgressIndicator(),
           Container(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 84),
             color: Colors.white,
             child: Row(
               children: [
