@@ -20,6 +20,8 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   late TabController _tab;
   SavingsOverview? _sav;
   bool _loading = true;
+  // 资金细则调序模式：开启时卡片底部只显示 ↑↓（隐藏改/删），便于拖动重排
+  bool _ordering = false;
 
   @override
   void initState() {
@@ -205,13 +207,31 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         Row(children: [
           const Text('资金细则', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const Spacer(),
-          TextButton.icon(
-            onPressed: () => _showItemDialog(),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('新增细则'),
-          ),
+          if (_ordering)
+            TextButton.icon(
+              onPressed: () => setState(() => _ordering = false),
+              icon: const Icon(Icons.check, size: 18, color: AppColors.income),
+              label: const Text('完成', style: TextStyle(color: AppColors.income)),
+            )
+          else ...[
+            TextButton.icon(
+              onPressed: () => setState(() => _ordering = true),
+              icon: const Icon(Icons.swap_vert, size: 18),
+              label: const Text('调序'),
+            ),
+            TextButton.icon(
+              onPressed: () => _showItemDialog(),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('新增细则'),
+            ),
+          ],
         ]),
-        const SizedBox(height: 10),
+        if (_ordering) const Padding(
+          padding: EdgeInsets.only(bottom: 4),
+          child: Text('调序模式：用卡片下方 ↑↓ 调整顺序，完成后点右上角「完成」',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        ),
+        const SizedBox(height: 6),
         _itemGrid(s.items, false),
         if (s.expiredItems.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -237,13 +257,13 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         return Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: items.map((it) => SizedBox(width: w, child: _itemTile(it, expired))).toList(),
+          children: items.map((it) => SizedBox(width: w, child: _itemTile(it, expired, ordering: _ordering && !expired))).toList(),
         );
       },
     );
   }
 
-  Widget _itemTile(SavingsItem it, bool expired) {
+  Widget _itemTile(SavingsItem it, bool expired, {bool ordering = false}) {
     final color = it.isLiability ? AppColors.expense : AppColors.income;
     return Card(
       margin: EdgeInsets.zero,
@@ -287,18 +307,20 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 ),
               ),
             const SizedBox(height: 4),
+            // 调序模式只显示上下移按钮；默认模式显示改/删
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: ordering ? MainAxisAlignment.spaceEvenly : MainAxisAlignment.end,
               children: [
-                if (!expired) ...[
+                if (ordering) ...[
                   TextButton(onPressed: () => _moveItem(it, -1), child: const Text('↑')),
                   TextButton(onPressed: () => _moveItem(it, 1), child: const Text('↓')),
+                ] else ...[
+                  TextButton(onPressed: () => _showItemDialog(it), child: const Text('改')),
+                  TextButton(
+                    onPressed: () => _deleteItem(it),
+                    child: const Text('删', style: TextStyle(color: AppColors.expense)),
+                  ),
                 ],
-                TextButton(onPressed: () => _showItemDialog(it), child: const Text('改')),
-                TextButton(
-                  onPressed: () => _deleteItem(it),
-                  child: const Text('删', style: TextStyle(color: AppColors.expense)),
-                ),
               ],
             ),
           ],
