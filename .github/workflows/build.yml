@@ -22,6 +22,26 @@ jobs:
           flutter create --no-pub --platforms=android _gen_tmp
           cp -r _gen_tmp/android .
           rm -rf _gen_tmp
+      - name: Apply custom app icons
+        run: |
+          # 自定义 APP 图标（圆角 PNG，来自 assets/icons/）
+          # 删除 flutter create 默认的 vector foreground，避免与 PNG 同名冲突
+          rm -f android/app/src/main/res/drawable/ic_launcher_foreground.xml \
+                android/app/src/main/res/drawable-v21/ic_launcher_foreground.xml
+          # 各密度 mipmap（Android 7 及以下使用）—— cp src/. dst/ 把内容直接放进 dst
+          cp -r assets/icons/mipmap-mdpi/. android/app/src/main/res/mipmap-mdpi/
+          cp -r assets/icons/mipmap-hdpi/. android/app/src/main/res/mipmap-hdpi/
+          cp -r assets/icons/mipmap-xhdpi/. android/app/src/main/res/mipmap-xhdpi/
+          cp -r assets/icons/mipmap-xxhdpi/. android/app/src/main/res/mipmap-xxhdpi/
+          cp -r assets/icons/mipmap-xxxhdpi/. android/app/src/main/res/mipmap-xxxhdpi/
+          # adaptive icon foreground（Android 8+ 使用）
+          cp -r assets/icons/drawable-mdpi/. android/app/src/main/res/drawable-mdpi/
+          cp -r assets/icons/drawable-hdpi/. android/app/src/main/res/drawable-hdpi/
+          cp -r assets/icons/drawable-xhdpi/. android/app/src/main/res/drawable-xhdpi/
+          cp -r assets/icons/drawable-xxhdpi/. android/app/src/main/res/drawable-xxhdpi/
+          cp -r assets/icons/drawable-xxxhdpi/. android/app/src/main/res/drawable-xxxhdpi/
+          # adaptive icon XML（背景改为新图标，避免 Flutter 默认蓝色背景）
+          cp -r assets/icons/mipmap-anydpi-v26/. android/app/src/main/res/mipmap-anydpi-v26/
       - name: Patch Android project
         run: python3 scripts/patch_android.py
       - run: flutter pub get
