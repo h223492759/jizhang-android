@@ -185,6 +185,19 @@ class ApiClient {
     return d as Map<String, dynamic>;
   }
 
+  /// 预算设置全量（跨年，离线镜像用）
+  Future<List<Map<String, dynamic>>> getBudgetSettings() async {
+    final d = await _req(() => _dio.get('/budgets/settings'));
+    return ((d as Map)['list'] as List? ?? []).cast<Map<String, dynamic>>();
+  }
+
+  /// 服务器操作审计日志（最近 N 条）
+  Future<List<Map<String, dynamic>>> getOpLogs({int limit = 50}) async {
+    final d = await _req(
+        () => _dio.get('/oplogs', queryParameters: {'limit': limit}));
+    return ((d as Map)['list'] as List? ?? []).cast<Map<String, dynamic>>();
+  }
+
   Future<Overview> getOverview({String? start, String? end}) async {
     final q = <String, dynamic>{};
     if (start != null) q['start'] = start;

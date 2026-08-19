@@ -50,7 +50,100 @@ class LocalFirstApi {
       income: ((cs['income'] as num?) ?? 0).toDouble(),
       list: rows.map(_flowFromRow).toList(),
     );
+
   }
+
+  // ---- 镜像刷新 helpers ----
+  Future<void> _refreshRecurring() async {
+    try {
+      final bookId = await _curBook();
+      final rows = await _api.getRecurring();
+      await LocalDb.instance.replaceRecurring(
+          bookId,
+          rows
+              .map((r) => {
+                    'id': r.id,
+                    'type': r.type,
+                    'category': r.category,
+                    'description': r.description,
+                    'amount': r.amount,
+                    'payment_method': r.paymentMethod,
+                    'freq': r.freq,
+                    'day_of_month': r.dayOfMonth,
+                    'month_of_year': r.monthOfYear,
+                    'note': r.note,
+                    'next_run': r.nextRun,
+                    'attribution_uid': r.attributionUid,
+                    'attribution': r.attribution,
+                  })
+              .toList());
+    } catch (_) {}
+  }
+
+  Future<void> _refreshBudgets() async {
+    try {
+      final bookId = await _curBook();
+      final rows = await _api.getBudgetSettings();
+      await LocalDb.instance.replaceBudgets(
+          bookId,
+          rows
+              .map((r) => {
+                    'year': r['year'],
+                    'category': r['category'] ?? '',
+                    'amount': r['amount'] ?? 0,
+                    'expression': r['expression'] ?? '',
+                  })
+              .toList());
+    } catch (_) {}
+  }
+
+  Future<void> _refreshWallets() async {
+    try {
+      final bookId = await _curBook();
+      final w = await _api.getWallets();
+      await LocalDb.instance.saveWalletsJson(
+          bookId,
+          jsonEncode({
+            'wallets': w.wallets
+                .map((x) => {
+                      'id': x.id,
+                      'name': x.name,
+                      'icon': x.icon,
+                      'target': x.target,
+                      'note': x.note,
+                                            'balance': x.balance,
+                      'link_from': x.linkFrom,
+                      'link_category': x.linkCategory,
+                    })
+                .toList(),
+            'totalBalance': w.totalBalance,
+            'totalTarget': w.totalTarget,
+          }));
+    } catch (_) {}
+  }
+
+  /// 把定期模板请求体转本地镜像行（离线新建乐观写入用）
+  Map<String, Object?> _recurringFromBody(int bookId, int id,
+      Map<String, dynamic> b, {String? uuid, bool dirty = false}) =>
+      {
+        'id': id,
+        'book_id': bookId,
+        'type': b['type'] ?? 'expense',
+        'category': b['category'] ?? '',
+        'description': b['description'] ?? '',
+        'amount': (b['amount'] as num?)?.toDouble() ?? 0,
+        'payment_method': b['payment_method'] ?? '',
+        'freq': b['freq'] ?? 'monthly',
+        'day_of_month': b['day_of_month'] ?? 1,
+        'month_of_year': b['month_of_year'] ?? 1,
+        'note': b['note'] ?? '',
+        'next_run': b['next_run'] ?? '',
+        'attribution_uid': b['attribution_uid'],
+        'attribution': b['attribution'] ?? '',
+        'client_uuid': uuid,
+        'dirty': dirty ? 1 : 0,
+      };
+
 
   Future<Overview> getOverview({String? start, String? end}) async {
     final bookId = await _curBook();
@@ -231,15 +324,50 @@ class LocalFirstApi {
     }
   }
 
-  // ================= 储蓄（目标）写操作：在线 + 刷新本地镜像 =================
+  // ================= 通用离线写（在线直连 / 断网入队 + 操作日志） =================
 
-  Future<void> _savWrite(Future<void> Function() fn) async {
-    await fn();
-    await _refreshSavings();
+  Future<void> _offlineWrite({
+    required String op,
+    required String entity,
+    required Future<void> Function() online,
+    Map<String, dynamic>? body,
+    int? entityId,
+    String? uuid,
+    String summary = '',
+    Future<void> Function()? refresh,
+    Future<void> Function()? localApply,
+  }) async {
+    final bookId = await _curBook();
+    try {
+      await online();
+      await LocalDb.instance.addOpLog(bookId,
+          op: op, entity: entity, entityId: entityId, uuid: uuid,
+          summary: summary, status: 'ok');
+      if (refresh != null) await refresh();
+    } catch (e) {
+      if (_isNetworkErr(e)) {
+        await LocalDb.instance.enqueue(op, entity,
+            entityId: entityId, uuid: uuid, body: body);
+        await LocalDb.instance.addOpLog(bookId,
+            op: op, entity: entity, entityId: entityId, uuid: uuid,
+            summary: summary, status: 'queued');
+        if (localApply != null) await localApply();
+        return;
+      }
+      await LocalDb.instance.addOpLog(bookId,
+          op: op, entity: entity, entityId: entityId, uuid: uuid,
+          summary: summary, status: 'failed');
+      rethrow;
+    }
   }
 
+  // ---- 储蓄（目标）写操作：全部离线可改 ----
   Future<void> setSavingsGoal({required double target, String? note}) =>
-      _savWrite(() => _api.setSavingsGoal(target: target, note: note));
+      _offlineWrite(
+          op: 'setSavingsGoal', entity: 'savings_goal',
+          online: () => _api.setSavingsGoal(target: target, note: note),
+          body: {'target': target, 'note': note},
+          summary: '修改目标 ¥$target', refresh: _refreshSavings);
 
   Future<void> addSavingsItem({
     required String name,
@@ -248,9 +376,15 @@ class LocalFirstApi {
     String? asOf,
     String? asOfEnd,
     String? note,
-  }) =>
-      _savWrite(() => _api.addSavingsItem(
-          name: name, amount: amount, sign: sign, asOf: asOf, asOfEnd: asOfEnd, note: note));
+  }) {
+    final uuid = SyncEngine.newUuid();
+    return _offlineWrite(
+        op: 'addSavingsItem', entity: 'savings_item', uuid: uuid,
+        online: () => _api.addSavingsItem(
+            name: name, amount: amount, sign: sign, asOf: asOf, asOfEnd: asOfEnd, note: note),
+        body: {'name': name, 'amount': amount, 'sign': sign, 'as_of': asOf, 'as_of_end': asOfEnd, 'note': note, 'client_uuid': uuid},
+        summary: '新增细则 $name ¥$amount', refresh: _refreshSavings);
+  }
 
   Future<void> updateSavingsItem({
     required int id,
@@ -261,45 +395,72 @@ class LocalFirstApi {
     String? asOfEnd,
     String? note,
   }) =>
-      _savWrite(() => _api.updateSavingsItem(
-          id: id, name: name, amount: amount, sign: sign, asOf: asOf, asOfEnd: asOfEnd, note: note));
+      _offlineWrite(
+          op: 'updateSavingsItem', entity: 'savings_item', entityId: id,
+          online: () => _api.updateSavingsItem(
+              id: id, name: name, amount: amount, sign: sign, asOf: asOf, asOfEnd: asOfEnd, note: note),
+          body: {'id': id, 'name': name, 'amount': amount, 'sign': sign, 'as_of': asOf, 'as_of_end': asOfEnd, 'note': note},
+          summary: '修改细则 $name', refresh: _refreshSavings);
 
-  Future<void> deleteSavingsItem(int id) =>
-      _savWrite(() => _api.deleteSavingsItem(id));
+  Future<void> deleteSavingsItem(int id) => _offlineWrite(
+      op: 'deleteSavingsItem', entity: 'savings_item', entityId: id,
+      online: () => _api.deleteSavingsItem(id),
+      body: {'id': id}, summary: '删除细则 #$id', refresh: _refreshSavings);
 
-  Future<void> reorderSavingsItems(List<int> ids) =>
-      _savWrite(() => _api.reorderSavingsItems(ids));
+  Future<void> reorderSavingsItems(List<int> ids) => _offlineWrite(
+      op: 'reorderSavingsItems', entity: 'savings_item',
+      online: () => _api.reorderSavingsItems(ids),
+      body: {'ids': ids}, summary: '调整细则顺序', refresh: _refreshSavings);
 
   Future<void> bulkUpdateSavingsItems({
     required List<Map<String, dynamic>> items,
     String? ymd,
     String? mode,
   }) =>
-      _savWrite(() => _api.bulkUpdateSavingsItems(items: items, ymd: ymd, mode: mode));
+      _offlineWrite(
+          op: 'bulkUpdateSavingsItems', entity: 'savings_item',
+          online: () => _api.bulkUpdateSavingsItems(items: items, ymd: ymd, mode: mode),
+          body: {'items': items, 'ymd': ymd, 'mode': mode},
+          summary: '更新资产和负债', refresh: _refreshSavings);
 
   Future<void> setSavingsItemAmount(int id,
           {required double amount, String note = '', String ymd = ''}) =>
-      _savWrite(() =>
-          _api.setSavingsItemAmount(id, amount: amount, note: note, ymd: ymd));
+      _offlineWrite(
+          op: 'setSavingsItemAmount', entity: 'savings_item', entityId: id,
+          online: () => _api.setSavingsItemAmount(id, amount: amount, note: note, ymd: ymd),
+          body: {'id': id, 'amount': amount, 'note': note, 'ymd': ymd},
+          summary: '新增记录 ¥$amount', refresh: _refreshSavings);
 
   Future<void> updateSavingsItemHistory(int id, int hid,
           {required double amount, String note = ''}) =>
-      _savWrite(() => _api.updateSavingsItemHistory(id, hid,
-          amount: amount, note: note));
+      _offlineWrite(
+          op: 'updateSavingsItemHistory', entity: 'savings_history', entityId: id,
+          online: () => _api.updateSavingsItemHistory(id, hid, amount: amount, note: note),
+          body: {'id': id, 'hid': hid, 'amount': amount, 'note': note},
+          summary: '修改历史记录', refresh: _refreshSavings);
 
   Future<void> deleteSavingsItemHistory(int id, int hid) =>
-      _savWrite(() => _api.deleteSavingsItemHistory(id, hid));
+      _offlineWrite(
+          op: 'deleteSavingsItemHistory', entity: 'savings_history', entityId: id,
+          online: () => _api.deleteSavingsItemHistory(id, hid),
+          body: {'id': id, 'hid': hid}, summary: '删除历史记录', refresh: _refreshSavings);
 
   Future<void> deleteSavingsHistory(String ymd) =>
-      _savWrite(() => _api.deleteSavingsHistory(ymd));
+      _offlineWrite(
+          op: 'deleteSavingsHistory', entity: 'savings_history',
+          online: () => _api.deleteSavingsHistory(ymd),
+          body: {'ymd': ymd}, summary: '删除 $ymd 历史', refresh: _refreshSavings);
 
   Future<void> updateSavingsHistory({
     required String ymd,
     required double asset,
     required double liability,
   }) =>
-      _savWrite(() => _api.updateSavingsHistory(
-          ymd: ymd, asset: asset, liability: liability));
+      _offlineWrite(
+          op: 'updateSavingsHistory', entity: 'savings_history',
+          online: () => _api.updateSavingsHistory(ymd: ymd, asset: asset, liability: liability),
+          body: {'ymd': ymd, 'asset': asset, 'liability': liability},
+          summary: '修改 $ymd 历史', refresh: _refreshSavings);
 
   Future<void> _refreshSavings() async {
     try {
@@ -350,12 +511,6 @@ class LocalFirstApi {
   }
 
   // ================= 透传（在线） =================
-  Future<List<Recurring>> getRecurring() => _api.getRecurring();
-  Future<int> addRecurring(Map<String, dynamic> body) =>
-      _api.addRecurring(body);
-  Future<void> updateRecurring(int id, Map<String, dynamic> body) =>
-      _api.updateRecurring(id, body);
-  Future<void> deleteRecurring(int id) => _api.deleteRecurring(id);
   Future<int> generateRecurring() => _api.generateRecurring();
   Future<List<AttributionMember>> getAttributions() =>
       _api.getAttributions();
@@ -366,22 +521,242 @@ class LocalFirstApi {
       _api.getDaily(start: start, end: end);
   Future<List<MonthlyStat>> getMonthly({int? year, String? category}) =>
       _api.getMonthly(year: year, category: category);
-  Future<BudgetData> getBudgets({int? year}) => _api.getBudgets(year: year);
+
+  // ---- 定期模板：读本地 / 写离线 ----
+  Future<List<Recurring>> getRecurring() async {
+    final bookId = await _curBook();
+    final rows = await LocalDb.instance.getRecurringLocal(bookId);
+    return rows
+        .map((r) => Recurring.fromJson(
+            r.map((k, v) => MapEntry(k.toString(), v))))
+        .toList();
+  }
+
+  Future<int> addRecurring(Map<String, dynamic> body) async {
+    final bookId = await _curBook();
+    final uuid = SyncEngine.newUuid();
+    final b2 = {...body, 'client_uuid': uuid};
+    try {
+      final id = await _api.addRecurring(b2);
+      await LocalDb.instance.addOpLog(bookId,
+          op: 'addRecurring', entity: 'recurring', entityId: id, uuid: uuid,
+          summary: '新增定期模板', status: 'ok');
+      await _refreshRecurring();
+      return id;
+    } catch (e) {
+      if (_isNetworkErr(e)) {
+        await LocalDb.instance.enqueue('addRecurring', 'recurring', uuid: uuid, body: b2);
+        await LocalDb.instance.addOpLog(bookId,
+            op: 'addRecurring', entity: 'recurring', uuid: uuid,
+            summary: '新增定期模板', status: 'queued');
+        await LocalDb.instance.upsertRecurringLocal(
+            _recurringFromBody(bookId, -DateTime.now().millisecondsSinceEpoch, b2,
+                uuid: uuid, dirty: true));
+        return -DateTime.now().millisecondsSinceEpoch;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> updateRecurring(int id, Map<String, dynamic> body) =>
+      _offlineWrite(
+          op: 'updateRecurring', entity: 'recurring', entityId: id,
+          online: () => _api.updateRecurring(id, body),
+          body: {'id': id, ...body}, summary: '修改定期模板',
+          refresh: _refreshRecurring);
+
+  Future<void> deleteRecurring(int id) =>
+      _offlineWrite(
+          op: 'deleteRecurring', entity: 'recurring', entityId: id,
+          online: () => _api.deleteRecurring(id),
+          body: {'id': id}, summary: '删除定期模板',
+          localApply: () => LocalDb.instance.deleteRecurringLocal(id),
+          refresh: _refreshRecurring);
+
+  // ---- 预算：读本地（设置镜像 + 本地算进度）/ 写离线 ----
+  Future<BudgetData> getBudgets({int? year}) async {
+    final bookId = await _curBook();
+    final y = year ?? DateTime.now().year;
+    final settings = await LocalDb.instance.getBudgetSettings(bookId);
+    final rows = settings.where((r) => (r['year'] as int) == y).toList();
+    final totalRow = rows.where((r) => (r['category'] ?? '') == '').toList();
+    final catRows = rows.where((r) => (r['category'] ?? '') != '').toList();
+    final flows = await LocalDb.instance.allFlows(bookId);
+    double yearSpent = 0;
+    final catSpent = <String, double>{};
+    for (final f in flows) {
+      final t = (f['flow_time'] as String? ?? '');
+      if (f['type'] != 'expense' || !t.startsWith('$y')) continue;
+      final amt = ((f['amount'] as num?) ?? 0).toDouble();
+      yearSpent += amt;
+      final c = ((f['category'] as String?) ?? '');
+      catSpent[c] = (catSpent[c] ?? 0) + amt;
+    }
+    final totalAmount = ((totalRow.isEmpty ? null : totalRow.first['amount']) as num?)?.toDouble() ?? 0;
+    final cats = catRows.map((r) {
+      final cat = ((r['category'] as String?) ?? '');
+      final amt = ((r['amount'] as num?) ?? 0).toDouble();
+      final spent = catSpent[cat] ?? 0;
+      return BudgetCat(
+        category: cat,
+        amount: amt,
+        expression: ((r['expression'] as String?) ?? ''),
+        spent: spent,
+        remaining: amt - spent,
+        percent: amt > 0 ? (spent / amt * 100).round() : 0,
+      );
+    }).toList();
+    final sbc = <String, double>{};
+    final allCats = await LocalDb.instance.getCategories(bookId);
+    for (final c in allCats) {
+      if (c['type'] == 'expense') {
+        sbc[((c['name'] as String?) ?? '')] =
+            catSpent[((c['name'] as String?) ?? '')] ?? 0;
+      }
+    }
+    return BudgetData(
+      year: y,
+      totalAmount: totalAmount,
+      totalSpent: yearSpent,
+      totalRemaining: totalAmount - yearSpent,
+      totalPercent: totalAmount > 0 ? (yearSpent / totalAmount * 100).round() : 0,
+      categories: cats,
+      spentByCategory: sbc,
+    );
+  }
+
   Future<void> setBudget({
     required int year,
     String? category,
     required double amount,
     String? expression,
     List<String>? categories,
-  }) =>
-      _api.setBudget(
-          year: year,
-          category: category,
-          amount: amount,
-          expression: expression,
-          categories: categories);
+  }) {
+    final cat = category ?? '';
+    return _offlineWrite(
+        op: 'setBudget', entity: 'budget',
+        online: () => _api.setBudget(
+            year: year, category: category, amount: amount,
+            expression: expression, categories: categories),
+        body: {'year': year, 'category': category, 'amount': amount, 'expression': expression, 'categories': categories},
+        summary: '设置预算 ¥$amount',
+        localApply: () async {
+          final b = await _curBook();
+          await LocalDb.instance.upsertBudgetLocal(b, year, cat, amount, expression ?? '');
+        },
+        refresh: _refreshBudgets);
+  }
+
   Future<void> deleteBudget({required int year, String category = ''}) =>
-      _api.deleteBudget(year: year, category: category);
+      _offlineWrite(
+          op: 'deleteBudget', entity: 'budget',
+          online: () => _api.deleteBudget(year: year, category: category),
+          body: {'year': year, 'category': category},
+          summary: '删除预算',
+          localApply: () async {
+            final b = await _curBook();
+            await LocalDb.instance.deleteBudgetLocal(b, year, category);
+          },
+          refresh: _refreshBudgets);
+
+  // ---- 钱包：读本地整包 / 写离线 ----
+  Future<WalletsData> getWallets() async {
+    final bookId = await _curBook();
+    final j = await LocalDb.instance.getWalletsJson(bookId);
+    if (j == null || j.isEmpty) {
+      return WalletsData(wallets: [], totalBalance: 0, totalTarget: 0);
+    }
+    return WalletsData.fromJson(jsonDecode(j));
+  }
+
+  Future<int> addWallet({
+    required String name,
+    String icon = '👛',
+    double target = 0,
+    String linkCategory = '',
+    String linkFrom = '',
+    String note = '',
+  }) async {
+    final bookId = await _curBook();
+    final uuid = SyncEngine.newUuid();
+    try {
+      final id = await _api.addWallet(
+          name: name, icon: icon, target: target,
+          linkCategory: linkCategory, linkFrom: linkFrom, note: note);
+      await LocalDb.instance.addOpLog(bookId,
+          op: 'addWallet', entity: 'wallet', entityId: id, uuid: uuid,
+          summary: '新增钱包 $name', status: 'ok');
+      await _refreshWallets();
+      return id;
+    } catch (e) {
+      if (_isNetworkErr(e)) {
+        await LocalDb.instance.enqueue('addWallet', 'wallet', uuid: uuid, body: {
+          'name': name, 'icon': icon, 'target': target,
+          'link_category': linkCategory, 'link_from': linkFrom, 'note': note,
+          'client_uuid': uuid,
+        });
+        await LocalDb.instance.addOpLog(bookId,
+            op: 'addWallet', entity: 'wallet', uuid: uuid,
+            summary: '新增钱包 $name', status: 'queued');
+        return -DateTime.now().millisecondsSinceEpoch;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> updateWallet({
+    required int id,
+    required String name,
+    String icon = '👛',
+    double target = 0,
+    String note = '',
+    String linkCategory = '',
+    String linkFrom = '',
+  }) =>
+      _offlineWrite(
+          op: 'updateWallet', entity: 'wallet', entityId: id,
+          online: () => _api.updateWallet(
+              id: id, name: name, icon: icon, target: target, note: note,
+              linkCategory: linkCategory, linkFrom: linkFrom),
+          body: {'id': id, 'name': name, 'icon': icon, 'target': target, 'note': note, 'link_category': linkCategory, 'link_from': linkFrom},
+          summary: '修改钱包 $name', refresh: _refreshWallets);
+
+  Future<void> deleteWallet(int id) =>
+      _offlineWrite(
+          op: 'deleteWallet', entity: 'wallet', entityId: id,
+          online: () => _api.deleteWallet(id),
+          body: {'id': id}, summary: '删除钱包', refresh: _refreshWallets);
+
+  Future<void> addWalletTxn(int id,
+          {required double amount,
+          required String direction,
+          required String ymd,
+          String note = ''}) =>
+      _offlineWrite(
+          op: 'addWalletTxn', entity: 'wallet_txn', entityId: id,
+          online: () => _api.addWalletTxn(id,
+              amount: amount, direction: direction, ymd: ymd, note: note),
+          body: {'id': id, 'amount': amount, 'direction': direction, 'ymd': ymd, 'note': note},
+          summary: '钱包记账 $direction ¥$amount', refresh: _refreshWallets);
+
+  Future<void> updateWalletTxn(int id,
+          {required double amount,
+          required String direction,
+          required String ymd,
+          String note = ''}) =>
+      _offlineWrite(
+          op: 'updateWalletTxn', entity: 'wallet_txn', entityId: id,
+          online: () => _api.updateWalletTxn(id,
+              amount: amount, direction: direction, ymd: ymd, note: note),
+          body: {'id': id, 'amount': amount, 'direction': direction, 'ymd': ymd, 'note': note},
+          summary: '修改钱包记录', refresh: _refreshWallets);
+
+  Future<void> deleteWalletTxn(int id) =>
+      _offlineWrite(
+          op: 'deleteWalletTxn', entity: 'wallet_txn', entityId: id,
+          online: () => _api.deleteWalletTxn(id),
+          body: {'id': id}, summary: '删除钱包记录', refresh: _refreshWallets);
+
   Future<BillMonthly> getBillMonthly({int? year}) =>
       _api.getBillMonthly(year: year);
   Future<BillYearly> getBillYearly() => _api.getBillYearly();
@@ -393,55 +768,7 @@ class LocalFirstApi {
       _api.getSavingsItemHistory(id);
   Future<Map<String, dynamic>> getWalletTxns(int id) =>
       _api.getWalletTxns(id);
-  Future<WalletsData> getWallets() => _api.getWallets();
-  Future<void> addWalletTxn(int id,
-          {required double amount,
-          required String direction,
-          required String ymd,
-          String note = ''}) =>
-      _api.addWalletTxn(id,
-          amount: amount, direction: direction, ymd: ymd, note: note);
-  Future<int> addWallet({
-    required String name,
-    String icon = '👛',
-    double target = 0,
-    String linkCategory = '',
-    String linkFrom = '',
-    String note = '',
-  }) =>
-      _api.addWallet(
-          name: name,
-          icon: icon,
-          target: target,
-          linkCategory: linkCategory,
-          linkFrom: linkFrom,
-          note: note);
-  Future<void> updateWallet({
-    required int id,
-    required String name,
-    String icon = '👛',
-    double target = 0,
-    String note = '',
-    String linkCategory = '',
-    String linkFrom = '',
-  }) =>
-      _api.updateWallet(
-          id: id,
-          name: name,
-          icon: icon,
-          target: target,
-          note: note,
-          linkCategory: linkCategory,
-          linkFrom: linkFrom);
-  Future<void> deleteWallet(int id) => _api.deleteWallet(id);
-  Future<void> updateWalletTxn(int id,
-          {required double amount,
-          required String direction,
-          required String ymd,
-          String note = ''}) =>
-      _api.updateWalletTxn(id,
-          amount: amount, direction: direction, ymd: ymd, note: note);
-  Future<void> deleteWalletTxn(int id) => _api.deleteWalletTxn(id);
+
   Future<AiStatus> getAiStatus() => _api.getAiStatus();
   Future<AiParseResult> parseText(String text) => _api.parseText(text);
   Future<AiAnalyze> analyzeMonth({String? month}) =>
@@ -450,6 +777,8 @@ class LocalFirstApi {
   Future<Map<String, dynamic>> getSavingsMonthItems(String ym) =>
       _api.getSavingsMonthItems(ym);
   Future<Meta> getMeta() => _api.getMeta();
+  Future<List<Map<String, dynamic>>> getOpLogs({int limit = 50}) =>
+      _api.getOpLogs(limit: limit);
   Future<int> ping() => _api.ping();
   Future<LoginResult> login(String username, String password) =>
       _api.login(username, password);
@@ -494,4 +823,5 @@ final localApiProvider = Provider<LocalFirstApi>((ref) {
   final lfa = LocalFirstApi(api);
   lfa.currentUser = ref.watch(sessionProvider).user;
   return lfa;
+
 });

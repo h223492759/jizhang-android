@@ -77,10 +77,11 @@ class SyncEngine extends ChangeNotifier {
   /// 记录刷新信号：页面可 watch 此字段触发重新读取本地
   int get tick => _syncTick;
 
-  // ---------------- Outbox 补传 ----------------
+  // ---------------- Outbox 补传（全实体分发器） ----------------
   Future<void> _flushOutbox(int bookId, ApiClient a) async {
     final rows = await LocalDb.instance.listOutbox();
     if (rows.isEmpty) return;
+    var replayed = false;
     for (final row in rows) {
       final id = (row['id'] as num).toInt();
       final op = row['op'] as String;
@@ -91,32 +92,166 @@ class SyncEngine extends ChangeNotifier {
           ? <String, dynamic>{}
           : jsonDecode(bodyRaw) as Map<String, dynamic>;
       try {
-        if (op == 'create') {
-          // 幂等：uuid 必须带上；服务器返回 {id, dup?}
-          final newId = await a.createFlow({...body, 'uuid': uuid ?? ''});
-          // 本地临时行（client_uuid=uuid）删除，稍后增量拉取回填真实行
-          if (uuid != null && uuid.isNotEmpty) {
-            await LocalDb.instance.deleteFlowByUuid(uuid);
-          }
-          if (newId > 0) {
-            await LocalDb.instance.upsertFlow(
-                (await LocalDb.instance.flowById(newId)) ?? <String, Object?>{
-                  'id': newId,
-                  'book_id': bookId,
-                });
-          }
-        } else if (op == 'update' && entityId != null) {
-          await a.updateFlow(entityId, body);
-          await LocalDb.instance.markDirty(entityId, false);
-        } else if (op == 'delete' && entityId != null) {
-          await a.deleteFlow(entityId);
-          await LocalDb.instance.deleteFlowById(entityId);
-        }
+        await _replay(a, op, entityId, uuid, body, bookId);
         await LocalDb.instance.removeOutbox(id);
+        replayed = true;
       } catch (e) {
         await LocalDb.instance.bumpRetries(id);
         rethrow; // 网络或服务器错误：中止补传，等待下次同步
       }
+    }
+    // 有补传成功 → 重拉小表保证镜像一致
+    if (replayed) await _pullSmallTables(bookId, a);
+  }
+
+  Future<void> _replay(ApiClient a, String op, int? entityId, String? uuid,
+      Map<String, dynamic> body, int bookId) async {
+    switch (op) {
+      // ---- 流水 ----
+      case 'createFlow':
+        final newId = await a.createFlow({...body, 'uuid': uuid ?? ''});
+        if (uuid != null && uuid.isNotEmpty) {
+          await LocalDb.instance.deleteFlowByUuid(uuid);
+        }
+        break;
+      case 'updateFlow':
+        await a.updateFlow(body['id'] as int, body);
+        await LocalDb.instance.markDirty(body['id'] as int, false);
+        break;
+      case 'deleteFlow':
+        await a.deleteFlow(body['id'] as int);
+        await LocalDb.instance.deleteFlowById(body['id'] as int);
+        break;
+      // ---- 预算（budgets 天然幂等） ----
+      case 'setBudget':
+        await a.setBudget(
+            year: body['year'] as int,
+            category: body['category'] as String?,
+            amount: (body['amount'] as num).toDouble(),
+            expression: body['expression'] as String?,
+            categories: (body['categories'] as List?)?.cast<String>());
+        break;
+      case 'deleteBudget':
+        await a.deleteBudget(
+            year: body['year'] as int,
+            category: (body['category'] as String?) ?? '');
+        break;
+      // ---- 储蓄 ----
+      case 'setSavingsGoal':
+        await a.setSavingsGoal(
+            target: (body['target'] as num).toDouble(), note: body['note'] as String?);
+        break;
+      case 'addSavingsItem':
+        await a.addSavingsItem(
+            name: body['name'] as String,
+            amount: (body['amount'] as num).toDouble(),
+            sign: (body['sign'] as num).toInt(),
+            asOf: body['as_of'] as String?,
+            asOfEnd: body['as_of_end'] as String?,
+            note: body['note'] as String?);
+        break;
+      case 'updateSavingsItem':
+        await a.updateSavingsItem(
+            id: body['id'] as int,
+            name: body['name'] as String,
+            amount: (body['amount'] as num).toDouble(),
+            sign: (body['sign'] as num).toInt(),
+            asOf: body['as_of'] as String?,
+            asOfEnd: body['as_of_end'] as String?,
+            note: body['note'] as String?);
+        break;
+      case 'deleteSavingsItem':
+        await a.deleteSavingsItem(body['id'] as int);
+        break;
+      case 'reorderSavingsItems':
+        await a.reorderSavingsItems(
+            (body['ids'] as List).map((e) => (e as num).toInt()).toList());
+        break;
+      case 'bulkUpdateSavingsItems':
+        await a.bulkUpdateSavingsItems(
+            items: (body['items'] as List).cast<Map<String, dynamic>>(),
+            ymd: body['ymd'] as String?,
+            mode: body['mode'] as String?);
+        break;
+      case 'setSavingsItemAmount':
+        await a.setSavingsItemAmount(body['id'] as int,
+            amount: (body['amount'] as num).toDouble(),
+            note: (body['note'] as String?) ?? '',
+            ymd: (body['ymd'] as String?) ?? '');
+        break;
+      case 'updateSavingsItemHistory':
+        await a.updateSavingsItemHistory(body['id'] as int, body['hid'] as int,
+            amount: (body['amount'] as num).toDouble(),
+            note: (body['note'] as String?) ?? '');
+        break;
+      case 'deleteSavingsItemHistory':
+        await a.deleteSavingsItemHistory(body['id'] as int, body['hid'] as int);
+        break;
+      case 'deleteSavingsHistory':
+        await a.deleteSavingsHistory(body['ymd'] as String);
+        break;
+      case 'updateSavingsHistory':
+        await a.updateSavingsHistory(
+            ymd: body['ymd'] as String,
+            asset: (body['asset'] as num).toDouble(),
+            liability: (body['liability'] as num).toDouble());
+        break;
+      // ---- 定期模板 ----
+      case 'addRecurring':
+        await a.addRecurring(body);
+        if (uuid != null && uuid.isNotEmpty) {
+          await LocalDb.instance.deleteRecurringByUuid(uuid);
+        }
+        break;
+      case 'updateRecurring':
+        await a.updateRecurring(body['id'] as int, body);
+        break;
+      case 'deleteRecurring':
+        await a.deleteRecurring(body['id'] as int);
+        await LocalDb.instance.deleteRecurringLocal(body['id'] as int);
+        break;
+      // ---- 钱包 ----
+      case 'addWallet':
+        await a.addWallet(
+            name: body['name'] as String,
+            icon: (body['icon'] as String?) ?? '👛',
+            target: ((body['target'] as num?) ?? 0).toDouble(),
+            linkCategory: (body['link_category'] as String?) ?? '',
+            linkFrom: (body['link_from'] as String?) ?? '',
+            note: (body['note'] as String?) ?? '');
+        break;
+      case 'updateWallet':
+        await a.updateWallet(
+            id: body['id'] as int,
+            name: body['name'] as String,
+            icon: (body['icon'] as String?) ?? '👛',
+            target: ((body['target'] as num?) ?? 0).toDouble(),
+            note: (body['note'] as String?) ?? '',
+            linkCategory: (body['link_category'] as String?) ?? '',
+            linkFrom: (body['link_from'] as String?) ?? '');
+        break;
+      case 'deleteWallet':
+        await a.deleteWallet(body['id'] as int);
+        break;
+      case 'addWalletTxn':
+        await a.addWalletTxn(body['id'] as int,
+            amount: (body['amount'] as num).toDouble(),
+            direction: body['direction'] as String,
+            ymd: body['ymd'] as String,
+            note: (body['note'] as String?) ?? '');
+        break;
+      case 'updateWalletTxn':
+        await a.updateWalletTxn(body['id'] as int,
+            amount: (body['amount'] as num).toDouble(),
+            direction: body['direction'] as String,
+            ymd: body['ymd'] as String,
+            note: (body['note'] as String?) ?? '');
+        break;
+      case 'deleteWalletTxn':
+        await a.deleteWalletTxn(body['id'] as int);
+        break;
+      default:
+        break;
     }
   }
 
@@ -194,6 +329,66 @@ class SyncEngine extends ChangeNotifier {
       'months': sav.months.map(monthJson).toList(),
     });
     await db.saveSavings(bookId, savJson);
+
+    // 预算设置（跨年，离线镜像 + 本地算进度）
+    try {
+      final bset = await a.getBudgetSettings();
+      await db.replaceBudgets(
+          bookId,
+          bset
+              .map((r) => {
+                    'year': r['year'],
+                    'category': r['category'] ?? '',
+                    'amount': r['amount'] ?? 0,
+                    'expression': r['expression'] ?? '',
+                  })
+              .toList());
+    } catch (_) {}
+    // 定期模板
+    try {
+      final recs = await a.getRecurring();
+      await db.replaceRecurring(
+          bookId,
+          recs
+              .map((r) => {
+                    'id': r.id,
+                    'type': r.type,
+                    'category': r.category,
+                    'description': r.description,
+                    'amount': r.amount,
+                    'payment_method': r.paymentMethod,
+                    'freq': r.freq,
+                    'day_of_month': r.dayOfMonth,
+                    'month_of_year': r.monthOfYear,
+                    'note': r.note,
+                    'next_run': r.nextRun,
+                    'attribution_uid': r.attributionUid,
+                    'attribution': r.attribution,
+                  })
+              .toList());
+    } catch (_) {}
+    // 钱包（整包）
+    try {
+      final w = await a.getWallets();
+      await db.saveWalletsJson(
+          bookId,
+          jsonEncode({
+            'wallets': w.wallets
+                .map((x) => {
+                      'id': x.id,
+                      'name': x.name,
+                      'icon': x.icon,
+                      'target': x.target,
+                      'note': x.note,
+                      'balance': x.balance,
+                      'link_from': x.linkFrom,
+                      'link_category': x.linkCategory,
+                    })
+                .toList(),
+            'totalBalance': w.totalBalance,
+            'totalTarget': w.totalTarget,
+          }));
+    } catch (_) {}
   }
 
   // ---------------- 流水增量 / 全量 ----------------

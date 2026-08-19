@@ -9,6 +9,7 @@ import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/me/owner_color_settings_page.dart';
 import 'package:jizhang_android/screens/record/auto_record_settings_page.dart';
 import 'package:jizhang_android/screens/server/server_list_page.dart';
+import 'package:jizhang_android/screens/me/op_logs_page.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
 import 'package:jizhang_android/core/sync_engine.dart';
 import 'package:jizhang_android/core/storage.dart';
@@ -106,10 +107,11 @@ class MePage extends ConsumerWidget {
               } else {
                 sub = '点按立即同步';
               }
-              return _tile(Icons.sync, '同步', () => _syncNow(context, ref),
+              return           _tile(Icons.sync, '同步', () => _syncNow(context, ref),
                   subtitle: sub);
             },
           ),
+          _tile(Icons.history, '操作日志', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OpLogsPage())), subtitle: '本地/服务器操作记录'),
           _tile(Icons.swap_horiz, '切换服务器', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage()))),
           const SizedBox(height: 12),
           // 版本信息 + 设置信息合并展示

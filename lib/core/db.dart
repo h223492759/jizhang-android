@@ -21,7 +21,7 @@ class LocalDb {
 
   Future<Database> _open() async {
     final path = p.join(await getDatabasesPath(), 'jizhang_local.db');
-    return openDatabase(path, version: 1, onCreate: (d, v) async {
+    return openDatabase(path, version: 2, onCreate: (d, v) async {
       await d.execute('''
         CREATE TABLE flows(
           id INTEGER PRIMARY KEY,
@@ -94,7 +94,61 @@ class LocalDb {
         )''');
       await d.execute(
           'CREATE TABLE sync_meta(key TEXT PRIMARY KEY, value TEXT)');
+      await _createV2Tables(d);
+    }, onUpgrade: (d, oldV, newV) async {
+      if (oldV < 2) await _createV2Tables(d);
     });
+  }
+
+  Future<void> _createV2Tables(DatabaseExecutor d) async {
+    await d.execute('''
+      CREATE TABLE IF NOT EXISTS budgets(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        category TEXT NOT NULL DEFAULT '',
+        amount REAL NOT NULL DEFAULT 0,
+        expression TEXT NOT NULL DEFAULT '',
+        dirty INTEGER NOT NULL DEFAULT 0
+      )''');
+    await d.execute('CREATE INDEX IF NOT EXISTS idx_budgets_book ON budgets(book_id, year)');
+    await d.execute('''
+      CREATE TABLE IF NOT EXISTS recurring(
+        id INTEGER PRIMARY KEY,
+        book_id INTEGER NOT NULL,
+        type TEXT NOT NULL DEFAULT 'expense',
+        category TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        amount REAL NOT NULL DEFAULT 0,
+        payment_method TEXT NOT NULL DEFAULT '',
+        freq TEXT NOT NULL DEFAULT 'monthly',
+        day_of_month INTEGER NOT NULL DEFAULT 1,
+        month_of_year INTEGER NOT NULL DEFAULT 1,
+        note TEXT NOT NULL DEFAULT '',
+        next_run TEXT NOT NULL DEFAULT '',
+        attribution_uid INTEGER,
+        attribution TEXT NOT NULL DEFAULT '',
+        client_uuid TEXT,
+        dirty INTEGER NOT NULL DEFAULT 0
+      )''');
+    await d.execute('''
+      CREATE TABLE IF NOT EXISTS wallet_json(
+        book_id INTEGER PRIMARY KEY,
+        json TEXT NOT NULL
+      )''');
+    await d.execute('''
+      CREATE TABLE IF NOT EXISTS ops_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL,
+        ts TEXT NOT NULL,
+        op TEXT NOT NULL,
+        entity TEXT NOT NULL DEFAULT '',
+        entity_id INTEGER,
+        uuid TEXT,
+        summary TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'ok'
+      )''');
+    await d.execute('CREATE INDEX IF NOT EXISTS idx_opslog_book ON ops_log(book_id, id DESC)');
   }
 
   // ---------------- flows ----------------
@@ -388,4 +442,124 @@ class LocalDb {
     await d.insert('sync_meta', {'key': key, 'value': value},
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
+
+  // ---------------- budgets（预算设置镜像） ----------------
+  Future<void> replaceBudgets(int bookId, List<Map<String, Object?>> rows) async {
+    final d = await db;
+    await d.delete('budgets', where: 'book_id=?', whereArgs: [bookId]);
+    final batch = d.batch();
+    for (final r in rows) {
+      batch.insert('budgets', Map<String, Object?>.from(r)..['book_id'] = bookId);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<Map<String, Object?>>> getBudgetSettings(int bookId) async {
+    final d = await db;
+    return d.query('budgets',
+        where: 'book_id=?', whereArgs: [bookId], orderBy: 'year, category');
+  }
+
+  Future<void> upsertBudgetLocal(int bookId, int year, String category,
+      double amount, String expression) async {
+    final d = await db;
+    await d.insert('budgets', {
+      'book_id': bookId,
+      'year': year,
+      'category': category,
+      'amount': amount,
+      'expression': expression,
+      'dirty': 1,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> deleteBudgetLocal(int bookId, int year, String category) async {
+    final d = await db;
+    await d.delete('budgets',
+        where: 'book_id=? AND year=? AND category=?',
+        whereArgs: [bookId, year, category]);
+  }
+
+  // ---------------- recurring（定期模板镜像） ----------------
+  Future<void> replaceRecurring(int bookId, List<Map<String, Object?>> rows) async {
+    final d = await db;
+    await d.delete('recurring', where: 'book_id=?', whereArgs: [bookId]);
+    final batch = d.batch();
+    for (final r in rows) {
+      batch.insert('recurring', Map<String, Object?>.from(r)..['book_id'] = bookId);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<Map<String, Object?>>> getRecurringLocal(int bookId) async {
+    final d = await db;
+    return d.query('recurring', where: 'book_id=?', whereArgs: [bookId], orderBy: 'id');
+  }
+
+  Future<void> upsertRecurringLocal(Map<String, Object?> row) async {
+    final d = await db;
+    await d.insert('recurring', Map<String, Object?>.from(row),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> deleteRecurringLocal(int id) async {
+    final d = await db;
+    await d.delete('recurring', where: 'id=?', whereArgs: [id]);
+  }
+
+  Future<void> deleteRecurringByUuid(String uuid) async {
+    final d = await db;
+    await d.delete('recurring', where: 'client_uuid=?', whereArgs: [uuid]);
+  }
+
+  // ---------------- wallets（整包 JSON 镜像） ----------------
+  Future<void> saveWalletsJson(int bookId, String json) async {
+    final d = await db;
+    await d.insert('wallet_json', {'book_id': bookId, 'json': json},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<String?> getWalletsJson(int bookId) async {
+    final d = await db;
+    final rows = await d.query('wallet_json',
+        where: 'book_id=?', whereArgs: [bookId], limit: 1);
+    return rows.isEmpty ? null : (rows.first['json'] as String?);
+  }
+
+  // ---------------- ops_log（本地操作日志） ----------------
+  Future<void> addOpLog(int bookId, {
+    required String op,
+    String entity = '',
+    int? entityId,
+    String? uuid,
+    String summary = '',
+    String status = 'ok',
+  }) async {
+    final d = await db;
+    await d.insert('ops_log', {
+      'book_id': bookId,
+      'ts': DateTime.now().toIso8601String(),
+      'op': op,
+      'entity': entity,
+      'entity_id': entityId,
+      'uuid': uuid,
+      'summary': summary,
+      'status': status,
+    });
+  }
+
+  Future<List<Map<String, Object?>>> listOpLogs(int bookId, {int limit = 100}) async {
+    final d = await db;
+    return d.query('ops_log',
+        where: 'book_id=?', whereArgs: [bookId],
+        orderBy: 'id DESC', limit: limit);
+  }
+
+  // outbox 待重试数量（日志页展示）
+  Future<int> pendingOutboxCount() async {
+    final d = await db;
+    final r = await d.rawQuery('SELECT COUNT(*) AS n FROM outbox');
+    return (r.first['n'] as int?) ?? 0;
+  }
 }
+
