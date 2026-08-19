@@ -9,6 +9,7 @@ import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
 import 'package:jizhang_android/screens/flows/owner_flow_page.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 /// 分类详情页：用于图表页「分类排行」点击进入。
 /// - 顶部 3 行固定（始终可见）：
@@ -78,7 +79,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final fp = await api.getFlows(
           category: widget.category, type: widget.type, start: _start(), end: _end(), pageSize: 2000);
       final cats = await api.getCategories();

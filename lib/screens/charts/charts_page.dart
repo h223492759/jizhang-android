@@ -10,6 +10,7 @@ import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/flows/owner_flow_page.dart';
 import 'package:jizhang_android/screens/charts/category_detail_page.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class ChartsPage extends ConsumerStatefulWidget {
   const ChartsPage({super.key});
@@ -58,7 +59,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final cats = await api.getCategoryStat(type: _type, start: _start(), end: _end());
       final catMeta = await api.getCategories();
       final flows = await api.getFlows(start: _start(), end: _end(), pageSize: 2000);
@@ -399,7 +400,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       dateLabel = '${_period.year}年$m月';
       final s = DateFormat('yyyy-MM-01').format(DateTime(_period.year, m));
       final e = DateFormat('yyyy-MM-dd').format(DateTime(_period.year, m + 1, 0));
-      final fp = await ref.read(apiProvider).getFlows(start: s, end: e, pageSize: 2000);
+      final fp = await ref.read(localApiProvider).getFlows(start: s, end: e, pageSize: 2000);
       final list = fp.list.where((f) => f.type == _type).toList()
         ..sort((a, b) => b.amount.compareTo(a.amount));
       top = list.take(3).map((f) => _TopItem(f)).toList();

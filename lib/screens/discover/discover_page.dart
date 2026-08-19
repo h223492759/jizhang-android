@@ -5,6 +5,7 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class DiscoverPage extends ConsumerStatefulWidget {
   const DiscoverPage({super.key});
@@ -30,7 +31,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     setState(() => _msgs.add(_Msg(role: 'user', text: text)));
     setState(() => _busy = true);
     try {
-      final r = await ref.read(apiProvider).parseText(text);
+      final r = await ref.read(localApiProvider).parseText(text);
       setState(() => _msgs.add(_Msg(role: 'ai', text: '已识别以下记账信息', parse: r)));
     } catch (e) {
       setState(() => _msgs.add(_Msg(role: 'ai', text: e.toString().replaceFirst('ApiException: ', ''))));
@@ -42,7 +43,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   Future<void> _analyze() async {
     setState(() => _busy = true);
     try {
-      final a = await ref.read(apiProvider).analyzeMonth();
+      final a = await ref.read(localApiProvider).analyzeMonth();
       setState(() => _msgs.add(_Msg(role: 'ai', text: a.analysis.isEmpty ? '（AI 未返回分析）' : a.analysis)));
     } catch (e) {
       setState(() => _msgs.add(_Msg(role: 'ai', text: e.toString().replaceFirst('ApiException: ', ''))));
@@ -60,7 +61,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
       return;
     }
     try {
-      await ref.read(apiProvider).createFlow({
+      await ref.read(localApiProvider).createFlow({
         'type': p.type ?? 'expense',
         'amount': amt,
         'category': p.category ?? '其他',

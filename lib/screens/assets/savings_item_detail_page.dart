@@ -5,6 +5,7 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class SavingsItemDetailPage extends ConsumerStatefulWidget {
   final SavingsItem item;
@@ -26,7 +27,7 @@ class _SavingsItemDetailPageState extends ConsumerState<SavingsItemDetailPage> {
 
   Future<void> _load() async {
     try {
-      final d = await ref.read(apiProvider).getSavingsItemHistory(widget.item.id);
+      final d = await ref.read(localApiProvider).getSavingsItemHistory(widget.item.id);
       if (mounted) setState(() => _data = d);
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));

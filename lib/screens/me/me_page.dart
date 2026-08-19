@@ -9,6 +9,9 @@ import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/me/owner_color_settings_page.dart';
 import 'package:jizhang_android/screens/record/auto_record_settings_page.dart';
 import 'package:jizhang_android/screens/server/server_list_page.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
+import 'package:jizhang_android/core/sync_engine.dart';
+import 'package:jizhang_android/core/storage.dart';
 
 class MePage extends ConsumerWidget {
   const MePage({super.key});
@@ -87,6 +90,26 @@ class MePage extends ConsumerWidget {
           // 当前账本：点击切换
           _tile(Icons.book, '当前账本', () => _switchBook(context, ref, s), subtitle: book?.name ?? '未选择'),
           _tile(Icons.auto_awesome, '自动记账', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoRecordSettingsPage()))),
+          // 同步状态：点击手动同步
+          AnimatedBuilder(
+            animation: SyncEngine.instance,
+            builder: (context, _) {
+              final se = SyncEngine.instance;
+              String sub;
+              if (se.status == SyncStatus.syncing) {
+                sub = '同步中…';
+              } else if (se.status == SyncStatus.offline) {
+                sub = '离线 · 本地数据可用';
+              } else if (se.lastSyncAt != null) {
+                final t = se.lastSyncAt!;
+                sub = '上次同步 ${t.month}月${t.day}日 ${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+              } else {
+                sub = '点按立即同步';
+              }
+              return _tile(Icons.sync, '同步', () => _syncNow(context, ref),
+                  subtitle: sub);
+            },
+          ),
           _tile(Icons.swap_horiz, '切换服务器', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage()))),
           const SizedBox(height: 12),
           // 版本信息 + 设置信息合并展示
@@ -96,9 +119,24 @@ class MePage extends ConsumerWidget {
     );
   }
 
+  // 手动触发一次同步（成功后刷新 watch 数据版本的页面）
+  Future<void> _syncNow(BuildContext context, WidgetRef ref) async {
+    final bookId = await Storage.getBookId();
+    if (bookId == null) {
+      toast('尚未选择账本');
+      return;
+    }
+    final ok = await SyncEngine.instance.syncNow(bookId);
+    if (ok) {
+      ref.read(dataVersionProvider.notifier).state++;
+      toast('同步完成');
+    } else {
+      toast('离线或同步失败，本地数据仍可正常使用');
+    }
+  }
+
   // 切换账本
-  Future<void> _switchBook(BuildContext context, WidgetRef ref, SessionState s) async {
-    if (s.books.isEmpty) {
+  Future<void> _switchBook(BuildContext context, WidgetRef ref, SessionState s) async {    if (s.books.isEmpty) {
       toast('暂无可切换的账本');
       return;
     }
@@ -198,7 +236,7 @@ class MePage extends ConsumerWidget {
 
   Future<AiStatus> _aiStatus(WidgetRef ref) async {
     try {
-      return await ref.read(apiProvider).getAiStatus();
+      return await ref.read(localApiProvider).getAiStatus();
     } catch (_) {
       return AiStatus(enabled: false);
     }

@@ -7,6 +7,7 @@ import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/components/simple_date_picker.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class WalletDetailPage extends ConsumerStatefulWidget {
   final Wallet wallet;
@@ -41,7 +42,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
 
   Future<void> _load() async {
     try {
-      final d = await ref.read(apiProvider).getWalletTxns(widget.wallet.id);
+      final d = await ref.read(localApiProvider).getWalletTxns(widget.wallet.id);
       if (mounted) setState(() => _data = d);
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
@@ -83,7 +84,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
       return;
     }
     try {
-      await ref.read(apiProvider).addWalletTxn(
+      await ref.read(localApiProvider).addWalletTxn(
             widget.wallet.id,
             amount: amt,
             direction: _dir,
@@ -170,7 +171,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
       return;
     }
     try {
-      await ref.read(apiProvider).updateWalletTxn(
+      await ref.read(localApiProvider).updateWalletTxn(
             t.id,
             amount: amt,
             direction: dir,
@@ -186,7 +187,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
   Future<void> _deleteTxn(_WalletTxn t) async {
     if (!await _confirm('删除这条资金记录？')) return;
     try {
-      await ref.read(apiProvider).deleteWalletTxn(t.id);
+      await ref.read(localApiProvider).deleteWalletTxn(t.id);
       _load();
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));

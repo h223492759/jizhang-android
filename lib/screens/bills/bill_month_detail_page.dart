@@ -7,6 +7,7 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class BillMonthDetailPage extends ConsumerStatefulWidget {
   /// 月份场景：传 ym（如 "2026-08"），isYear=false
@@ -32,7 +33,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
 
   Future<void> _load() async {
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final d = widget.isYear
           ? await api.getBillYearDetail(widget.year!)
           : await api.getBillMonthDetail(widget.ym);

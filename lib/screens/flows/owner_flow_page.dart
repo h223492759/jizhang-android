@@ -8,6 +8,7 @@ import 'package:jizhang_android/core/owner_color.dart';
 import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 /// 某个归属人（账户）的流水明细：
 /// - 顶部 3 行固定：月/年模式 + 年月选择器 + 总额/平均值
@@ -89,7 +90,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final fp = await api.getFlows(
         start: _start(),
         end: _end(),

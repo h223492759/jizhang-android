@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/owner_color.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 /// 归属人底色设置：在「我的」里为其他归属人设置填充颜色，
 /// 首页/图表会把对应流水图标的底色显示为这里设置的颜色（自己始终是灰色）。
@@ -31,7 +32,7 @@ class _OwnerColorSettingsPageState extends ConsumerState<OwnerColorSettingsPage>
 
   Future<void> _loadOwners() async {
     try {
-      final fp = await ref.read(apiProvider).getFlows(pageSize: 1000);
+      final fp = await ref.read(localApiProvider).getFlows(pageSize: 1000);
       final set = <String>{};
       for (final f in fp.list) {
         if (f.attribution.isNotEmpty) set.add(f.attribution);

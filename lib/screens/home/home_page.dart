@@ -17,6 +17,7 @@ import 'package:jizhang_android/screens/flows/recurring_page.dart';
 import 'package:jizhang_android/screens/me/me_page.dart';
 import 'package:jizhang_android/screens/record/record_page.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -49,7 +50,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (!mounted) return;
     setState(() => _loading = true);
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final ov = await api.getOverview(start: _rangeStart(), end: _rangeEnd());
       final fp = await api.getFlows(start: _rangeStart(), end: _rangeEnd(), pageSize: 500);
       final cats = await api.getCategories();
@@ -88,7 +89,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _update(Flow f, Map<String, dynamic> body) async {
     try {
-      await ref.read(apiProvider).updateFlow(f.id, body);
+      await ref.read(localApiProvider).updateFlow(f.id, body);
       ref.read(dataVersionProvider.notifier).state++;
       toast('已更新');
     } catch (e) {
@@ -255,7 +256,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
       if (ok == true) {
         try {
-          await ref.read(apiProvider).deleteFlow(f.id);
+          await ref.read(localApiProvider).deleteFlow(f.id);
           ref.read(dataVersionProvider.notifier).state++;
           toast('已删除');
         } catch (e) {
@@ -581,7 +582,7 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
 
   Future<void> _loadPresets() async {
     try {
-      _presets = await ref.read(apiProvider).getPresets(type: widget.flow.type, limit: 12);
+      _presets = await ref.read(localApiProvider).getPresets(type: widget.flow.type, limit: 12);
     } catch (_) {
       _presets = PresetsData(presets: [], frequent: [], recent: []);
     }

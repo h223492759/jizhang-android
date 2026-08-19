@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class BookPickerPage extends ConsumerStatefulWidget {
   const BookPickerPage({super.key});
@@ -41,7 +42,7 @@ class _BookPickerPageState extends ConsumerState<BookPickerPage> {
     if (name == null || name.isEmpty) return;
     setState(() => _loading = true);
     try {
-      await ref.read(apiProvider).createBook(name);
+      await ref.read(localApiProvider).createBook(name);
       await ref.read(sessionProvider.notifier).refreshBooks();
       final books = ref.read(sessionProvider).books;
       final created = books.firstWhere((b) => b.name == name, orElse: () => books.last);

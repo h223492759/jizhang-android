@@ -1,7 +1,7 @@
 name: jizhang_android
 description: 记账本 - 安卓客户端（复刻鲨鱼记账交互，对接 jizhang 后端）
 publish_to: 'none'
-version: 1.1.5+1
+version: 1.2.0+1
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -17,6 +17,8 @@ dependencies:
   fl_chart: ^0.68.0
   intl: ^0.19.0
   package_info_plus: ^8.0.0
+  sqflite: ^2.3.3
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:

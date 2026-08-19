@@ -5,6 +5,7 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/components/simple_date_picker.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class RecordPage extends ConsumerStatefulWidget {
   final Flow? initialFlow;
@@ -44,7 +45,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
 
   Future<void> _loadCats() async {
     try {
-      _cats = await ref.read(apiProvider).getCategories();
+      _cats = await ref.read(localApiProvider).getCategories();
     } catch (_) {
       _cats = [];
     }
@@ -63,7 +64,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
 
   Future<void> _loadPresets() async {
     try {
-      _presets = await ref.read(apiProvider).getPresets(type: _type, limit: 12);
+      _presets = await ref.read(localApiProvider).getPresets(type: _type, limit: 12);
     } catch (_) {
       _presets = PresetsData(presets: [], frequent: [], recent: []);
     }
@@ -202,9 +203,9 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         'flow_time': ymd(_date),
       };
       if (_isEdit) {
-        await ref.read(apiProvider).updateFlow(widget.initialFlow!.id, body);
+        await ref.read(localApiProvider).updateFlow(widget.initialFlow!.id, body);
       } else {
-        await ref.read(apiProvider).createFlow(body);
+        await ref.read(localApiProvider).createFlow(body);
       }
       ref.read(dataVersionProvider.notifier).state++;
       toast(_isEdit ? '已更新' : '已保存');

@@ -164,8 +164,9 @@ class ApiClient {
     return FlowPage.fromJson(d);
   }
 
-  Future<void> createFlow(Map<String, dynamic> body) async {
-    await _req(() => _dio.post('/flows', data: body));
+  Future<int> createFlow(Map<String, dynamic> body) async {
+    final d = await _req(() => _dio.post('/flows', data: body));
+    return (d is Map && d['id'] != null) ? (d['id'] as num).toInt() : 0;
   }
 
   Future<void> updateFlow(int id, Map<String, dynamic> body) async {
@@ -174,6 +175,14 @@ class ApiClient {
 
   Future<void> deleteFlow(int id) async {
     await _req(() => _dio.delete('/flows/$id'));
+  }
+
+  /// 增量同步：返回 {all_ids, changed[], server_time}；不传 since = 全量
+  Future<Map<String, dynamic>> fetchFlowsSync({String? since}) async {
+    final q = <String, dynamic>{};
+    if (since != null && since.isNotEmpty) q['since'] = since;
+    final d = await _req(() => _dio.get('/flows/sync', queryParameters: q));
+    return d as Map<String, dynamic>;
   }
 
   Future<Overview> getOverview({String? start, String? end}) async {

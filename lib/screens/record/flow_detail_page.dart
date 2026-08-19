@@ -6,6 +6,7 @@ import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/core/owner_color.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class FlowDetailPage extends ConsumerStatefulWidget {
   final Flow flow;
@@ -28,7 +29,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
 
   Future<void> _load() async {
     try {
-      _cats = await ref.read(apiProvider).getCategories();
+      _cats = await ref.read(localApiProvider).getCategories();
     } catch (_) {
       _cats = [];
     }

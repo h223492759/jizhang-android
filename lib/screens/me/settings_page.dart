@@ -4,6 +4,7 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -25,7 +26,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _load() async {
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final meta = await api.getMeta();
       AiStatus ai;
       try {

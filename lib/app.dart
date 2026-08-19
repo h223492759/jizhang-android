@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/core/storage.dart';
+import 'package:jizhang_android/core/sync_engine.dart';
 import 'package:jizhang_android/screens/server/server_list_page.dart';
 import 'package:jizhang_android/screens/auth/login_page.dart';
 import 'package:jizhang_android/screens/book/book_picker_page.dart';
@@ -58,6 +61,7 @@ class MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserver {
   int _idx = 0;
   final _pages = const [HomePage(), ChartsPage(), DiscoverPage(), MePage()];
+  Timer? _syncTimer;
 
   @override
   void initState() {
@@ -67,6 +71,9 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AutoRecordService.instance.processNow(ref, context);
       AutoRecordService.instance.startPolling(ref, context);
+      _sync();
+      // 离线同步：每 30 秒静默增量同步一次
+      _syncTimer = Timer.periodic(const Duration(seconds: 30), (_) => _sync());
     });
   }
 
@@ -74,6 +81,7 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     AutoRecordService.instance.stopPolling();
+    _syncTimer?.cancel();
     super.dispose();
   }
 
@@ -81,6 +89,17 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       AutoRecordService.instance.processNow(ref, context);
+      _sync();
+    }
+  }
+
+  /// 静默同步：成功后自增 dataVersion 让 watch 它的页面自动刷新
+  Future<void> _sync() async {
+    final bookId = await Storage.getBookId();
+    if (bookId == null) return;
+    final ok = await SyncEngine.instance.syncNow(bookId);
+    if (ok && mounted) {
+      ref.read(dataVersionProvider.notifier).state++;
     }
   }
 
@@ -97,7 +116,13 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
       // 明确不延伸主体到底栏后面：避免 body 内容偶尔穿透 BottomAppBar 的 notch
       // 导致 FAB 看起来跑到屏幕中间并被 body 文字覆盖的问题。
       extendBody: false,
-      body: _pages[_idx],
+      body: Stack(
+        children: [
+          _pages[_idx],
+          // 右上角同步状态（静默）：转圈=同步中；离线小标记=断网（本地数据仍可用）
+          const Positioned(top: 6, right: 6, child: _SyncIndicator()),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openRecord,
         tooltip: '记一笔',
@@ -145,6 +170,46 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 右上角静默同步指示：同步中转圈，离线显示小标记，空闲隐藏
+class _SyncIndicator extends StatelessWidget {
+  const _SyncIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: SyncEngine.instance,
+      builder: (context, _) {
+        final st = SyncEngine.instance.status;
+        if (st == SyncStatus.syncing) {
+          return Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.85),
+              shape: BoxShape.circle,
+            ),
+            child: const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+        if (st == SyncStatus.offline) {
+          return Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.85),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.cloud_off, size: 13, color: AppColors.textSecondary),
+          );
+        }
+        return const SizedBox.shrink();
+      },
     );
   }
 }

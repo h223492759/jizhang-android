@@ -5,6 +5,7 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 /// 定期记账：每月/每年固定收支模板，到时间自动生成流水
 class RecurringPage extends ConsumerStatefulWidget {
@@ -27,7 +28,7 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
 
   Future<void> _init() async {
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       _cats = await api.getCategories();
       // 先到期的落成流水，再拉模板
       try {
@@ -47,7 +48,7 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
 
   Future<void> _reload() async {
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       _list = await api.getRecurring();
       if (mounted) setState(() {});
     } catch (e) {
@@ -64,7 +65,7 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
 
   Future<void> _generate() async {
     try {
-      final n = await ref.read(apiProvider).generateRecurring();
+      final n = await ref.read(localApiProvider).generateRecurring();
       toast(n > 0 ? '已生成 $n 笔' : '暂无可生成的记录');
       await _reload();
     } catch (e) {
@@ -97,7 +98,7 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
     );
     if (ok == true) {
       try {
-        final api = ref.read(apiProvider);
+        final api = ref.read(localApiProvider);
         final body = {
           'type': form.type,
           'category': form.category,
@@ -140,7 +141,7 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
     );
     if (ok != true) return;
     try {
-      await ref.read(apiProvider).deleteRecurring(t.id);
+      await ref.read(localApiProvider).deleteRecurring(t.id);
       toast('已删除');
       await _reload();
     } catch (e) {

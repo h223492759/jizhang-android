@@ -7,6 +7,7 @@ import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/components/flow_row.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class FlowFilterPage extends ConsumerStatefulWidget {
   final String? category;
@@ -42,7 +43,7 @@ class _FlowFilterPageState extends ConsumerState<FlowFilterPage> {
 
   Future<void> _load() async {
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final fp = await api.getFlows(
             category: widget.category,
             type: widget.type,

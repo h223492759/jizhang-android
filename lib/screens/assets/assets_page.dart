@@ -7,6 +7,7 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class AssetsPage extends ConsumerStatefulWidget {
   final int initialTab;
@@ -33,7 +34,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final sav = await api.getSavings();
       _sav = sav;
     } catch (e) {
@@ -543,7 +544,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     }
     try {
       if (isEdit) {
-        await ref.read(apiProvider).updateSavingsItem(
+        await ref.read(localApiProvider).updateSavingsItem(
           id: it!.id,
           name: name.text.trim(),
           amount: amt,
@@ -553,7 +554,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
           note: note.text.trim(),
         );
       } else {
-        await ref.read(apiProvider).addSavingsItem(
+        await ref.read(localApiProvider).addSavingsItem(
           name: name.text.trim(),
           amount: amt,
           sign: liability ? -1 : 1,
@@ -571,7 +572,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   Future<void> _deleteItem(SavingsItem it) async {
     if (!await _confirm('删除资金细则「${it.name}」？')) return;
     try {
-      await ref.read(apiProvider).deleteSavingsItem(it.id);
+      await ref.read(localApiProvider).deleteSavingsItem(it.id);
       _load();
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
@@ -589,7 +590,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     items[idx] = items[to];
     items[to] = tmp;
     try {
-      await ref.read(apiProvider).reorderSavingsItems(items.map((x) => x.id).toList());
+      await ref.read(localApiProvider).reorderSavingsItems(items.map((x) => x.id).toList());
       await _load();
       toast(dir < 0 ? '已上移' : '已下移');
     } catch (e) {
@@ -624,7 +625,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     );
     if (v != null) {
       try {
-        await ref.read(apiProvider).setSavingsGoal(target: v);
+        await ref.read(localApiProvider).setSavingsGoal(target: v);
         _load();
       } catch (e) {
         toast(e.toString().replaceFirst('ApiException: ', ''));
@@ -696,7 +697,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
       'amount': double.tryParse(ctrls[it.id]!.text.trim()) ?? 0,
     }).toList();
     try {
-      await ref.read(apiProvider).bulkUpdateSavingsItems(items: items, ymd: date.text.trim());
+      await ref.read(localApiProvider).bulkUpdateSavingsItems(items: items, ymd: date.text.trim());
       _load();
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
@@ -708,7 +709,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     final ym = m.ymd.length >= 7 ? m.ymd.substring(0, 7) : m.ymd;
     Map<String, dynamic> monthData;
     try {
-      monthData = await ref.read(apiProvider).getSavingsMonthItems(ym);
+      monthData = await ref.read(localApiProvider).getSavingsMonthItems(ym);
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
       return;
@@ -782,7 +783,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             })
         .toList();
     try {
-      await ref.read(apiProvider).bulkUpdateSavingsItems(
+      await ref.read(localApiProvider).bulkUpdateSavingsItems(
           items: body, ymd: date.text.trim(), mode: 'history');
       _load();
     } catch (e) {
@@ -793,7 +794,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   Future<void> _delHistory(SavingsMonth m) async {
     if (!await _confirm('删除 ${m.ymd} 的历史记录？')) return;
     try {
-      await ref.read(apiProvider).deleteSavingsHistory(m.ymd);
+      await ref.read(localApiProvider).deleteSavingsHistory(m.ymd);
       _load();
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
@@ -823,7 +824,7 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
 
   Future<void> _load() async {
     try {
-      final d = await ref.read(apiProvider).getSavingsItemHistory(widget.item.id);
+      final d = await ref.read(localApiProvider).getSavingsItemHistory(widget.item.id);
       if (mounted) {
         setState(() {
           _rows = (d['rows'] as List? ?? [])
@@ -906,7 +907,7 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
       return;
     }
     try {
-      await ref.read(apiProvider).setSavingsItemAmount(
+      await ref.read(localApiProvider).setSavingsItemAmount(
           widget.item.id,
           amount: amt,
           note: note.text.trim(),
@@ -955,7 +956,7 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
       return;
     }
     try {
-      await ref.read(apiProvider).updateSavingsItemHistory(
+      await ref.read(localApiProvider).updateSavingsItemHistory(
         widget.item.id,
         (h['id'] as num).toInt(),
         amount: amt,
@@ -983,7 +984,7 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
     );
     if (ok != true) return;
     try {
-      await ref.read(apiProvider)
+      await ref.read(localApiProvider)
           .deleteSavingsItemHistory(widget.item.id, (h['id'] as num).toInt());
       toast('已删除');
       widget.onChanged();

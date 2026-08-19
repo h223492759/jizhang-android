@@ -6,6 +6,7 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/charts/category_detail_page.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class BudgetPage extends ConsumerStatefulWidget {
   const BudgetPage({super.key});
@@ -28,7 +29,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final results = await Future.wait([api.getBudgets(year: _year), api.getCategories()]);
       _data = results[0] as BudgetData;
       _expenseCats = (results[1] as List<Category>).where((c) => c.type == 'expense').toList();
@@ -145,7 +146,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     final amt = double.tryParse(picked ?? '');
     if (picked == null || amt == null || amt < 0) return;
     try {
-      await ref.read(apiProvider).setBudget(year: _year, category: category, amount: amt);
+      await ref.read(localApiProvider).setBudget(year: _year, category: category, amount: amt);
       toast('已保存');
       _load();
     } catch (e) {

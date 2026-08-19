@@ -8,6 +8,7 @@ import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/components/simple_date_picker.dart';
 import 'package:jizhang_android/screens/assets/wallet_detail_page.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 const _palette = [
   Colors.blue,
@@ -43,7 +44,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final d = await api.getWallets();
       final cats = await api.getCategories();
       if (mounted) {
@@ -352,7 +353,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
     );
     if (ok != true || name.text.trim().isEmpty) return;
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       final id = await api.addWallet(
         name: name.text.trim(),
         icon: icon.text.trim().isEmpty ? '👛' : icon.text.trim(),
@@ -419,7 +420,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
     );
     if (ok != true || name.text.trim().isEmpty) return;
     try {
-      await ref.read(apiProvider).updateWallet(
+      await ref.read(localApiProvider).updateWallet(
         id: w.id,
         name: name.text.trim(),
         icon: icon.text.trim().isEmpty ? '👛' : icon.text.trim(),
@@ -437,7 +438,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
   Future<void> _deleteWallet(Wallet w) async {
     if (!await _confirm('删除钱包「${w.name}」？其下所有资金记录也会一并删除。')) return;
     try {
-      await ref.read(apiProvider).deleteWallet(w.id);
+      await ref.read(localApiProvider).deleteWallet(w.id);
       _load();
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));

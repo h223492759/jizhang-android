@@ -6,6 +6,7 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/bills/bill_month_detail_page.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 
 class BillsPage extends ConsumerStatefulWidget {
   const BillsPage({super.key});
@@ -29,7 +30,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final api = ref.read(apiProvider);
+      final api = ref.read(localApiProvider);
       if (_yearMode) {
         _yearly = await api.getBillYearly();
       } else {
