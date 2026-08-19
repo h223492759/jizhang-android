@@ -295,6 +295,11 @@ class ApiClient {
     await _req(() => _dio.delete('/savings/items/$id'));
   }
 
+  // 资金细则调序：ids 为最新顺序
+  Future<void> reorderSavingsItems(List<int> ids) async {
+    await _req(() => _dio.post('/savings/items/order', data: {'ids': ids}));
+  }
+
   Future<void> bulkUpdateSavingsItems({
     required List<Map<String, dynamic>> items,
     String? ymd,

@@ -290,6 +290,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (!expired) ...[
+                  TextButton(onPressed: () => _moveItem(it, -1), child: const Text('↑')),
+                  TextButton(onPressed: () => _moveItem(it, 1), child: const Text('↓')),
+                ],
                 TextButton(onPressed: () => _showItemDialog(it), child: const Text('改')),
                 TextButton(
                   onPressed: () => _deleteItem(it),
@@ -547,6 +551,25 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     try {
       await ref.read(apiProvider).deleteSavingsItem(it.id);
       _load();
+    } catch (e) {
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
+  }
+
+  // 资金细则调序：dir=-1 上移 / 1 下移，保存后重新加载按新顺序
+  Future<void> _moveItem(SavingsItem it, int dir) async {
+    final items = List<SavingsItem>.from(_sav?.items ?? []);
+    final idx = items.indexWhere((x) => x.id == it.id);
+    if (idx < 0) return;
+    final to = idx + dir;
+    if (to < 0 || to >= items.length) return;
+    final tmp = items[idx];
+    items[idx] = items[to];
+    items[to] = tmp;
+    try {
+      await ref.read(apiProvider).reorderSavingsItems(items.map((x) => x.id).toList());
+      await _load();
+      toast(dir < 0 ? '已上移' : '已下移');
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     }

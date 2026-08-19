@@ -82,16 +82,27 @@ jobs:
           src="build/app/outputs/flutter-apk/app-release.apk"
           dst="build/app/outputs/flutter-apk/jizhang-${tag}.apk"
           cp "$src" "$dst"
+          # APP 图标预览图：随 Release 一起发布，GitHub 会为图片资产显示缩略图
+          cp assets/icons/mipmap-xxxhdpi/ic_launcher.png build/app/outputs/flutter-apk/app-icon.png
           echo "apk=$dst" >> "$GITHUB_OUTPUT"
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: jizhang-apk
-          path: build/app/outputs/flutter-apk/jizhang-*.apk
+          path: |
+            build/app/outputs/flutter-apk/jizhang-*.apk
+            build/app/outputs/flutter-apk/app-icon.png
       - name: Publish to GitHub Release
         if: success() && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/app/outputs/flutter-apk/jizhang-*.apk
+          files: |
+            build/app/outputs/flutter-apk/jizhang-*.apk
+            build/app/outputs/flutter-apk/app-icon.png
           generate_release_notes: true
+          body: |
+            ## 📱 记账本 Android
+            ![APP 图标](app-icon.png)
+            
+            点击上方 APK 文件下载安装；`app-icon.png` 为应用图标预览。
