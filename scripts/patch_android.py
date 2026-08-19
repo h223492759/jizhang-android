@@ -106,9 +106,28 @@ def patch_manifest():
         # 确保 INTERNET 权限一定存在，插在 <manifest> 之后
         filtered.insert(manifest_open_idx + 1, '    <uses-permission android:name="android.permission.INTERNET" />')
     s = "\n".join(filtered)
+    # 自动记账：通知监听权限（Android 13+ 运行时申请）+ 服务声明
+    if "POST_NOTIFICATIONS" not in s:
+        s = s.replace(
+            '<uses-permission android:name="android.permission.INTERNET" />',
+            '<uses-permission android:name="android.permission.INTERNET" />\n'
+            '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />',
+            1,
+        )
+    if "AutoRecordListenerService" not in s:
+        service_block = '''    <service
+        android:name=".AutoRecordListenerService"
+        android:label="自动记账"
+        android:exported="false"
+        android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+        <intent-filter>
+            <action android:name="android.service.notification.NotificationListenerService" />
+        </intent-filter>
+    </service>'''
+        s = s.replace("</application>", service_block + "\n    </application>", 1)
     with open(p, "w", encoding="utf-8") as f:
         f.write(s)
-    print("manifest patched")
+    print("manifest patched (+POST_NOTIFICATIONS, +AutoRecordListenerService)")
 
 
 def patch_network_security_config():

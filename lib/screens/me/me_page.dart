@@ -7,6 +7,7 @@ import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/build_info.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/me/owner_color_settings_page.dart';
+import 'package:jizhang_android/screens/record/auto_record_settings_page.dart';
 import 'package:jizhang_android/screens/server/server_list_page.dart';
 
 class MePage extends ConsumerWidget {
@@ -85,6 +86,7 @@ class MePage extends ConsumerWidget {
           _tile(Icons.palette, '归属人底色', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OwnerColorSettingsPage()))),
           // 当前账本：点击切换
           _tile(Icons.book, '当前账本', () => _switchBook(context, ref, s), subtitle: book?.name ?? '未选择'),
+          _tile(Icons.auto_awesome, '自动记账', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoRecordSettingsPage()))),
           _tile(Icons.swap_horiz, '切换服务器', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage()))),
           const SizedBox(height: 12),
           // 版本信息 + 设置信息合并展示

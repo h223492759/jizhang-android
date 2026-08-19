@@ -12,6 +12,7 @@ import 'package:jizhang_android/screens/charts/charts_page.dart';
 import 'package:jizhang_android/screens/discover/discover_page.dart';
 import 'package:jizhang_android/screens/me/me_page.dart';
 import 'package:jizhang_android/screens/record/record_page.dart';
+import 'package:jizhang_android/screens/record/auto_record_service.dart';
 
 class App extends ConsumerWidget {
   const App({super.key});
@@ -54,9 +55,34 @@ class MainShell extends ConsumerStatefulWidget {
   ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends ConsumerState<MainShell> {
+class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserver {
   int _idx = 0;
   final _pages = const [HomePage(), ChartsPage(), DiscoverPage(), MePage()];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // 启动后立即处理一次队列，之后由定时轮询接管
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AutoRecordService.instance.processNow(ref, context);
+      AutoRecordService.instance.startPolling(ref, context);
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    AutoRecordService.instance.stopPolling();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      AutoRecordService.instance.processNow(ref, context);
+    }
+  }
 
   void _openRecord() {
     Navigator.push(
