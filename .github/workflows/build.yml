@@ -101,8 +101,3 @@ jobs:
             build/app/outputs/flutter-apk/jizhang-*.apk
             build/app/outputs/flutter-apk/app-icon.png
           generate_release_notes: true
-          body: |
-            ## 📱 记账本 Android
-            ![APP 图标](https://github.com/h223492759/jizhang-android/releases/download/${{ github.ref_name }}/app-icon.png)
-
-            点击上方 APK 文件下载安装；`app-icon.png` 为应用图标预览。
