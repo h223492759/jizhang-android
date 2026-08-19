@@ -103,6 +103,8 @@ class Flow {
   final String flowTime;
   final String attribution;
   final String? attributionColor;
+  /// 来源：'' 手动 | 'ai' AI识别 | 'auto' 通知自动记账
+  final String source;
   Flow({
     required this.id,
     required this.type,
@@ -113,6 +115,7 @@ class Flow {
     required this.flowTime,
     required this.attribution,
     this.attributionColor,
+    this.source = '',
   });
   factory Flow.fromJson(Map<String, dynamic> j) => Flow(
         id: j['id'],
@@ -124,10 +127,13 @@ class Flow {
         flowTime: j['flow_time'] ?? '',
         attribution: j['attribution'] ?? '',
         attributionColor: j['attribution_color'],
+        source: j['source'] ?? '',
       );
   static List<Flow> listFrom(dynamic v) =>
       (v as List? ?? []).map((e) => Flow.fromJson(e)).toList();
   bool get isExpense => type == 'expense';
+  /// 是否是 AI/自动记账来源（显示 AI 小标识）
+  bool get isAiSource => source == 'ai' || source == 'auto';
 }
 
 class FlowPage {

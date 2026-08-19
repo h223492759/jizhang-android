@@ -40,10 +40,28 @@ Widget compactFlowTile({
       Expanded(
         child: _tap(
           onNameTap ?? onTap,
-          Text(name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14, color: AppColors.text)),
+          Row(
+            children: [
+              if (f.isAiSource) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text('AI',
+                      style: TextStyle(fontSize: 9, color: AppColors.text, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 4),
+              ],
+              Expanded(
+                child: Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, color: AppColors.text)),
+              ),
+            ],
+          ),
         ),
       ),
       const SizedBox(width: 8),

@@ -98,7 +98,8 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                   _row('日期', '${ymd(date)} ${weekdayCn(date)}'),
                   if (f.description.isNotEmpty) ...[
                     const Divider(height: 24),
-                    _row('名称', f.description),
+                    _row('名称', f.description,
+                        prefix: f.isAiSource ? _aiTag() : null),
                   ],
                   const Divider(height: 24),
                   Row(
@@ -138,23 +139,44 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
     );
   }
 
-  Widget _row(String label, String value, {Color? valueColor}) {
+  Widget _row(String label, String value, {Color? valueColor, Widget? prefix}) {
     return Row(
       children: [
         Text(label,
             style: const TextStyle(fontSize: 15, color: AppColors.textSecondary)),
         const SizedBox(width: 16),
         Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: valueColor ?? AppColors.text),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (prefix != null) ...[prefix, const SizedBox(width: 6)],
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: valueColor ?? AppColors.text),
+                ),
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _aiTag() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: const Text('AI',
+          style: TextStyle(
+              fontSize: 9, color: AppColors.text, fontWeight: FontWeight.bold)),
     );
   }
 }
