@@ -7,6 +7,7 @@ import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/core/owner_color.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
+import 'record_page.dart';
 
 class FlowDetailPage extends ConsumerStatefulWidget {
   final Flow flow;
@@ -135,9 +136,116 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
               ),
             ),
           ),
+          // 操作按钮：修改 / 归属 / 删除
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _editFlow,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('修改'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _changeAttribution,
+                    icon: const Icon(Icons.person_outline, size: 18),
+                    label: const Text('归属'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _deleteFlow,
+                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.expense),
+                    label: const Text('删除', style: TextStyle(color: AppColors.expense)),
+                    style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.expense)),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  // 修改：跳到记账页（编辑模式）
+  void _editFlow() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => RecordPage(initialFlow: widget.flow)),
+    );
+    if (mounted) Navigator.pop(context);
+  }
+
+  // 归属：弹窗改归属人
+  Future<void> _changeAttribution() async {
+    final ctrl = TextEditingController(text: widget.flow.attribution);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('更换归属人'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '归属人昵称',
+            hintText: '如：老婆 / 老板 / 室友',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (name == null) return;
+    try {
+      await ref.read(localApiProvider).updateFlow(widget.flow.id, {
+        'attribution': name,
+        'attribution_uid': null,
+      });
+      ref.read(dataVersionProvider.notifier).state++;
+      toast('归属已更新');
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
+  }
+
+  // 删除：二次确认后调 deleteFlow
+  Future<void> _deleteFlow() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除这笔流水？'),
+        content: const Text('此操作不可撤销。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除', style: TextStyle(color: AppColors.expense)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(localApiProvider).deleteFlow(widget.flow.id);
+      ref.read(dataVersionProvider.notifier).state++;
+      toast('已删除');
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
   }
 
   Widget _row(String label, String value, {Color? valueColor, Widget? prefix}) {

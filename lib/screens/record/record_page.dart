@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' hide Flow;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
@@ -63,10 +64,15 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   }
 
   Future<void> _loadPresets() async {
+    // 优先从服务器拉取（保证网页端刚改的常用名能立刻同步到安卓端），离线时退回本地缓存
     try {
-      _presets = await ref.read(localApiProvider).getPresets(type: _type, limit: 12);
+      _presets = await ref.read(apiProvider).getPresets(type: _type, limit: 12);
     } catch (_) {
-      _presets = PresetsData(presets: [], frequent: [], recent: []);
+      try {
+        _presets = await ref.read(localApiProvider).getPresets(type: _type, limit: 12);
+      } catch (_) {
+        _presets = PresetsData(presets: [], frequent: [], recent: []);
+      }
     }
     if (mounted) setState(() => _presetsLoaded = true);
   }
