@@ -454,8 +454,9 @@ class Wallet {
   final double target;
   final String note;
   final String linkFrom;
-  final String linkCategory; // 兼容旧字段（服务器 JSON 字符串）
-  final List<String> linkCategories; // 多分类数组（新版）
+  final String linkCategory; // 兼容旧字段
+  final List<String> linkCategories;
+  final List<({String cat, String from})> linkLinks; // 多行关联（cat+from）
   final double manualBalance;
   final double linked;
   final double balance;
@@ -473,6 +474,7 @@ class Wallet {
     required this.linkFrom,
     required this.linkCategory,
     required this.linkCategories,
+    required this.linkLinks,
     required this.manualBalance,
     required this.linked,
     required this.balance,
@@ -504,6 +506,21 @@ class Wallet {
         }
       }
     }
+    // linkLinks 多行（每行 cat+from），兼容旧：单 linkCategory + linkFrom 构造 1 行
+    final linksRaw = j['linkLinks'];
+    List<({String cat, String from})> links = [];
+    if (linksRaw is List) {
+      for (final x in linksRaw) {
+        if (x is Map) {
+          final c = (x['cat'] ?? '').toString();
+          if (c.isEmpty) continue;
+          links.add((cat: c, from: (x['from'] ?? '').toString()));
+        }
+      }
+    }
+    if (links.isEmpty && cats.isNotEmpty) {
+      links = [for (final c in cats) (cat: c, from: (j['link_from'] ?? '').toString())];
+    }
     return Wallet(
         id: j['id'],
         name: j['name'] ?? '',
@@ -513,6 +530,7 @@ class Wallet {
         linkFrom: j['link_from'] ?? '',
         linkCategory: j['link_category'] ?? '',
         linkCategories: cats,
+        linkLinks: links,
         manualBalance: (j['manualBalance'] ?? 0).toDouble(),
         linked: (j['linked'] ?? 0).toDouble(),
         balance: (j['balance'] ?? 0).toDouble(),

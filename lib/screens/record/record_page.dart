@@ -467,7 +467,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     for (final p in raw) {
       unique.putIfAbsent(p.name, () => p);
     }
-    final display = unique.values.take(60).toList();
+    final display = unique.values.take(200).toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
       child: Column(

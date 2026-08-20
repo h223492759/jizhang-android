@@ -410,6 +410,7 @@ class ApiClient {
     String linkCategory = '',
     String linkFrom = '',
     String note = '',
+    List<Map<String, String>>? linkLinks,
   }) async {
     final body = {
       'name': name,
@@ -418,6 +419,7 @@ class ApiClient {
       'link_category': linkCategory,
       'link_from': linkFrom,
       'note': note,
+      if (linkLinks != null) 'link_links': linkLinks,
     };
     final d = await _req(() => _dio.post('/wallets', data: body));
     return (d['id'] as num).toInt();
@@ -431,6 +433,7 @@ class ApiClient {
     String note = '',
     String linkCategory = '',
     String linkFrom = '',
+    List<Map<String, String>>? linkLinks,
   }) async {
     final body = {
       'name': name,
@@ -439,6 +442,7 @@ class ApiClient {
       'note': note,
       'link_category': linkCategory,
       'link_from': linkFrom,
+      if (linkLinks != null) 'link_links': linkLinks,
     };
     await _req(() => _dio.put('/wallets/$id', data: body));
   }

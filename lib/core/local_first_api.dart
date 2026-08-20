@@ -223,16 +223,17 @@ class LocalFirstApi {
           count: ((r['count'] as num?) ?? 0).toInt(),
         );
 
-    // frequent：count>=2 且未收藏/未隐藏，按频次降序
+    // frequent：count>=1（用户要求"不限制字段和词数，有多少显示多少"）且未收藏/未隐藏，按频次降序
+    // 不限制 take 数量，让记账页完整显示网页端所有常用名
     final freqRows = suggestRows
         .where((r) =>
-            (((r['count'] as num?) ?? 0).toInt()) >= 2 &&
+            (((r['count'] as num?) ?? 0).toInt()) >= 1 &&
             !presetNames.contains(r['name']) &&
             !hiddenNames.contains(r['name']))
         .toList()
       ..sort((a, b) => ((b['count'] as num?) ?? 0)
           .compareTo((a['count'] as num?) ?? 0));
-    final frequent = freqRows.take(limit).map(fromSuggest).toList();
+    final frequent = freqRows.map(fromSuggest).toList();
 
     // recent：last_time 非空，按最近时间倒序（物化字段，不再实时聚合 flows）
     final recentRows = suggestRows
@@ -768,13 +769,15 @@ class LocalFirstApi {
     String linkCategory = '',
     String linkFrom = '',
     String note = '',
+    List<Map<String, String>>? linkLinks,
   }) async {
     final bookId = await _curBook();
     final uuid = SyncEngine.newUuid();
     try {
       final id = await _api.addWallet(
           name: name, icon: icon, target: target,
-          linkCategory: linkCategory, linkFrom: linkFrom, note: note);
+          linkCategory: linkCategory, linkFrom: linkFrom, note: note,
+          linkLinks: linkLinks);
       await LocalDb.instance.addOpLog(bookId,
           op: 'addWallet', entity: 'wallet', entityId: id, uuid: uuid,
           summary: '新增钱包 $name', status: 'ok');
@@ -785,6 +788,7 @@ class LocalFirstApi {
         await LocalDb.instance.enqueue('addWallet', 'wallet', uuid: uuid, body: {
           'name': name, 'icon': icon, 'target': target,
           'link_category': linkCategory, 'link_from': linkFrom, 'note': note,
+          if (linkLinks != null) 'link_links': linkLinks,
           'client_uuid': uuid,
         });
         await LocalDb.instance.addOpLog(bookId,
@@ -804,13 +808,18 @@ class LocalFirstApi {
     String note = '',
     String linkCategory = '',
     String linkFrom = '',
+    List<Map<String, String>>? linkLinks,
   }) =>
       _offlineWrite(
           op: 'updateWallet', entity: 'wallet', entityId: id,
           online: () => _api.updateWallet(
               id: id, name: name, icon: icon, target: target, note: note,
-              linkCategory: linkCategory, linkFrom: linkFrom),
-          body: {'id': id, 'name': name, 'icon': icon, 'target': target, 'note': note, 'link_category': linkCategory, 'link_from': linkFrom},
+              linkCategory: linkCategory, linkFrom: linkFrom, linkLinks: linkLinks),
+          body: {
+            'id': id, 'name': name, 'icon': icon, 'target': target, 'note': note,
+            'link_category': linkCategory, 'link_from': linkFrom,
+            if (linkLinks != null) 'link_links': linkLinks,
+          },
           summary: '修改钱包 $name', refresh: _refreshWallets);
 
   Future<void> deleteWallet(int id) =>
