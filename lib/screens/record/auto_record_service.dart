@@ -211,48 +211,103 @@ class AutoRecordService {
   ParsedNotification? _parse(Map<String, dynamic> raw) {
     final text = '${raw['title'] ?? ''} ${raw['text'] ?? ''}';
     if (text.trim().isEmpty) return null;
-    // 必须是支付类通知才识别，避免把"百果园接龙""商品价目"等含 ¥ 的营销/聊天
-    // 内容误当成账单（用户截图：百果园 A级新疆西梅 ¥29.9/箱 这种就被错认了）。
-    const payKw = [
-      '支付成功', '付款成功', '已支付', '已付款',
-      '收款通知', '收款成功', '已收款',
-      '扣款', '已扣款',
-      '入账', '到账',
-      '支付', '付款', '消费', '支出',
-      '信用卡还款', '还款成功',
+
+    // ---- ① 误识别过滤：强信号词（完成时态） ----
+    const strongKw = [
+      '支付成功', '付款成功', '成功付款', '支付成功通知', '已支付', '已付款',
+      '收款成功', '已收款', '收款通知', '收款到账',
+      '扣款成功', '已扣款', '已消费',
+      '入账', '到账', '还款成功', '已还款', '退款成功', '已退款',
     ];
-    final hasPayKw = payKw.any((kw) => text.contains(kw));
-    // 白名单支付 App 的通知可以放宽（即便没有关键字也认），其它包必须有
-    // 关键字才识别——避免聊天/营销里的价格被误抓。
-    final pkg = raw['pkg']?.toString() ?? '';
-    const payApps = {
-      'com.eg.android.AlipayGphone',
-      'com.tencent.mm',
-      'com.tencent.wepay',
-      'com.unionpay',
-    };
-    final isPaymentApp = payApps.contains(pkg);
-    if (!hasPayKw && !(isPaymentApp && (text.contains('¥') || text.contains('￥') || text.contains('元')))) {
+    const weakKw = [
+      '支付', '付款', '消费', '支出', '扣款', '还款', '退款', '收款', '入账',
+    ];
+    // 营销/聊天黑名单：命中这些词且没有强支付信号 → 丢弃（接龙/价目/优惠等）
+    const marketingKw = [
+      '优惠', '秒杀', '限时', '活动', '领券', '抵扣', '红包', '接龙', '价目',
+      '团购', '热卖', '返利', '折扣', '会员日', '特惠', '立减', '满减',
+      '优惠券', '代金券', '促销', '特价', '砍价', '拼团', '领红包', '商品推荐',
+    ];
+    final hasStrong = strongKw.any((kw) => text.contains(kw));
+    if (!hasStrong) {
+      // 无强信号：直接丢弃（哪怕是支付 App——营销/聊天也会在支付 App 里出现）
       return null;
     }
-    // 金额
-    final amtMatch = RegExp(r'[¥￥]\s*([0-9]+(?:\.[0-9]{1,2})?)')
-            .firstMatch(text) ??
-        RegExp(r'([0-9]+(?:\.[0-9]{1,2})?)\s*元').firstMatch(text);
-    if (amtMatch == null) return null;
-    final amount = double.tryParse(amtMatch.group(1) ?? '');
-    if (amount == null || amount <= 0) return null;
-    // 方向：收入/收款 → income；否则 expense
-    final isIncome =
-        text.contains('收入') || text.contains('收款') || text.contains('入账');
-    // 商户：title（支付宝通知 title 通常是商户名），或 text 里「给XX付款/支付给XX」
-    String merchant = (raw['title'] ?? '').toString().trim();
-    if (merchant.isEmpty || merchant == '支付宝' || merchant == '微信支付') {
-      final m = RegExp(r'(?:支付|付款|转给|给|收款方)\s*([\u4e00-\u9fa5A-Za-z0-9·]{2,20})')
-          .firstMatch(text);
-      merchant = m?.group(1) ?? '';
+    if (marketingKw.any((kw) => text.contains(kw))) {
+      // 有强信号但混了营销词：只有当强信号词非常明确（成功/到账/扣款）才继续，
+      // 否则视为营销截图误抓
+      final clearSignal = ['支付成功', '付款成功', '成功付款', '收款成功', '到账', '入账', '扣款成功']
+          .any((kw) => text.contains(kw));
+      if (!clearSignal) return null;
     }
-    if (merchant.isEmpty) merchant = isIncome ? '收款' : '支出';
+
+    // ---- ② 金额提取（优先级：实付/支付/付款金额 > 紧跟支付词的 ¥ > 首个 ¥） ----
+    double? amount;
+    final amtRe = RegExp(r'[¥￥]\s*([0-9]+(?:\.[0-9]{1,2})?)');
+    final amtYuanRe = RegExp(r'([0-9]+(?:\.[0-9]{1,2})?)\s*元');
+    final paidRe = RegExp(
+        r'(?:实付|实际支付|支付金额|付款金额|实付金额|支付成功[^¥￥]{0,8})(?:[¥￥]\s*)?([0-9]+(?:\.[0-9]{1,2})?)');
+    // 1) 实付/支付金额 上下文
+    final paidM = paidRe.firstMatch(text);
+    if (paidM != null) {
+      final v = double.tryParse(paidM.group(1) ?? '');
+      if (v != null && v > 0) amount = v;
+    }
+    // 2) "¥xx" 且前文紧跟支付/付款/成功
+    if (amount == null) {
+      final m = RegExp(r'(?:支付|付款|成功|实付)[^¥￥\n]{0,10}[¥￥]\s*([0-9]+(?:\.[0-9]{1,2})?)')
+          .firstMatch(text);
+      if (m != null) {
+        final v = double.tryParse(m.group(1) ?? '');
+        if (v != null && v > 0) amount = v;
+      }
+    }
+    // 3) 兜底：首个 ¥ 或 xx元
+    if (amount == null) {
+      final m = amtRe.firstMatch(text) ?? amtYuanRe.firstMatch(text);
+      if (m != null) {
+        final v = double.tryParse(m.group(1) ?? '');
+        if (v != null && v > 0) amount = v;
+      }
+    }
+    if (amount == null) return null;
+    // 金额合理性区间（0.01 ~ 10万），防异常识别
+    if (amount <= 0 || amount > 100000) return null;
+
+    // ---- ③ 方向 ----
+    final isIncome =
+        text.contains('收入') || text.contains('收款') || text.contains('入账') ||
+        text.contains('到账') || text.contains('已收款');
+
+    // ---- ④ 商户提取（升级版） ----
+    // 平台词：出现即视为"未识别到商户"，需要从 text 里找
+    const platformWords = ['微信支付', '支付宝', '微信', '零钱', '云闪付', '银行卡', '银联'];
+    String merchant = (raw['title'] ?? '').toString().trim();
+    if (merchant.isEmpty ||
+        platformWords.any((w) => merchant == w || merchant.contains(w))) {
+      // 优先级：收款方：XX / 商户：XX / 向XX付款 / XX收款 / 支付给XX / 付款给XX / 给XX付款
+      final patterns = [
+        RegExp(r'(?:收款方|商户|商家|交易对象|收款单位)\s*[:：]\s*([\u4e00-\u9fa5A-Za-z0-9·]{2,20})'),
+        RegExp(r'(?:向|给|转给)\s*([\u4e00-\u9fa5A-Za-z0-9·]{2,12})\s*(?:付款|支付|转账)'),
+        RegExp(r'(?:支付|付款)(?:给)?\s*([\u4e00-\u9fa5A-Za-z0-9·]{2,12})\s*(?:的)?(?:收款|账单)'),
+        RegExp(r'([\u4e00-\u9fa5A-Za-z0-9·]{2,12})\s*(?:收款|到账|入账)'),
+      ];
+      for (final re in patterns) {
+        final m = re.firstMatch(text);
+        if (m != null) {
+          final cand = m.group(1) ?? '';
+          // 过滤掉平台词/金额残留
+          if (cand.isNotEmpty &&
+              !platformWords.any((w) => cand == w || cand.contains(w))) {
+            merchant = cand;
+            break;
+          }
+        }
+      }
+      if (merchant.isEmpty || platformWords.any((w) => merchant == w)) {
+        merchant = isIncome ? '收款' : '支出';
+      }
+    }
     return ParsedNotification(
       id: raw['id']?.toString() ?? '',
       pkg: raw['pkg']?.toString() ?? '',

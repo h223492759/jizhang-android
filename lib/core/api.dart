@@ -470,6 +470,27 @@ class ApiClient {
     return AiParseResult.fromJson(d);
   }
 
+  /// 商户分类（学习闭环）：先查商户→分类映射，命中直接返回；否则 AI 分类
+  Future<AiParseResult> classifyMerchant(
+      {required String merchant, String text = '', double amount = 0, String type = 'expense', String paymentMethod = ''}) async {
+    final d = await _req(() => _dio.post('/merchants/classify', data: {
+      'merchant': merchant,
+      'text': text,
+      'amount': amount,
+      'type': type,
+      'payment_method': paymentMethod,
+    }));
+    return AiParseResult.fromJson(d);
+  }
+
+  /// 学习：用户确认/修改分类后写入 商户→分类 映射
+  Future<void> learnMerchant(String merchant, String category) async {
+    await _req(() => _dio.post('/merchants', data: {
+      'merchant': merchant,
+      'category': category,
+    }));
+  }
+
   Future<AiAnalyze> analyzeMonth({String? month}) async {
     final q = <String, dynamic>{};
     if (month != null) q['month'] = month;

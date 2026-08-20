@@ -21,7 +21,7 @@ class LocalDb {
 
   Future<Database> _open() async {
     final path = p.join(await getDatabasesPath(), 'jizhang_local.db');
-    return openDatabase(path, version: 2, onCreate: (d, v) async {
+    return openDatabase(path, version: 3, onCreate: (d, v) async {
       await d.execute('''
         CREATE TABLE flows(
           id INTEGER PRIMARY KEY,
@@ -97,7 +97,36 @@ class LocalDb {
       await _createV2Tables(d);
     }, onUpgrade: (d, oldV, newV) async {
       if (oldV < 2) await _createV2Tables(d);
+      if (oldV < 3) await _createV3Tables(d);
     });
+  }
+
+  /// v3：常用名称镜像表（preset_suggest / hidden_names）。
+  /// 从 v1.3.x 升级过来的库 version 已是 2，onCreate 不会重跑，必须在这里补建，
+  /// 否则 getSuggest 查询报 no such table → 记账页"常用名加载失败"。
+  Future<void> _createV3Tables(DatabaseExecutor d) async {
+    await d.execute('''
+      CREATE TABLE IF NOT EXISTS preset_suggest(
+        book_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 0,
+        category TEXT NOT NULL DEFAULT '',
+        payment_method TEXT NOT NULL DEFAULT '',
+        avg_amount REAL NOT NULL DEFAULT 0,
+        last_time TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (book_id, type, name)
+      )''');
+    await d.execute('CREATE INDEX IF NOT EXISTS idx_suggest_book ON preset_suggest(book_id, type)');
+    await d.execute('''
+      CREATE TABLE IF NOT EXISTS hidden_names(
+        book_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (book_id, type, name)
+      )''');
   }
 
   Future<void> _createV2Tables(DatabaseExecutor d) async {

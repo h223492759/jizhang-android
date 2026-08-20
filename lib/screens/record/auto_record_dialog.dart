@@ -41,6 +41,7 @@ class AutoRecordDialog extends ConsumerStatefulWidget {
 class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
   late final TextEditingController _nameCtrl;
   late String _category;
+  String? _aiCategory; // AI/映射给的初始分类（用于判断用户是否改过 → 学习）
   bool _aiLoading = true;
   List<Category> _cats = [];
 
@@ -63,12 +64,21 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
   Future<void> _aiClassify() async {
     try {
       final api = ref.read(apiProvider);
-      final r = await api.parseText(widget.parsed.text);
+      // 学习闭环：先查 商户→分类 映射（命中直接返回），否则 AI 分类
+      final r = await api.classifyMerchant(
+        merchant: widget.parsed.merchant,
+        text: widget.parsed.text,
+        amount: widget.parsed.amount,
+        type: widget.parsed.isIncome ? 'income' : 'expense',
+      );
       if (mounted) {
         setState(() {
           final aiCat = r.category ?? '';
           final aiDesc = r.description ?? '';
-          if (aiCat.isNotEmpty) _category = aiCat;
+          if (aiCat.isNotEmpty) {
+            _category = aiCat;
+            _aiCategory = aiCat;
+          }
           if (aiDesc.isNotEmpty &&
               !_nameCtrl.text.contains(aiDesc) &&
               aiDesc != widget.parsed.merchant) {
@@ -86,6 +96,17 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
     }
   }
 
+  /// 学习闭环：用户点了「记一笔」，若分类被改过（与 AI/映射不同）且商户明确 → 写入映射
+  Future<void> _maybeLearn() async {
+    final p = widget.parsed;
+    if (p.merchant.isEmpty) return;
+    if (p.merchant == '支出' || p.merchant == '收款') return;
+    if (_aiCategory != null && _category == _aiCategory) return; // 没改过，不学
+    try {
+      await ref.read(apiProvider).learnMerchant(p.merchant, _category);
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -97,25 +118,25 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
   @override
   Widget build(BuildContext context) {
     final p = widget.parsed;
+    final dateText =
+        '${p.time.year}-${p.time.month.toString().padLeft(2, '0')}-${p.time.day.toString().padLeft(2, '0')}';
+    final payLabel = _pkgLabel(p.pkg);
     return AlertDialog(
+      // 第一区：确认记账（左）+ 来源小字（右对齐）
       title: Row(children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: const Text('AI 记账',
-              style: TextStyle(fontSize: 11, color: AppColors.text, fontWeight: FontWeight.bold)),
-        ),
-        const SizedBox(width: 8),
-        const Expanded(child: Text('确认记账', style: TextStyle(fontSize: 16))),
+        const Expanded(
+            child: Text('确认记账', style: TextStyle(fontSize: 16))),
+        if (payLabel.isNotEmpty)
+          Text(payLabel,
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary)),
       ]),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 第二区：支出金额（左）+ 支付方式/日期（右侧 2 行右对齐）
             Row(children: [
               Text(p.isIncome ? '收入' : '支出',
                   style: TextStyle(
@@ -124,12 +145,27 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                       fontWeight: FontWeight.bold)),
               const SizedBox(width: 8),
               Text('¥${fmtMoney(p.amount)}',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  style:
+                      const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (payLabel.isNotEmpty)
+                    Text(payLabel,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary)),
+                  const SizedBox(height: 2),
+                  Text(dateText,
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
+                ],
+              ),
             ]),
-            const SizedBox(height: 6),
-            Text(p.merchant, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            Text('${p.time.year}-${p.time.month.toString().padLeft(2, '0')}-${p.time.day.toString().padLeft(2, '0')}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 4),
+            Text(p.merchant,
+                style:
+                    const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             const SizedBox(height: 12),
             TextField(
               controller: _nameCtrl,
@@ -137,36 +173,68 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                   labelText: '名称', border: OutlineInputBorder(), isDense: true),
             ),
             const SizedBox(height: 10),
-            // 分类选择
-            Row(children: [
-              const Text('分类', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _aiLoading
-                    ? const Text('AI 识别中…',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary))
-                    : Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          ..._cats.take(12).map((c) => ChoiceChip(
-                                label: Text(c.name,
-                                    style: const TextStyle(fontSize: 12)),
-                                selected: c.name == _category,
-                                visualDensity: VisualDensity.compact,
-                                onSelected: (_) =>
-                                    setState(() => _category = c.name),
-                              )),
-                          if (_cats.isEmpty)
-                            Text(_category,
-                                style: const TextStyle(fontSize: 12)),
-                        ],
-                      ),
-              ),
-            ]),
-            const SizedBox(height: 6),
-            Text('来源：${_pkgLabel(p.pkg)} 通知自动识别',
-                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            // 第三区：分类（无"分类"文字，四行网格放完整，不截断）
+            _aiLoading
+                ? const SizedBox(
+                    height: 80,
+                    child: Center(
+                      child: Text('AI 识别中…',
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                    ),
+                  )
+                : GridView.count(
+                    crossAxisCount: 6,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 4,
+                    crossAxisSpacing: 4,
+                    childAspectRatio: 2.4,
+                    children: _cats.isEmpty
+                        ? [
+                            Center(
+                                child: Text(_category,
+                                    style:
+                                        const TextStyle(fontSize: 12)))
+                          ]
+                        : _cats.map((c) {
+                            final on = c.name == _category;
+                            return InkWell(
+                              onTap: () =>
+                                  setState(() => _category = c.name),
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                alignment: Alignment.center,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 2),
+                                decoration: BoxDecoration(
+                                  color: on
+                                      ? AppColors.primary
+                                      : AppColors.background,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: on
+                                        ? AppColors.primaryDark
+                                        : AppColors.divider,
+                                    width: on ? 1.2 : 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  c.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: on
+                                        ? Colors.white
+                                        : AppColors.text,
+                                    fontWeight:
+                                        on ? FontWeight.w600 : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                  ),
           ],
         ),
       ),
@@ -198,16 +266,19 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
           child: const Text('不再记', style: TextStyle(color: AppColors.expense)),
         ),
         TextButton(
-          onPressed: () => _pop(AutoRecordAction(
-              ignore: false,
-              neverAgain: false,
-              isIncome: p.isIncome,
-              amount: p.amount,
-              description: _nameCtrl.text.trim(),
-              category: _category,
-              merchant: p.merchant,
-              pkg: p.pkg,
-              time: p.time)),
+          onPressed: () {
+            _maybeLearn(); // 学习闭环：改过分类则写入 商户→分类 映射（不影响记账）
+            _pop(AutoRecordAction(
+                ignore: false,
+                neverAgain: false,
+                isIncome: p.isIncome,
+                amount: p.amount,
+                description: _nameCtrl.text.trim(),
+                category: _category,
+                merchant: p.merchant,
+                pkg: p.pkg,
+                time: p.time));
+          },
           child: const Text('记一笔', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
