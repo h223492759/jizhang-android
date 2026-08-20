@@ -136,16 +136,17 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
               ),
             ),
           ),
-          // 操作按钮：修改 / 归属 / 删除
+          // 操作按钮（从左到右：删除 / 归属 / 修改）
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             child: Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _editFlow,
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('修改'),
+                    onPressed: _deleteFlow,
+                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.expense),
+                    label: const Text('删除', style: TextStyle(color: AppColors.expense)),
+                    style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.expense)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -159,10 +160,9 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _deleteFlow,
-                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.expense),
-                    label: const Text('删除', style: TextStyle(color: AppColors.expense)),
-                    style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.expense)),
+                    onPressed: _editFlow,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('修改'),
                   ),
                 ),
               ],
