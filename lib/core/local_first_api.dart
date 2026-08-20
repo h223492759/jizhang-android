@@ -395,7 +395,12 @@ class LocalFirstApi {
     final existing = await db.flowById(id);
     try {
       await _api.updateFlow(id, body);
-      if (existing != null) await db.markDirty(id, false);
+      // 同步更新本地镜像（关键）：否则首页/流水列表读本地仍是旧值，
+      // 必须切页重进才触发重新同步才会刷新
+      if (existing != null) {
+        final updated = <String, Object?>{...existing, ...body, 'id': id, 'dirty': 0};
+        await db.upsertFlow(updated);
+      }
       _syncAfterWrite();
     } catch (e) {
       if (_isNetworkErr(e) && existing != null) {
