@@ -251,7 +251,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                         w.balance >= w.target ? AppColors.income : AppColors.primaryDark),
                   ),
                 ),
-              if (w.linkCategory.isNotEmpty) ...[
+              if ((w.linkCategories.isNotEmpty ? w.linkCategories.join('、') : w.linkCategory).isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -259,7 +259,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                     color: AppColors.primarySoft,
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Text('🔗 关联 ${w.linkCategory} · 自 ${w.linkFrom}',
+                  child: Text('🔗 关联 ${w.linkCategories.isNotEmpty ? w.linkCategories.join('、') : w.linkCategory} · 自 ${w.linkFrom}',
                       style: const TextStyle(fontSize: 12, color: AppColors.primaryDark)),
                 ),
                 const SizedBox(height: 4),
@@ -308,7 +308,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
     final target = TextEditingController();
     final initBalance = TextEditingController();
     final note = TextEditingController();
-    String linkCat = '';
+    final linkCats = <String>{};
     final linkFrom = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -327,17 +327,26 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                 TextField(controller: initBalance, keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(labelText: '已存金额（可选，记为一笔存入）')),
                 const SizedBox(height: 8),
-                const Text('关联流水分类（可选）', style: TextStyle(fontSize: 13)),
-                DropdownButton<String>(
-                  isExpanded: true,
-                  value: linkCat.isEmpty ? null : linkCat,
-                  hint: const Text('不关联'),
-                  items: [
-                    const DropdownMenuItem(value: '', child: Text('不关联')),
-                    ..._cats.map((c) => DropdownMenuItem(
-                        value: c.name, child: Text('${c.name}${c.type == 'income' ? '（收）' : '（支）'}'))),
+                const Text('关联流水分类（可选，可多选）', style: TextStyle(fontSize: 13)),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    ..._cats.map((c) => ChoiceChip(
+                          label: Text('${c.name}${c.type == 'income' ? '（收）' : '（支）'}',
+                              style: const TextStyle(fontSize: 12)),
+                          selected: linkCats.contains(c.name),
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (_) => set(() {
+                            if (linkCats.contains(c.name)) {
+                              linkCats.remove(c.name);
+                            } else {
+                              linkCats.add(c.name);
+                            }
+                          }),
+                        )),
                   ],
-                  onChanged: (v) => set(() => linkCat = v ?? ''),
                 ),
                 TextField(controller: linkFrom, decoration: const InputDecoration(labelText: '关联起始日（如20260101，可选）')),
                 TextField(controller: note, decoration: const InputDecoration(labelText: '备注（可选）')),
@@ -358,7 +367,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
         name: name.text.trim(),
         icon: icon.text.trim().isEmpty ? '👛' : icon.text.trim(),
         target: double.tryParse(target.text.trim()) ?? 0,
-        linkCategory: linkCat,
+        linkCategory: linkCats.join(','),
         linkFrom: linkFrom.text.trim(),
         note: note.text.trim(),
       );
@@ -377,7 +386,12 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
     final icon = TextEditingController(text: w.icon);
     final target = TextEditingController(text: w.target > 0 ? w.target.toString() : '');
     final note = TextEditingController(text: w.note);
-    String linkCat = w.linkCategory;
+    // 多分类：数组优先，兼容旧单值
+    final linkCats = <String>{
+      ...(w.linkCategories.isNotEmpty
+          ? w.linkCategories
+          : (w.linkCategory.isNotEmpty ? [w.linkCategory] : [])),
+    };
     final linkFrom = TextEditingController(text: w.linkFrom);
     final ok = await showDialog<bool>(
       context: context,
@@ -394,17 +408,26 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                 TextField(controller: target, keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(labelText: '目标金额（可选）')),
                 const SizedBox(height: 8),
-                const Text('关联流水分类（可选）', style: TextStyle(fontSize: 13)),
-                DropdownButton<String>(
-                  isExpanded: true,
-                  value: linkCat.isEmpty ? null : linkCat,
-                  hint: const Text('不关联'),
-                  items: [
-                    const DropdownMenuItem(value: '', child: Text('不关联')),
-                    ..._cats.map((c) => DropdownMenuItem(
-                        value: c.name, child: Text('${c.name}${c.type == 'income' ? '（收）' : '（支）'}'))),
+                const Text('关联流水分类（可选，可多选）', style: TextStyle(fontSize: 13)),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    ..._cats.map((c) => ChoiceChip(
+                          label: Text('${c.name}${c.type == 'income' ? '（收）' : '（支）'}',
+                              style: const TextStyle(fontSize: 12)),
+                          selected: linkCats.contains(c.name),
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (_) => set(() {
+                            if (linkCats.contains(c.name)) {
+                              linkCats.remove(c.name);
+                            } else {
+                              linkCats.add(c.name);
+                            }
+                          }),
+                        )),
                   ],
-                  onChanged: (v) => set(() => linkCat = v ?? ''),
                 ),
                 TextField(controller: linkFrom, decoration: const InputDecoration(labelText: '关联起始日（如20260101，可选）')),
                 TextField(controller: note, decoration: const InputDecoration(labelText: '备注（可选）')),
@@ -425,7 +448,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
         name: name.text.trim(),
         icon: icon.text.trim().isEmpty ? '👛' : icon.text.trim(),
         target: double.tryParse(target.text.trim()) ?? 0,
-        linkCategory: linkCat,
+        linkCategory: linkCats.join(','),
         linkFrom: linkFrom.text.trim(),
         note: note.text.trim(),
       );

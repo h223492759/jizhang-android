@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Flow;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/core/storage.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
@@ -63,14 +64,28 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   }
 
   Future<void> _loadPresets() async {
-    // 本地镜像直读（秒开），过期 5 分钟后台自动同步——不再每次调服务器
+    // 先读本地镜像（秒开），随后台拉最新常用名保证与网页端一致（网页端设置了多少就显示多少）
     try {
-      _presets = await ref.read(localApiProvider).getPresets(type: _type, limit: 30);
+      _presets = await ref.read(localApiProvider).getPresets(type: _type, limit: 60);
     } catch (_) {
       _presets = PresetsData(presets: [], frequent: [], recent: []);
       if (mounted) toast('常用名加载失败，请检查网络');
     }
     if (mounted) setState(() => _presetsLoaded = true);
+    // 后台强制拉最新镜像（不依赖 5 分钟过期）：网页端刚改的常用名下次打开记账页即可见
+    _refreshPresets();
+  }
+
+  Future<void> _refreshPresets() async {
+    try {
+      final bookId = await Storage.getBookId();
+      if (bookId == null) return;
+      await ref.read(localApiProvider).syncPresetsNow(bookId);
+      if (!mounted) return;
+      final fresh = await ref.read(localApiProvider).getPresets(type: _type, limit: 60);
+      if (mounted && !_presetsLoaded) return;
+      if (mounted) setState(() => _presets = fresh);
+    } catch (_) {}
   }
 
   List<Category> get _visibleCats =>
@@ -452,7 +467,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     for (final p in raw) {
       unique.putIfAbsent(p.name, () => p);
     }
-    final display = unique.values.take(30).toList();
+    final display = unique.values.take(60).toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
       child: Column(
@@ -470,18 +485,22 @@ class _RecordPageState extends ConsumerState<RecordPage> {
           ),
           if (display.isNotEmpty) ...[
             const SizedBox(height: 8),
-            // 纵向 Wrap 多行展示全部常用名（之前横滚一行易被截断"显示不全"）
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: display.map((p) {
-                return ActionChip(
-                  label: Text(p.name, style: const TextStyle(fontSize: 12)),
-                  backgroundColor: Colors.grey.shade200,
-                  side: BorderSide.none,
-                  onPressed: () => _applyPreset(p),
-                );
-              }).toList(),
+            // 一行横滚（用户指定交互）：左右滑动选择全部常用名
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: display.map((p) {
+                  return Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    child: ActionChip(
+                      label: Text(p.name, style: const TextStyle(fontSize: 12)),
+                      backgroundColor: Colors.grey.shade200,
+                      side: BorderSide.none,
+                      onPressed: () => _applyPreset(p),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ] else if (_cat != null) ...[
             const SizedBox(height: 6),

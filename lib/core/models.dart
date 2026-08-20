@@ -454,7 +454,8 @@ class Wallet {
   final double target;
   final String note;
   final String linkFrom;
-  final String linkCategory;
+  final String linkCategory; // 兼容旧字段（服务器 JSON 字符串）
+  final List<String> linkCategories; // 多分类数组（新版）
   final double manualBalance;
   final double linked;
   final double balance;
@@ -471,6 +472,7 @@ class Wallet {
     required this.note,
     required this.linkFrom,
     required this.linkCategory,
+    required this.linkCategories,
     required this.manualBalance,
     required this.linked,
     required this.balance,
@@ -480,7 +482,29 @@ class Wallet {
     required this.lastYmd,
     required this.percent,
   });
-  factory Wallet.fromJson(Map<String, dynamic> j) => Wallet(
+  factory Wallet.fromJson(Map<String, dynamic> j) {
+    // linkCategories 数组优先；兼容旧版 linkCategory 字符串
+    List<String> cats = [];
+    if (j['linkCategories'] is List) {
+      cats = (j['linkCategories'] as List).map((e) => e.toString()).toList();
+    } else {
+      final raw = (j['link_category'] ?? '').toString().trim();
+      if (raw.isNotEmpty) {
+        try {
+          final arr = jsonDecode(raw);
+          if (arr is List) {
+            cats = arr.map((e) => e.toString()).toList();
+          } else if (raw.contains('[')) {
+            cats = raw.replaceAll(RegExp(r'[\[\]" ]'), '').split(',').where((s) => s.isNotEmpty).toList();
+          } else {
+            cats = [raw];
+          }
+        } catch (_) {
+          cats = raw.split(RegExp(r'[,，]')).where((s) => s.isNotEmpty).toList();
+        }
+      }
+    }
+    return Wallet(
         id: j['id'],
         name: j['name'] ?? '',
         icon: j['icon'] ?? '👛',
@@ -488,6 +512,7 @@ class Wallet {
         note: j['note'] ?? '',
         linkFrom: j['link_from'] ?? '',
         linkCategory: j['link_category'] ?? '',
+        linkCategories: cats,
         manualBalance: (j['manualBalance'] ?? 0).toDouble(),
         linked: (j['linked'] ?? 0).toDouble(),
         balance: (j['balance'] ?? 0).toDouble(),
@@ -497,6 +522,7 @@ class Wallet {
         lastYmd: j['last_ymd'] ?? '',
         percent: j['percent'] ?? 0,
       );
+  }
   static List<Wallet> listFrom(dynamic v) =>
       (v as List? ?? []).map((e) => Wallet.fromJson(e)).toList();
 }
