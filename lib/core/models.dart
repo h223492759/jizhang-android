@@ -622,17 +622,21 @@ class PresetName {
   final String? category;
   final String? paymentMethod;
   final double? amount;
+  // 仅 frequent（有流水的未收藏建议）有值；presets 收藏为 0
+  final int count;
   PresetName({
     required this.name,
     this.category,
     this.paymentMethod,
     this.amount,
+    this.count = 0,
   });
   factory PresetName.fromJson(Map<String, dynamic> j) => PresetName(
         name: j['name'] ?? '',
         category: j['category'],
         paymentMethod: j['payment_method'],
         amount: j['amount'] != null ? (j['amount']).toDouble() : null,
+        count: (j['count'] is num) ? (j['count'] as num).toInt() : 0,
       );
   static List<PresetName> listFrom(dynamic v) =>
       (v as List? ?? []).map((e) => PresetName.fromJson(e)).toList();

@@ -26,6 +26,10 @@ class AutoRecordService {
       _instance ??= AutoRecordService._();
 
   Timer? _timer;
+  // 重入保护：弹窗已经在展示时，轮询/再次 processNow 直接跳过，
+  // 避免 6 秒定时轮轮把同一批通知堆出多个弹窗（用户截图里"点了很多次忽略
+  // 后弹窗后面都变浅/变深"就是这个原因）。
+  bool _showing = false;
 
   AutoRecordService._();
 
@@ -154,46 +158,52 @@ class AutoRecordService {
 
   // ---------------- 主流程 ----------------
   Future<void> _processQueue(WidgetRef ref, BuildContext context) async {
+    if (_showing) return; // 已有弹窗在展示，跳过本次轮询，避免叠加
     if (!(await enabled)) return;
     final s = ref.read(sessionProvider);
     if (!s.hasToken || !s.hasBook) return;
     final pending = await fetchPending();
     if (pending.isEmpty) return;
-    for (final raw in pending) {
-      if (!context.mounted) return;
-      final parsed = _parse(raw);
-      if (parsed == null) {
+    _showing = true;
+    try {
+      for (final raw in pending) {
+        if (!context.mounted) return;
+        final parsed = _parse(raw);
+        if (parsed == null) {
+          await removePending(raw['id']?.toString() ?? '');
+          continue;
+        }
+        // 排除规则
+        if (await _excluded(parsed)) {
+          await removePending(raw['id']?.toString() ?? '');
+          continue;
+        }
+        // 去重：商户+金额+2分钟
+        final dedupKey = '${parsed.merchant}|${parsed.amount.toStringAsFixed(2)}';
+        if (await _dedupHit(dedupKey)) {
+          await removePending(raw['id']?.toString() ?? '');
+          continue;
+        }
+        // 弹窗确认（强制）
+        if (!context.mounted) return;
+        final result = await showDialog<AutoRecordAction>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AutoRecordDialog(parsed: parsed),
+        );
+        if (!context.mounted) continue;
         await removePending(raw['id']?.toString() ?? '');
-        continue;
+        if (result == null) continue; // 忽略
+        if (result.ignore) continue;
+        if (result.neverAgain) {
+          await _addExcludeFromDialog(result);
+          continue;
+        }
+        await _dedupMark(dedupKey);
+        await _saveFlow(ref, result);
       }
-      // 排除规则
-      if (await _excluded(parsed)) {
-        await removePending(raw['id']?.toString() ?? '');
-        continue;
-      }
-      // 去重：商户+金额+2分钟
-      final dedupKey = '${parsed.merchant}|${parsed.amount.toStringAsFixed(2)}';
-      if (await _dedupHit(dedupKey)) {
-        await removePending(raw['id']?.toString() ?? '');
-        continue;
-      }
-      // 弹窗确认（强制）
-      if (!context.mounted) return;
-      final result = await showDialog<AutoRecordAction>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AutoRecordDialog(parsed: parsed),
-      );
-      if (!context.mounted) continue;
-      await removePending(raw['id']?.toString() ?? '');
-      if (result == null) continue; // 忽略
-      if (result.ignore) continue;
-      if (result.neverAgain) {
-        await _addExcludeFromDialog(result);
-        continue;
-      }
-      await _dedupMark(dedupKey);
-      await _saveFlow(ref, result);
+    } finally {
+      _showing = false;
     }
   }
 
@@ -201,6 +211,30 @@ class AutoRecordService {
   ParsedNotification? _parse(Map<String, dynamic> raw) {
     final text = '${raw['title'] ?? ''} ${raw['text'] ?? ''}';
     if (text.trim().isEmpty) return null;
+    // 必须是支付类通知才识别，避免把"百果园接龙""商品价目"等含 ¥ 的营销/聊天
+    // 内容误当成账单（用户截图：百果园 A级新疆西梅 ¥29.9/箱 这种就被错认了）。
+    const payKw = [
+      '支付成功', '付款成功', '已支付', '已付款',
+      '收款通知', '收款成功', '已收款',
+      '扣款', '已扣款',
+      '入账', '到账',
+      '支付', '付款', '消费', '支出',
+      '信用卡还款', '还款成功',
+    ];
+    final hasPayKw = payKw.any((kw) => text.contains(kw));
+    // 白名单支付 App 的通知可以放宽（即便没有关键字也认），其它包必须有
+    // 关键字才识别——避免聊天/营销里的价格被误抓。
+    final pkg = raw['pkg']?.toString() ?? '';
+    const payApps = {
+      'com.eg.android.AlipayGphone',
+      'com.tencent.mm',
+      'com.tencent.wepay',
+      'com.unionpay',
+    };
+    final isPaymentApp = payApps.contains(pkg);
+    if (!hasPayKw && !(isPaymentApp && (text.contains('¥') || text.contains('￥') || text.contains('元')))) {
+      return null;
+    }
     // 金额
     final amtMatch = RegExp(r'[¥￥]\s*([0-9]+(?:\.[0-9]{1,2})?)')
             .firstMatch(text) ??
