@@ -282,7 +282,7 @@ class LocalFirstApi {
           'sort': m['sort'] ?? 0,
         };
       }).toList();
-      await db.replacePresets(bookId, pRows);
+      await db.replacePresets(bookId, type, pRows);
 
       // frequent + recent 合并成一张 preset_suggest 镜像（同名合并，count 取 frequent 的）
       final byName = <String, Map<String, Object?>>{};
@@ -313,7 +313,7 @@ class LocalFirstApi {
           'last_time': m['last_time'] ?? '',
         };
       }
-      await db.replaceSuggest(bookId, byName.values.toList());
+      await db.replaceSuggest(bookId, type, byName.values.toList());
 
       final hRows = (resp['hidden'] as List? ?? []).map<Map<String, Object?>>((e) {
         final m = e as Map<String, dynamic>;
@@ -324,7 +324,7 @@ class LocalFirstApi {
           'created_at': m['created_at'] ?? '',
         };
       }).toList();
-      await db.replaceHidden(bookId, hRows);
+      await db.replaceHidden(bookId, type, hRows);
     }
     await db.setMeta('preset_sync_$bookId', DateTime.now().toIso8601String());
   }

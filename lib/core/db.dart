@@ -401,9 +401,12 @@ class LocalDb {
   }
 
   // ---------------- presets（收藏） ----------------
-  Future<void> replacePresets(int bookId, List<Map<String, Object?>> rows) async {
+  // 按 (book_id, type) 替换——两个 type 分开存储，避免互相覆盖
+  Future<void> replacePresets(
+      int bookId, String type, List<Map<String, Object?>> rows) async {
     final d = await db;
-    await d.delete('presets', where: 'book_id=?', whereArgs: [bookId]);
+    await d.delete('presets',
+        where: 'book_id=? AND type=?', whereArgs: [bookId, type]);
     final batch = d.batch();
     for (final r in rows) {
       batch.insert('presets', Map<String, Object?>.from(r)..['book_id'] = bookId);
@@ -420,9 +423,13 @@ class LocalDb {
   }
 
   // ---------------- preset_suggest / hidden_names 镜像（方案 A） ----------------
-  Future<void> replaceSuggest(int bookId, List<Map<String, Object?>> rows) async {
+  // 按 (book_id, type) 替换——修复 v1.4.0 bug：之前按 book_id 全删再插单 type，
+  // 循环里 income 会覆盖 expense，导致记账页"支出一条都没有"
+  Future<void> replaceSuggest(
+      int bookId, String type, List<Map<String, Object?>> rows) async {
     final d = await db;
-    await d.delete('preset_suggest', where: 'book_id=?', whereArgs: [bookId]);
+    await d.delete('preset_suggest',
+        where: 'book_id=? AND type=?', whereArgs: [bookId, type]);
     final batch = d.batch();
     for (final r in rows) {
       batch.insert('preset_suggest', Map<String, Object?>.from(r)..['book_id'] = bookId);
@@ -437,9 +444,11 @@ class LocalDb {
         whereArgs: [bookId, type]);
   }
 
-  Future<void> replaceHidden(int bookId, List<Map<String, Object?>> rows) async {
+  Future<void> replaceHidden(
+      int bookId, String type, List<Map<String, Object?>> rows) async {
     final d = await db;
-    await d.delete('hidden_names', where: 'book_id=?', whereArgs: [bookId]);
+    await d.delete('hidden_names',
+        where: 'book_id=? AND type=?', whereArgs: [bookId, type]);
     final batch = d.batch();
     for (final r in rows) {
       batch.insert('hidden_names', Map<String, Object?>.from(r)..['book_id'] = bookId);

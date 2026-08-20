@@ -76,7 +76,13 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     setState(() => _busy = true);
     try {
       final r = await ref.read(localApiProvider).parseText(text);
-      setState(() => _msgs.add(_Msg(role: 'ai', text: '已识别以下记账信息', parse: r)));
+      if ((r.amount ?? 0) <= 0) {
+        // 问句/叙述（如「这个月奶茶一共花了多少」）→ 不当作记账，友好提示
+        setState(() => _msgs.add(
+            _Msg(role: 'ai', text: '没有识别到金额：这似乎不是一笔消费。请直接说「XX花了X元」这类的话。')));
+      } else {
+        setState(() => _msgs.add(_Msg(role: 'ai', text: '已识别以下记账信息', parse: r)));
+      }
     } catch (e) {
       setState(() => _msgs.add(_Msg(role: 'ai', text: e.toString().replaceFirst('ApiException: ', ''))));
     } finally {
@@ -236,8 +242,10 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                       backgroundColor: Colors.white,
                       side: BorderSide(color: AppColors.divider),
                       onPressed: () {
+                        // 与上方常用名称一致：只填到输入框，由用户确认/修改后再发送，
+                        // 避免示例直接记账造成误记
                         _ctrl.text = e;
-                        _send();
+                        _ctrl.selection = TextSelection.collapsed(offset: e.length);
                       },
                     ))
                 .toList(),
