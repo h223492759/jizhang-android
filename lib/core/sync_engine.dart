@@ -39,6 +39,8 @@ class SyncEngine extends ChangeNotifier {
 
   /// 当前账本的同步游标 key
   static String _cursorKey(int bookId) => 'last_sync_$bookId';
+  /// 指纹 key（本地存上次同步指纹，判断服务器有无变化）
+  static String _fpKey(int bookId) => 'bundle_fp_$bookId';
 
   /// 触发同步：优先增量；本地无该账本数据时自动全量。
   /// 返回是否成功完成（含"无需同步"）
@@ -49,9 +51,21 @@ class SyncEngine extends ChangeNotifier {
     status = SyncStatus.syncing;
     notifyListeners();
     try {
+      // 1) 补传本地待同步写操作
       await _flushOutbox(bookId, a);
-      await _pullSmallTables(bookId, a);
-      await _pullFlows(bookId, a);
+      // 2) 指纹探测：无变化 → 跳过全部拉取（只同步有修改/新增的部分）
+      final db = LocalDb.instance;
+      final lastFp = await db.getMeta(_fpKey(bookId));
+      final fpResp = await a.getFingerprint(lastFp: lastFp);
+      final unchanged = fpResp['unchanged'] == true;
+      await db.setMeta(_fpKey(bookId), (fpResp['fp'] ?? '') as String);
+      if (!unchanged) {
+        // 3) 小表 + 流水并行拉取（互不依赖，一次网络往返时间）
+        await Future.wait([
+          _pullSmallTables(bookId, a),
+          _pullFlows(bookId, a),
+        ]);
+      }
       status = SyncStatus.idle;
       lastError = null;
       _syncTick++;
@@ -256,70 +270,76 @@ class SyncEngine extends ChangeNotifier {
     }
   }
 
-  // ---------------- 小表全量 ----------------
+  // ---------------- 小表全量（各表并行拉取，一次网络往返时间） ----------------
   Future<void> _pullSmallTables(int bookId, ApiClient a) async {
     final db = LocalDb.instance;
-    // 分类
-    final cats = await a.getCategories();
-    await db.replaceCategories(
-        bookId,
-        cats
-            .map((c) => {
-                  'id': c.id,
-                  'book_id': bookId,
-                  'name': c.name,
-                  'type': c.type,
-                  'icon': c.icon,
-                  'color': c.color,
-                  'sort': c.sort,
-                })
-            .toList());
-    // 账本
-    final books = await a.getBooks();
-    await db.replaceBooks(books
-        .map((b) => {
-              'id': b.id,
-              'name': b.name,
-              'owner_id': b.ownerId,
-              'role': b.role,
-              'members': b.members,
-              'flows': b.flows,
-            })
-        .toList());
+    // 单个小表失败不影响其它（分类/账本失败比较关键，预算/钱包等可容忍）
+    Future<void> guard(Future<void> f) => f.catchError((_) {});
+
+    Future<void> pullCategories() async {
+      final cats = await a.getCategories();
+      await db.replaceCategories(
+          bookId,
+          cats
+              .map((c) => {
+                    'id': c.id,
+                    'book_id': bookId,
+                    'name': c.name,
+                    'type': c.type,
+                    'icon': c.icon,
+                    'color': c.color,
+                    'sort': c.sort,
+                  })
+              .toList());
+    }
+
+    Future<void> pullBooks() async {
+      final books = await a.getBooks();
+      await db.replaceBooks(books
+          .map((b) => {
+                'id': b.id,
+                'name': b.name,
+                'owner_id': b.ownerId,
+                'role': b.role,
+                'members': b.members,
+                'flows': b.flows,
+              })
+          .toList());
+    }
+
     // 收藏名称 + 建议 + 已取消显示（方案 A：一次性镜像全量，含 suggest/hidden/last_time）
-    await LocalFirstApi(a).syncPresetsNow(bookId);
-    // 目标/细则（整包 JSON）
-    final sav = await a.getSavings();
-    Map itemJson(SavingsItem it) => {
-          'id': it.id,
-          'name': it.name,
-          'sign': it.sign,
-          'amount': it.amount,
-          'note': it.note,
-          'as_of': it.asOf,
-          'as_of_end': it.asOfEnd,
-          'sort': it.sort,
-        };
+    Future<void> pullPresets() => LocalFirstApi(a).syncPresetsNow(bookId);
 
-    Map monthJson(SavingsMonth m) => {
-          'ymd': m.ymd,
-          'asset': m.asset,
-          'liability': m.liability,
-          'net': m.net,
-          'op_user': m.opUser,
-        };
+    Future<void> pullSavings() async {
+      final sav = await a.getSavings();
+      Map itemJson(SavingsItem it) => {
+            'id': it.id,
+            'name': it.name,
+            'sign': it.sign,
+            'amount': it.amount,
+            'note': it.note,
+            'as_of': it.asOf,
+            'as_of_end': it.asOfEnd,
+            'sort': it.sort,
+          };
+      Map monthJson(SavingsMonth m) => {
+            'ymd': m.ymd,
+            'asset': m.asset,
+            'liability': m.liability,
+            'net': m.net,
+            'op_user': m.opUser,
+          };
+      final savJson = jsonEncode({
+        'goal': sav.goal,
+        'items': sav.items.map(itemJson).toList(),
+        'expiredItems': sav.expiredItems.map(itemJson).toList(),
+        'current': sav.current,
+        'months': sav.months.map(monthJson).toList(),
+      });
+      await db.saveSavings(bookId, savJson);
+    }
 
-    final savJson = jsonEncode({
-      'goal': sav.goal,
-      'items': sav.items.map(itemJson).toList(),
-      'expiredItems': sav.expiredItems.map(itemJson).toList(),
-      'current': sav.current,
-      'months': sav.months.map(monthJson).toList(),
-    });
-    await db.saveSavings(bookId, savJson);
-
-    // 预算设置（跨年，离线镜像 + 本地算进度）
-    try {
+    Future<void> pullBudgets() async {
       final bset = await a.getBudgetSettings();
       await db.replaceBudgets(
           bookId,
@@ -331,9 +351,9 @@ class SyncEngine extends ChangeNotifier {
                     'expression': r['expression'] ?? '',
                   })
               .toList());
-    } catch (_) {}
-    // 定期模板
-    try {
+    }
+
+    Future<void> pullRecurring() async {
       final recs = await a.getRecurring();
       await db.replaceRecurring(
           bookId,
@@ -354,9 +374,9 @@ class SyncEngine extends ChangeNotifier {
                     'attribution': r.attribution,
                   })
               .toList());
-    } catch (_) {}
-    // 钱包（整包）
-    try {
+    }
+
+    Future<void> pullWallets() async {
       final w = await a.getWallets();
       await db.saveWalletsJson(
           bookId,
@@ -376,7 +396,17 @@ class SyncEngine extends ChangeNotifier {
             'totalBalance': w.totalBalance,
             'totalTarget': w.totalTarget,
           }));
-    } catch (_) {}
+    }
+
+    await Future.wait([
+      guard(pullCategories()),
+      guard(pullBooks()),
+      guard(pullPresets()),
+      guard(pullSavings()),
+      guard(pullBudgets()),
+      guard(pullRecurring()),
+      guard(pullWallets()),
+    ]);
   }
 
   // ---------------- 流水增量 / 全量 ----------------

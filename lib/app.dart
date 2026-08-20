@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,19 +60,17 @@ class MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserver {
   int _idx = 0;
   final _pages = const [HomePage(), ChartsPage(), DiscoverPage(), MePage()];
-  Timer? _syncTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // 启动后立即处理一次队列，之后由定时轮询接管
+    // 事件驱动同步（用户：离线极少，不需要 30s 高频轮询）：
+    // 启动一次 + 从后台切回前台一次 + 写操作成功后（LocalFirstApi 内触发）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AutoRecordService.instance.processNow(ref, context);
       AutoRecordService.instance.startPolling(ref, context);
       _sync();
-      // 离线同步：每 30 秒静默增量同步一次
-      _syncTimer = Timer.periodic(const Duration(seconds: 30), (_) => _sync());
     });
   }
 
@@ -81,7 +78,6 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     AutoRecordService.instance.stopPolling();
-    _syncTimer?.cancel();
     super.dispose();
   }
 

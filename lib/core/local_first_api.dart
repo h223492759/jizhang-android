@@ -364,6 +364,7 @@ class LocalFirstApi {
     try {
       final id = await _api.createFlow({...body, 'uuid': uuid});
       await db.upsertFlow(_rowFromBody(bookId, id, body));
+      _syncAfterWrite(); // 写成功 → 触发一次同步（常用名/小表刷新；指纹可跳过）
       return id;
     } catch (e) {
       if (_isNetworkErr(e)) {
@@ -377,12 +378,25 @@ class LocalFirstApi {
     }
   }
 
+  /// 写操作成功后触发一次同步（事件驱动：用户离线极少，不需要 30s 轮询）。
+  /// syncNow 内部有 _syncing 锁 + 指纹跳过，重复触发开销极低。
+  void _syncAfterWrite() {
+    try {
+      _curBook().then((bookId) {
+        if (bookId > 0) {
+          SyncEngine.instance.syncNow(bookId).catchError((_) {});
+        }
+      });
+    } catch (_) {}
+  }
+
   Future<void> updateFlow(int id, Map<String, dynamic> body) async {
     final db = LocalDb.instance;
     final existing = await db.flowById(id);
     try {
       await _api.updateFlow(id, body);
       if (existing != null) await db.markDirty(id, false);
+      _syncAfterWrite();
     } catch (e) {
       if (_isNetworkErr(e) && existing != null) {
         await db.markDirty(id, true);
@@ -398,6 +412,7 @@ class LocalFirstApi {
     try {
       await _api.deleteFlow(id);
       await db.deleteFlowById(id);
+      _syncAfterWrite();
     } catch (e) {
       if (_isNetworkErr(e)) {
         await db.deleteFlowById(id);

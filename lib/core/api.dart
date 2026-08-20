@@ -500,6 +500,14 @@ class ApiClient {
     }));
     return (d as Map).cast<String, dynamic>();
   }
+
+  /// 同步指纹：服务器算所有表数据版本，与客户端上次一致则 unchanged（跳过全量拉取）
+  Future<Map<String, dynamic>> getFingerprint({String? lastFp}) async {
+    final d = await _req(() => _dio.get('/sync/fingerprint', queryParameters: {
+      if (lastFp != null && lastFp.isNotEmpty) 'fp': lastFp,
+    }));
+    return (d as Map).cast<String, dynamic>();
+  }
 }
 
 class LoginResult {
