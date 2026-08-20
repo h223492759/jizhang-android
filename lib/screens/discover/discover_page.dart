@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
@@ -32,10 +31,11 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     setState(() => _loadingSuggest = true);
     try {
       // 一次性拉两个类型（合并去重），按"已收藏优先 + 未收藏按频次降序"排序
+      // 走 localApiProvider：本地镜像直读（秒开）+ 过期 5 分钟后台自动同步
       final s = ref.read(sessionProvider);
       if (!s.hasToken || !s.hasBook) return;
-      final ex = await ref.read(apiProvider).getPresets(type: 'expense');
-      final inc = await ref.read(apiProvider).getPresets(type: 'income');
+      final ex = await ref.read(localApiProvider).getPresets(type: 'expense');
+      final inc = await ref.read(localApiProvider).getPresets(type: 'income');
       final chips = <_PresetChip>[];
       for (final p in ex.presets) {
         chips.add(_PresetChip(name: p.name, type: 'expense', pinned: true));

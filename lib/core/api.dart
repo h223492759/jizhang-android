@@ -489,6 +489,17 @@ class ApiClient {
     }));
     return PresetsData.fromJson(d);
   }
+
+  /// 返回完整原始响应（presets/frequent/recent/hidden/synced_at），
+  /// 供本地镜像表全量同步用（不丢失 hidden / count / last_time 等字段）
+  Future<Map<String, dynamic>> getPresetsRaw(
+      {required String type, int limit = 500}) async {
+    final d = await _req(() => _dio.get('/presets', queryParameters: {
+      'type': type,
+      'limit': limit,
+    }));
+    return (d as Map).cast<String, dynamic>();
+  }
 }
 
 class LoginResult {

@@ -149,6 +149,29 @@ class LocalDb {
         status TEXT NOT NULL DEFAULT 'ok'
       )''');
     await d.execute('CREATE INDEX IF NOT EXISTS idx_opslog_book ON ops_log(book_id, id DESC)');
+    // 方案 A：常用名称镜像表（preset_suggest + hidden_names），记账/发现页直接读本地
+    await d.execute('''
+      CREATE TABLE IF NOT EXISTS preset_suggest(
+        book_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 0,
+        category TEXT NOT NULL DEFAULT '',
+        payment_method TEXT NOT NULL DEFAULT '',
+        avg_amount REAL NOT NULL DEFAULT 0,
+        last_time TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (book_id, type, name)
+      )''');
+    await d.execute('CREATE INDEX IF NOT EXISTS idx_suggest_book ON preset_suggest(book_id, type)');
+    await d.execute('''
+      CREATE TABLE IF NOT EXISTS hidden_names(
+        book_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (book_id, type, name)
+      )''');
   }
 
   // ---------------- flows ----------------
@@ -367,6 +390,54 @@ class LocalDb {
         orderBy: 'sort, id');
   }
 
+  // ---------------- preset_suggest / hidden_names 镜像（方案 A） ----------------
+  Future<void> replaceSuggest(int bookId, List<Map<String, Object?>> rows) async {
+    final d = await db;
+    await d.delete('preset_suggest', where: 'book_id=?', whereArgs: [bookId]);
+    final batch = d.batch();
+    for (final r in rows) {
+      batch.insert('preset_suggest', Map<String, Object?>.from(r)..['book_id'] = bookId);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<Map<String, Object?>>> getSuggest(int bookId, String type) async {
+    final d = await db;
+    return d.query('preset_suggest',
+        where: 'book_id=? AND type=?',
+        whereArgs: [bookId, type]);
+  }
+
+  Future<void> replaceHidden(int bookId, List<Map<String, Object?>> rows) async {
+    final d = await db;
+    await d.delete('hidden_names', where: 'book_id=?', whereArgs: [bookId]);
+    final batch = d.batch();
+    for (final r in rows) {
+      batch.insert('hidden_names', Map<String, Object?>.from(r)..['book_id'] = bookId);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<Map<String, Object?>>> getHidden(int bookId, String type) async {
+    final d = await db;
+    return d.query('hidden_names',
+        where: 'book_id=? AND type=?',
+        whereArgs: [bookId, type]);
+  }
+
+  // ---------------- sync_meta ----------------
+  Future<String?> getMeta(String key) async {
+    final d = await db;
+    final rows = await d.query('sync_meta', where: 'key=?', whereArgs: [key], limit: 1);
+    return rows.isEmpty ? null : (rows.first['value'] as String?);
+  }
+
+  Future<void> setMeta(String key, String value) async {
+    final d = await db;
+    await d.insert('sync_meta', {'key': key, 'value': value},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
   // ---------------- savings（整包 JSON） ----------------
   Future<void> saveSavings(int bookId, String json) async {
     final d = await db;
@@ -427,20 +498,6 @@ class LocalDb {
       if (r.isNotEmpty) return true;
     }
     return false;
-  }
-
-  // ---------------- sync_meta ----------------
-  Future<String?> getMeta(String key) async {
-    final d = await db;
-    final rows = await d.query('sync_meta',
-        where: 'key=?', whereArgs: [key], limit: 1);
-    return rows.isEmpty ? null : (rows.first['value'] as String?);
-  }
-
-  Future<void> setMeta(String key, String value) async {
-    final d = await db;
-    await d.insert('sync_meta', {'key': key, 'value': value},
-        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // ---------------- budgets（预算设置镜像） ----------------

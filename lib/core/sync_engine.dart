@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/db.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 import 'package:jizhang_android/core/models.dart';
 
 enum SyncStatus {
@@ -285,21 +286,8 @@ class SyncEngine extends ChangeNotifier {
               'flows': b.flows,
             })
         .toList());
-    // 收藏名称（两种类型）
-    for (final t in ['expense', 'income']) {
-      final pd = await a.getPresets(type: t, limit: 1000);
-      await db.replacePresets(
-          bookId,
-          pd.presets
-              .map((p) => {
-                    'name': p.name,
-                    'type': t,
-                    'category': p.category ?? '',
-                    'payment_method': p.paymentMethod ?? '',
-                    'amount': p.amount ?? 0,
-                  })
-              .toList());
-    }
+    // 收藏名称 + 建议 + 已取消显示（方案 A：一次性镜像全量，含 suggest/hidden/last_time）
+    await LocalFirstApi(a).syncPresetsNow(bookId);
     // 目标/细则（整包 JSON）
     final sav = await a.getSavings();
     Map itemJson(SavingsItem it) => {

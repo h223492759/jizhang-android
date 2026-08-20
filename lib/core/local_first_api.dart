@@ -191,9 +191,14 @@ class LocalFirstApi {
         .toList();
   }
 
+  /// 常用名称（方案 A：本地镜像表直读 + 后台同步）。
+  /// 返回本地数据（立即，秒开）；若本地镜像过期（>5 分钟）或为空，则后台从服务器拉取刷新。
   Future<PresetsData> getPresets({required String type, int limit = 12}) async {
     final bookId = await _curBook();
     final db = LocalDb.instance;
+    // 后台同步（不阻塞返回）：先给本地数据
+    _maybeSyncPresets(bookId).catchError((_) {});
+
     final presetRows = await db.getPresets(bookId, type);
     final presets = presetRows
         .map((r) => PresetName(
@@ -203,50 +208,125 @@ class LocalFirstApi {
               amount: (r['amount'] as num?)?.toDouble(),
             ))
         .toList();
-    // frequent / recent：本地从流水统计（与后端同口径，排除收藏名）
     final presetNames = presets.map((p) => p.name).toSet();
-    final flows = await db.allFlows(bookId);
-    final byName = <String, List<Map<String, Object?>>>{};
-    for (final f in flows) {
-      if (f['type'] != type) continue;
-      final n = ((f['description'] as String?) ?? '').trim();
-      if (n.isEmpty || presetNames.contains(n)) continue;
-      byName.putIfAbsent(n, () => []).add(f);
-    }
-    PresetName fromGroup(List<Map<String, Object?>> g) {
-      g.sort((a, b) => ((b['flow_time'] ?? '') as String)
-          .compareTo((a['flow_time'] ?? '') as String));
-      final latest = g.first;
-      final sum = g.fold<double>(0,
-          (s, f) => s + (((f['amount'] as num?) ?? 0).toDouble()));
-      return PresetName(
-        name: (latest['description'] ?? '') as String,
-        category: latest['category'] as String?,
-        paymentMethod: latest['payment_method'] as String?,
-        amount: g.isEmpty ? null : sum / g.length,
-      );
-    }
 
-    final groups = byName.values.toList();
-    final frequent = groups
-        .where((g) => g.length >= 2)
+    final hiddenRows = await db.getHidden(bookId, type);
+    final hiddenNames =
+        hiddenRows.map((r) => (r['name'] ?? '') as String).toSet();
+
+    final suggestRows = await db.getSuggest(bookId, type);
+    PresetName fromSuggest(Map<String, Object?> r) => PresetName(
+          name: (r['name'] ?? '') as String,
+          category: r['category'] as String?,
+          paymentMethod: r['payment_method'] as String?,
+          amount: (r['avg_amount'] as num?)?.toDouble(),
+          count: ((r['count'] as num?) ?? 0).toInt(),
+        );
+
+    // frequent：count>=2 且未收藏/未隐藏，按频次降序
+    final freqRows = suggestRows
+        .where((r) =>
+            (((r['count'] as num?) ?? 0).toInt()) >= 2 &&
+            !presetNames.contains(r['name']) &&
+            !hiddenNames.contains(r['name']))
         .toList()
-      ..sort((a, b) {
-        final c = b.length.compareTo(a.length);
-        if (c != 0) return c;
-        return ((b.first['flow_time'] ?? '') as String)
-            .compareTo((a.first['flow_time'] ?? '') as String);
-      });
-    final freqList = frequent.take(limit).map(fromGroup).toList();
-    final freqNames = freqList.map((p) => p.name).toSet();
-    final recent = groups
-        .where((g) => !freqNames.contains(g.first['description']))
+      ..sort((a, b) => ((b['count'] as num?) ?? 0)
+          .compareTo((a['count'] as num?) ?? 0));
+    final frequent = freqRows.take(limit).map(fromSuggest).toList();
+
+    // recent：last_time 非空，按最近时间倒序（物化字段，不再实时聚合 flows）
+    final recentRows = suggestRows
+        .where((r) =>
+            ((r['last_time'] ?? '') as String).isNotEmpty &&
+            !presetNames.contains(r['name']) &&
+            !hiddenNames.contains(r['name']))
         .toList()
-      ..sort((a, b) => ((b.first['flow_time'] ?? '') as String)
-          .compareTo((a.first['flow_time'] ?? '') as String));
-    final recentList = recent.take(limit).map(fromGroup).toList();
+      ..sort((a, b) => ((b['last_time'] ?? '') as String)
+          .compareTo((a['last_time'] ?? '') as String));
+    final recent = recentRows.take(limit).map(fromSuggest).toList();
+
     return PresetsData(
-        presets: presets, frequent: freqList, recent: recentList);
+        presets: presets, frequent: frequent, recent: recent);
+  }
+
+  /// 若本地镜像过期（>5 分钟）或为空 → 从服务器全量同步到本地表
+  Future<void> _maybeSyncPresets(int bookId) async {
+    final db = LocalDb.instance;
+    if (bookId <= 0) return;
+    final last = await db.getMeta('preset_sync_$bookId');
+    if (last != null) {
+      final t = DateTime.tryParse(last);
+      if (t != null &&
+          DateTime.now().difference(t) < const Duration(minutes: 5)) {
+        return; // 5 分钟内同步过，直接用本地
+      }
+    }
+    await syncPresetsNow(bookId);
+  }
+
+  /// 全量同步：拉服务器 /presets（两种类型），写入本地镜像表 + 时间戳
+  Future<void> syncPresetsNow(int bookId) async {
+    if (bookId <= 0) return;
+    final db = LocalDb.instance;
+    for (final type in ['expense', 'income']) {
+      final resp = await _api.getPresetsRaw(type: type, limit: 500);
+      final pRows = (resp['presets'] as List? ?? []).map<Map<String, Object?>>((e) {
+        final m = e as Map<String, dynamic>;
+        return {
+          'id': m['id'],
+          'name': m['name'] ?? '',
+          'type': type,
+          'category': m['category'] ?? '',
+          'payment_method': m['payment_method'] ?? '',
+          'amount': m['amount'] ?? 0,
+          'sort': m['sort'] ?? 0,
+        };
+      }).toList();
+      await db.replacePresets(bookId, pRows);
+
+      // frequent + recent 合并成一张 preset_suggest 镜像（同名合并，count 取 frequent 的）
+      final byName = <String, Map<String, Object?>>{};
+      for (final f in (resp['frequent'] as List? ?? [])) {
+        final m = f as Map<String, dynamic>;
+        final n = (m['name'] ?? '') as String;
+        byName[n] = {
+          'type': type,
+          'name': n,
+          'count': m['count'] ?? 0,
+          'category': m['category'] ?? '',
+          'payment_method': m['payment_method'] ?? '',
+          'avg_amount': m['avg_amount'] ?? 0,
+          'last_time': m['last_time'] ?? '',
+        };
+      }
+      for (final r in (resp['recent'] as List? ?? [])) {
+        final m = r as Map<String, dynamic>;
+        final n = (m['name'] ?? '') as String;
+        final cur = byName[n];
+        byName[n] = {
+          'type': type,
+          'name': n,
+          'count': (cur?['count'] as num?) ?? 1,
+          'category': m['category'] ?? (cur?['category'] ?? ''),
+          'payment_method': m['payment_method'] ?? (cur?['payment_method'] ?? ''),
+          'avg_amount': m['avg_amount'] ?? (cur?['avg_amount'] ?? 0),
+          'last_time': m['last_time'] ?? '',
+        };
+      }
+      await db.replaceSuggest(bookId, byName.values.toList());
+
+      final hRows = (resp['hidden'] as List? ?? []).map<Map<String, Object?>>((e) {
+        final m = e as Map<String, dynamic>;
+        return {
+          'type': type,
+          'name': m['name'] ?? '',
+          'category': m['category'] ?? '',
+          'created_at': m['created_at'] ?? '',
+        };
+      }).toList();
+      await db.replaceHidden(bookId, hRows);
+    }
+    await db.setMeta('preset_sync_$bookId', DateTime.now().toIso8601String());
   }
 
   Future<SavingsOverview> getSavings() async {
