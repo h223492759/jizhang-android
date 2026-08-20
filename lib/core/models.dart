@@ -544,6 +544,9 @@ class AiParseResult {
   final String? paymentMethod;
   final String? date;
   final String? raw;
+  // 'query' 表示这是问句（如「这个月奶茶花了多少」），前端调 /flows/query；
+  // null/其它 = 正常解析结果
+  final String? kind;
   AiParseResult({
     this.type,
     this.amount,
@@ -552,6 +555,7 @@ class AiParseResult {
     this.paymentMethod,
     this.date,
     this.raw,
+    this.kind,
   });
   factory AiParseResult.fromJson(Map<String, dynamic> j) => AiParseResult(
         type: j['type'],
@@ -561,6 +565,22 @@ class AiParseResult {
         paymentMethod: j['payment_method'],
         date: j['date'],
         raw: j['raw'],
+        kind: j['kind'],
+      );
+}
+
+/// 流水查询结果（发现页「这个月奶茶花了多少」返回）
+class FlowQuery {
+  final String category;
+  final String period; // 'YYYY-MM'
+  final int count;
+  final double total;
+  FlowQuery({required this.category, required this.period, required this.count, required this.total});
+  factory FlowQuery.fromJson(Map<String, dynamic> j) => FlowQuery(
+        category: (j['category'] ?? '').toString(),
+        period: (j['period'] ?? '').toString(),
+        count: (j['count'] is num) ? (j['count'] as num).toInt() : 0,
+        total: (j['total'] is num) ? (j['total'] as num).toDouble() : 0.0,
       );
 }
 

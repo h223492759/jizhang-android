@@ -470,21 +470,18 @@ class _RecordPageState extends ConsumerState<RecordPage> {
           ),
           if (display.isNotEmpty) ...[
             const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: display.map((p) {
-                  return Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      label: Text(p.name, style: const TextStyle(fontSize: 12)),
-                      backgroundColor: Colors.grey.shade200,
-                      side: BorderSide.none,
-                      onPressed: () => _applyPreset(p),
-                    ),
-                  );
-                }).toList(),
-              ),
+            // 纵向 Wrap 多行展示全部常用名（之前横滚一行易被截断"显示不全"）
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: display.map((p) {
+                return ActionChip(
+                  label: Text(p.name, style: const TextStyle(fontSize: 12)),
+                  backgroundColor: Colors.grey.shade200,
+                  side: BorderSide.none,
+                  onPressed: () => _applyPreset(p),
+                );
+              }).toList(),
             ),
           ] else if (_cat != null) ...[
             const SizedBox(height: 6),

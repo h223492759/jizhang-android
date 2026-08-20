@@ -76,8 +76,17 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     setState(() => _busy = true);
     try {
       final r = await ref.read(localApiProvider).parseText(text);
-      if ((r.amount ?? 0) <= 0) {
-        // 问句/叙述（如「这个月奶茶一共花了多少」）→ 不当作记账，友好提示
+      if (r.kind == 'query') {
+        // 问句（如「这个月奶茶花了多少」）→ 调 /flows/query 按分类+时段统计
+        if (r.category == null || r.category!.isEmpty) {
+          setState(() => _msgs.add(_Msg(role: 'ai', text: '没识别到要查的分类：$text')));
+        } else {
+          final q = await ref.read(localApiProvider).queryFlows(category: r.category!, period: 'this_month');
+          setState(() => _msgs.add(_Msg(role: 'ai',
+              text: '「${q.category}」本月（${q.period}）共花 ¥${q.total.toStringAsFixed(2)}（${q.count} 笔）')));
+        }
+      } else if ((r.amount ?? 0) <= 0) {
+        // 单数字/叙述 → 友好提示
         setState(() => _msgs.add(
             _Msg(role: 'ai', text: '没有识别到金额：这似乎不是一笔消费。请直接说「XX花了X元」这类的话。')));
       } else {

@@ -470,6 +470,15 @@ class ApiClient {
     return AiParseResult.fromJson(d);
   }
 
+  /// 流水查询（发现页 AI 问账用）：按分类+时段统计合计
+  Future<FlowQuery> queryFlows({required String category, String period = 'this_month'}) async {
+    final d = await _req(() => _dio.get('/flows/query', queryParameters: {
+      'category': category,
+      'period': period,
+    }));
+    return FlowQuery.fromJson(d);
+  }
+
   /// 商户分类（学习闭环）：先查商户→分类映射，命中直接返回；否则 AI 分类
   Future<AiParseResult> classifyMerchant(
       {required String merchant, String text = '', double amount = 0, String type = 'expense', String paymentMethod = ''}) async {

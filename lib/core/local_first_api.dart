@@ -1389,6 +1389,9 @@ class LocalFirstApi {
   Future<AiParseResult> parseText(String text) => _api.parseText(text);
   Future<AiAnalyze> analyzeMonth({String? month}) =>
       _api.analyzeMonth(month: month);
+  Future<FlowQuery> queryFlows(
+          {required String category, String period = 'this_month'}) =>
+      _api.queryFlows(category: category, period: period);
   Future<List<AiModel>> getAiModels() => _api.getAiModels();
   Future<Map<String, dynamic>> getSavingsMonthItems(String ym) =>
       _api.getSavingsMonthItems(ym);
