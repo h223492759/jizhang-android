@@ -137,8 +137,12 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
               isYear ? '上年结余' : '上月结余',
               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
-            Text(fmtMoney((d['lastMonthBalance'] ?? 0).toDouble()),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(fmtMoney2((d['lastMonthBalance'] ?? 0).toDouble()),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -158,8 +162,12 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
         child: Column(children: [
           Text(l, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: 4),
-          Text(fmtMoney(v),
-              style: TextStyle(color: c, fontWeight: FontWeight.bold)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(fmtMoney2(v),
+                style: TextStyle(
+                    color: c, fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
         ]),
       );
 
@@ -183,7 +191,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
               Row(
                 children: [
                   Expanded(child: Text(cat, style: const TextStyle(fontWeight: FontWeight.bold))),
-                  Text('${fmtMoney(amt)} · ${pct.toStringAsFixed(1)}%',
+                  Text('${fmtMoney2(amt)} · ${pct.toStringAsFixed(1)}%',
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                 ],
               ),
@@ -213,7 +221,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
         Expanded(
           child: _statCard(
             isYear ? '单月最高支出' : '单日最高支出',
-            fmtMoney(hiAmt),
+            fmtMoney2(hiAmt),
             hiDate.isNotEmpty ? hiDate : '',
           ),
         ),
@@ -221,7 +229,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
         Expanded(
           child: _statCard(
             isYear ? '月均支出' : '日均支出',
-            fmtMoney(avg),
+            fmtMoney2(avg),
             '',
           ),
         ),
@@ -229,7 +237,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
         Expanded(
           child: _statCard(
             isYear ? '年支出' : '月支出',
-            fmtMoney(total),
+            fmtMoney2(total),
             '',
           ),
         ),
@@ -247,9 +255,12 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
             Text(label,
                 style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             const SizedBox(height: 4),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.expense)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(value,
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.expense)),
+            ),
             if (sub.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(sub,
@@ -323,7 +334,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
                 final m = list[group.x.toInt()] as Map;
                 final label = (m['label'] ?? '').toString();
                 return BarTooltipItem(
-                  '$label  ¥${fmtMoney(rod.toY)}',
+                  '$label  ¥${fmtMoney2(rod.toY)}',
                   const TextStyle(color: Colors.white, fontSize: 12),
                 );
               },
@@ -344,7 +355,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
         child: ListTile(
           title: Text('${f.category} ${f.description.isNotEmpty ? '· ${f.description}' : ''}'),
           subtitle: Text(f.flowTime),
-          trailing: Text('${isExpense ? '-' : '+'}${fmtMoney(f.amount)}',
+          trailing: Text('${isExpense ? '-' : '+'}${fmtMoney2(f.amount)}',
               style: TextStyle(
                   color: isExpense ? AppColors.expense : AppColors.income,
                   fontWeight: FontWeight.bold)),

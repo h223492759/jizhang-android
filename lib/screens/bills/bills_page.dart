@@ -191,7 +191,11 @@ class _BillsPageState extends ConsumerState<BillsPage> {
         child: Column(children: [
           Text(l, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: 4),
-          Text(fmtMoney(v), style: TextStyle(color: c, fontWeight: FontWeight.bold)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(fmtMoney2(v),
+                style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
         ]),
       );
 
@@ -235,7 +239,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerRight,
-                    child: Text(fmtMoney(r.income),
+                    child: Text(fmtMoney2(r.income),
                         style: const TextStyle(
                             fontSize: 14,
                             color: AppColors.income,
@@ -247,7 +251,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerRight,
-                    child: Text(fmtMoney(r.expense),
+                    child: Text(fmtMoney2(r.expense),
                         style: const TextStyle(
                             fontSize: 14,
                             color: AppColors.expense,
@@ -259,7 +263,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerRight,
-                    child: Text(fmtMoney(r.balance),
+                    child: Text(fmtMoney2(r.balance),
                         style: const TextStyle(
                             fontSize: 14,
                             color: AppColors.text,

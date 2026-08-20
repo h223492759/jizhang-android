@@ -16,50 +16,10 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   final _ctrl = TextEditingController();
   final List<_Msg> _msgs = [];
   bool _busy = false;
-  // 从网页端 /presets 同步过来的常用名建议（点一下填到输入框，由用户确认/修改再发送）
-  List<_PresetChip> _suggest = [];
-  bool _loadingSuggest = false;
 
   @override
   void initState() {
     super.initState();
-    _loadSuggest();
-  }
-
-  Future<void> _loadSuggest() async {
-    if (!mounted) return;
-    setState(() => _loadingSuggest = true);
-    try {
-      // 一次性拉两个类型（合并去重），按"已收藏优先 + 未收藏按频次降序"排序
-      // 走 localApiProvider：本地镜像直读（秒开）+ 过期 5 分钟后台自动同步
-      final s = ref.read(sessionProvider);
-      if (!s.hasToken || !s.hasBook) return;
-      final ex = await ref.read(localApiProvider).getPresets(type: 'expense');
-      final inc = await ref.read(localApiProvider).getPresets(type: 'income');
-      final chips = <_PresetChip>[];
-      for (final p in ex.presets) {
-        chips.add(_PresetChip(name: p.name, type: 'expense', pinned: true));
-      }
-      for (final p in ex.frequent) {
-        if (!chips.any((c) => c.name == p.name)) {
-          chips.add(_PresetChip(
-              name: p.name, type: 'expense', pinned: false, count: p.count));
-        }
-      }
-      for (final p in inc.presets) {
-        chips.add(_PresetChip(name: p.name, type: 'income', pinned: true));
-      }
-      for (final p in inc.frequent) {
-        if (!chips.any((c) => c.name == p.name)) {
-          chips.add(_PresetChip(
-              name: p.name, type: 'income', pinned: false, count: p.count));
-        }
-      }
-      if (mounted) setState(() => _suggest = chips);
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _loadingSuggest = false);
-    }
   }
 
   @override
@@ -214,32 +174,6 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
             ),
           ),
           const SizedBox(height: 16),
-          // 网页端常用名（★ + ×N），点一下把名称填到输入框，由用户补金额/修改后再发送
-          if (_suggest.isNotEmpty) ...[
-            const Text('你的常用名称（来自网页端，点击填到输入框）',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _suggest.map((c) {
-                final label = c.pinned
-                    ? '★ ${c.name}'
-                    : (c.count > 0 ? '${c.name} ×${c.count}' : c.name);
-                return ActionChip(
-                  label: Text(label, style: const TextStyle(fontSize: 13)),
-                  backgroundColor: c.pinned ? AppColors.primarySoft : Colors.white,
-                  side: BorderSide(color: AppColors.divider),
-                  onPressed: () {
-                    // 只填名称到输入框，不自动发送——避免误记（数据不靠推荐默认）
-                    _ctrl.text = c.name;
-                    _ctrl.selection = TextSelection.collapsed(offset: c.name.length);
-                  },
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-          ],
           const Text('试试这些：', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
           const SizedBox(height: 8),
           Wrap(
@@ -251,8 +185,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                       backgroundColor: Colors.white,
                       side: BorderSide(color: AppColors.divider),
                       onPressed: () {
-                        // 与上方常用名称一致：只填到输入框，由用户确认/修改后再发送，
-                        // 避免示例直接记账造成误记
+                        // 只填到输入框，由用户确认/修改后再发送，避免示例直接记账造成误记
                         _ctrl.text = e;
                         _ctrl.selection = TextSelection.collapsed(offset: e.length);
                       },
@@ -313,13 +246,4 @@ class _Msg {
   final AiParseResult? parse;
   bool saved = false;
   _Msg({required this.role, required this.text, this.parse});
-}
-
-/// 网页端常用名在发现页的展示项
-class _PresetChip {
-  final String name;
-  final String type; // expense | income
-  final bool pinned; // true=已收藏 ★ / false=未收藏 ×N
-  final int count; // 仅未收藏有值
-  _PresetChip({required this.name, required this.type, required this.pinned, this.count = 0});
 }

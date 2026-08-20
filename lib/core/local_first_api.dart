@@ -223,11 +223,10 @@ class LocalFirstApi {
           count: ((r['count'] as num?) ?? 0).toInt(),
         );
 
-    // frequent：count>=1（用户要求"不限制字段和词数，有多少显示多少"）且未收藏/未隐藏，按频次降序
-    // 不限制 take 数量，让记账页完整显示网页端所有常用名
+    // frequent：count>=2（用户要求：频次大于等于2次才显示）且未收藏/未隐藏，按频次降序
     final freqRows = suggestRows
         .where((r) =>
-            (((r['count'] as num?) ?? 0).toInt()) >= 1 &&
+            (((r['count'] as num?) ?? 0).toInt()) >= 2 &&
             !presetNames.contains(r['name']) &&
             !hiddenNames.contains(r['name']))
         .toList()

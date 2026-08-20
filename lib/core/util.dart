@@ -25,6 +25,12 @@ String fmtMoney(num v) {
   return f.format(v);
 }
 
+/// 固定两位小数（含 .00）——账单页等需要精确金额展示的场景
+String fmtMoney2(num v) {
+  final f = NumberFormat('#,##0.00', 'zh_CN');
+  return f.format(v);
+}
+
 String fmtMoneySigned(num v, {bool expenseRed = false}) {
   final sign = v < 0 ? '-' : '';
   return '$sign${fmtMoney(v.abs())}';
