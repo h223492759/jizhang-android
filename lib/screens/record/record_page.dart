@@ -447,13 +447,12 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   }
 
   Widget _nameInput() {
-    // 常用名称：收藏(★) 与高频/最近都严格按当前分类过滤——
-    // 只显示「未绑定分类」或「当前分类」的收藏/高频/最近，其他分类的收藏不可见；
-    // 未选分类时显示全部。收藏排最前，高频/最近随后。
+    // 常用名称：与网页端「常用名称」管理页完全一致——只用 ★ 已收藏 + ×N 未收藏建议。
+    // 不再混 recent（流水最近用过），否则会和网页端「常用名」对不上。
+    // 严格按当前分类过滤：只显示「未绑定分类」或「匹配当前分类」的；未选分类显示全部。
     final raw = <PresetName>[
       ..._filterByCat(_presets.presets),
       ..._filterByCat(_presets.frequent),
-      ..._filterByCat(_presets.recent),
     ].where((p) => p.name.isNotEmpty).toList();
     final unique = <String, PresetName>{};
     for (final p in raw) {
