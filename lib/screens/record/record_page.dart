@@ -66,12 +66,14 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   Future<void> _loadPresets() async {
     // 优先从服务器拉取（保证网页端刚改的常用名能立刻同步到安卓端），离线时退回本地缓存
     try {
-      _presets = await ref.read(apiProvider).getPresets(type: _type, limit: 12);
-    } catch (_) {
+      _presets = await ref.read(apiProvider).getPresets(type: _type, limit: 30);
+    } catch (e) {
       try {
-        _presets = await ref.read(localApiProvider).getPresets(type: _type, limit: 12);
+        _presets = await ref.read(localApiProvider).getPresets(type: _type, limit: 30);
       } catch (_) {
         _presets = PresetsData(presets: [], frequent: [], recent: []);
+        // 拉取失败时给出明确提示（避免静默空白）
+        if (mounted) toast('常用名加载失败，请检查网络后下拉刷新');
       }
     }
     if (mounted) setState(() => _presetsLoaded = true);
@@ -457,7 +459,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     for (final p in raw) {
       unique.putIfAbsent(p.name, () => p);
     }
-    final display = unique.values.take(10).toList();
+    final display = unique.values.take(30).toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
       child: Column(
