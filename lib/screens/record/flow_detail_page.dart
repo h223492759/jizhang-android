@@ -104,6 +104,11 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                     _row('名称', f.description,
                         prefix: f.isAiSource ? _aiTag() : null),
                   ],
+                  // AI 记账流水显示来源（支付方式），方便核对：微信支付/支付宝支付/XX银行卡等
+                  if (f.isAiSource) ...[
+                    const Divider(height: 24),
+                    _row('来源', f.paymentMethod.isNotEmpty ? f.paymentMethod : 'AI 自动记账'),
+                  ],
                   const Divider(height: 24),
                   Row(
                     children: [
