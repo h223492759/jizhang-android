@@ -21,7 +21,7 @@ class LocalDb {
 
   Future<Database> _open() async {
     final path = p.join(await getDatabasesPath(), 'jizhang_local.db');
-    return openDatabase(path, version: 3, onCreate: (d, v) async {
+    return openDatabase(path, version: 4, onCreate: (d, v) async {
       await d.execute('''
         CREATE TABLE flows(
           id INTEGER PRIMARY KEY,
@@ -98,7 +98,15 @@ class LocalDb {
     }, onUpgrade: (d, oldV, newV) async {
       if (oldV < 2) await _createV2Tables(d);
       if (oldV < 3) await _createV3Tables(d);
+      if (oldV < 4) await _createV4Alter(d);
     });
+  }
+
+  /// v4：分类预算加 sort 列（网页端 ↑↓ 调序后，安卓端按 sort 显示）
+  Future<void> _createV4Alter(DatabaseExecutor d) async {
+    try {
+      await d.execute('ALTER TABLE budgets ADD COLUMN sort INTEGER NOT NULL DEFAULT 0');
+    } catch (_) {}
   }
 
   /// v3：常用名称镜像表（preset_suggest / hidden_names）。
@@ -552,7 +560,7 @@ class LocalDb {
   Future<List<Map<String, Object?>>> getBudgetSettings(int bookId) async {
     final d = await db;
     return d.query('budgets',
-        where: 'book_id=?', whereArgs: [bookId], orderBy: 'year, category');
+        where: 'book_id=?', whereArgs: [bookId], orderBy: 'year, sort, category');
   }
 
   Future<void> upsertBudgetLocal(int bookId, int year, String category,
