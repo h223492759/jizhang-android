@@ -447,6 +447,23 @@ class SavingsOverview {
   double get remaining => (current['remaining'] ?? 0).toDouble();
 }
 
+
+// 解析定存细则 JSON 数组
+List<({String cat, String owner, double amount, String startYm, String endYm})> _parseDepositRules(dynamic raw) {
+  if (raw is List) {
+    return raw.whereType<Map>().map((m) {
+      return (
+        cat: (m['cat'] ?? '').toString(),
+        owner: (m['owner'] ?? '').toString(),
+        amount: ((m['amount'] ?? 0) as num).toDouble(),
+        startYm: (m['start_ym'] ?? '').toString(),
+        endYm: (m['end_ym'] ?? '').toString(),
+      );
+    }).where((r) => r.cat.isNotEmpty && r.amount > 0).toList();
+  }
+  return const [];
+}
+
 class Wallet {
   final int id;
   final String name;
@@ -457,6 +474,7 @@ class Wallet {
   final String linkCategory; // 兼容旧字段
   final List<String> linkCategories;
   final List<({String cat, String from})> linkLinks; // 多行关联（cat+from）
+  final List<({String cat, String owner, double amount, String startYm, String endYm})> depositRules; // 定存细则
   final double manualBalance;
   final double linked;
   final double balance;
@@ -475,6 +493,7 @@ class Wallet {
     required this.linkCategory,
     required this.linkCategories,
     required this.linkLinks,
+    required this.depositRules,
     required this.manualBalance,
     required this.linked,
     required this.balance,
@@ -531,6 +550,7 @@ class Wallet {
         linkCategory: j['link_category'] ?? '',
         linkCategories: cats,
         linkLinks: links,
+        depositRules: _parseDepositRules(j['deposit_rules']),
         manualBalance: (j['manualBalance'] ?? 0).toDouble(),
         linked: (j['linked'] ?? 0).toDouble(),
         balance: (j['balance'] ?? 0).toDouble(),

@@ -23,6 +23,18 @@ const _palette = [
   Colors.pink,
 ];
 
+
+class _DepositRow {
+  String cat;
+  String owner;
+  TextEditingController amount;
+  TextEditingController startYm;
+  TextEditingController endYm;
+  _DepositRow({this.cat = '', this.owner = '', String amount = '', String startYm = '', String endYm = ''})
+    : amount = TextEditingController(text: amount),
+      startYm = TextEditingController(text: startYm),
+      endYm = TextEditingController(text: endYm);
+}
 /// 分类钱包（与存款目标 / 资金细则完全独立的一页）
 class WalletsPage extends ConsumerStatefulWidget {
   const WalletsPage({super.key});
@@ -440,7 +452,6 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
     final icon = TextEditingController(text: w.icon);
     final target = TextEditingController(text: w.target > 0 ? w.target.toString() : '');
     final note = TextEditingController(text: w.note);
-    // 多行关联：数组优先，兼容旧 linkCategories/linkCategory + linkFrom（无 linkLinks 时回退构造）
     final linkRows = <_LinkRow>[];
     if (w.linkLinks.isNotEmpty) {
       for (final l in w.linkLinks) {
@@ -454,40 +465,117 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
       linkRows.add(_LinkRow(cat: w.linkCategory, from: w.linkFrom));
     }
     if (linkRows.isEmpty) linkRows.add(_LinkRow());
+    // 定存细则行（每行 {cat, amount, start_ym, end_ym}，owner 可选）
+    final depositRows = <_DepositRow>[];
+    for (final r in w.depositRules) {
+      depositRows.add(_DepositRow(
+        cat: r.cat, owner: r.owner,
+        amount: r.amount.toString(),
+        startYm: r.startYm, endYm: r.endYm,
+      ));
+    }
+    if (depositRows.isEmpty) depositRows.add(_DepositRow());
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (c, set) => AlertDialog(
-          title: const Text('修改钱包信息'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(controller: name, decoration: const InputDecoration(labelText: '名称')),
-                TextField(controller: icon, decoration: const InputDecoration(labelText: '图标 emoji（可选）')),
-                TextField(controller: target, keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: '目标金额（可选）')),
-                const SizedBox(height: 8),
-                const Text('关联流水分类（可选，每行一个分类+起始日）', style: TextStyle(fontSize: 13)),
-                const SizedBox(height: 4),
-                ...List.generate(linkRows.length, (i) => _buildLinkRow(linkRows, i, set)),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () => set(() => linkRows.add(_LinkRow())),
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('添加一行', style: TextStyle(fontSize: 12)),
+        builder: (c, set) => DefaultTabController(
+          length: 4,
+          child: AlertDialog(
+            titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            title: const Text('修改钱包信息'),
+            content: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TabBar(
+                    tabs: const [Tab(text: '基本信息'), Tab(text: '关联分类'), Tab(text: '定存细则'), Tab(text: '备注')],
+                    labelStyle: const TextStyle(fontSize: 13),
+                    unselectedLabelStyle: const TextStyle(fontSize: 13),
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    indicatorSize: TabBarIndicatorSize.label,
                   ),
-                ),
-                TextField(controller: note, decoration: const InputDecoration(labelText: '备注（可选）')),
-              ],
+                  SizedBox(
+                    height: 280,
+                    child: TabBarView(
+                      children: [
+                        // 基本信息
+                        SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextField(controller: name, decoration: const InputDecoration(labelText: '名称')),
+                              TextField(controller: icon, decoration: const InputDecoration(labelText: '图标 emoji（可选）')),
+                              TextField(controller: target, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(labelText: '目标金额（可选）')),
+                            ],
+                          ),
+                        ),
+                        // 关联分类
+                        SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              const Text('关联流水分类（每行一个分类+起始日）', style: TextStyle(fontSize: 13)),
+                              const SizedBox(height: 4),
+                              ...List.generate(linkRows.length, (i) => _buildLinkRow(linkRows, i, set)),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () => set(() => linkRows.add(_LinkRow())),
+                                  icon: const Icon(Icons.add, size: 16),
+                                  label: const Text('添加一行', style: TextStyle(fontSize: 12)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // 定存细则
+                        SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              const Text('每月第一笔匹配收入流水且金额 ≥ 规则总额时自动存入', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              const SizedBox(height: 6),
+                              ...List.generate(depositRows.length, (i) => _buildDepositRow(depositRows, i, set)),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () => set(() => depositRows.add(_DepositRow())),
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: const Text('添加定存细则', style: TextStyle(fontSize: 12)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        // 备注
+                        SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextField(controller: note, decoration: const InputDecoration(labelText: '备注（可选）')),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('保存')),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('保存')),
-          ],
         ),
       ),
     );
@@ -496,6 +584,17 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
         .where((r) => r.cat.trim().isNotEmpty)
         .map((r) => {'cat': r.cat.trim(), 'from': r.from.trim()})
         .toList();
+    final cleanDeposit = <Map<String, dynamic>>[];
+    for (final r in depositRows) {
+      final c = r.cat.trim();
+      final amt = double.tryParse(r.amount.text.trim()) ?? 0;
+      if (c.isEmpty || amt <= 0) continue;
+      cleanDeposit.add({
+        'cat': c, 'owner': r.owner.trim(),
+        'amount': amt,
+        'start_ym': r.startYm.text.trim(), 'end_ym': r.endYm.text.trim(),
+      });
+    }
     try {
       await ref.read(localApiProvider).updateWallet(
         id: w.id,
@@ -504,11 +603,73 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
         target: double.tryParse(target.text.trim()) ?? 0,
         linkLinks: cleanLinks,
         note: note.text.trim(),
+        depositRules: cleanDeposit,
       );
       _load();
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     }
+  }
+
+  Widget _buildDepositRow(List<_DepositRow> rows, int i, void Function(void Function()) set) {
+    final r = rows[i];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: TextEditingController(text: r.cat),
+                  decoration: const InputDecoration(labelText: '来源分类', isDense: true),
+                  onChanged: (v) => r.cat = v,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  controller: TextEditingController(text: r.owner),
+                  decoration: const InputDecoration(labelText: '归属人(可选)', isDense: true),
+                  onChanged: (v) => r.owner = v,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 16),
+                onPressed: () => set(() => rows.removeAt(i)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: r.amount,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: '金额', isDense: true),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  controller: r.startYm,
+                  decoration: const InputDecoration(labelText: '开始 YYYY-MM', isDense: true),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  controller: r.endYm,
+                  decoration: const InputDecoration(labelText: '结束 YYYY-MM', isDense: true),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _deleteWallet(Wallet w) async {

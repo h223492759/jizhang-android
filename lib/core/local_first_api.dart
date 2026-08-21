@@ -800,6 +800,7 @@ final w = await _api.getWallets();
     String linkFrom = '',
     String note = '',
     List<Map<String, String>>? linkLinks,
+    List<Map<String, dynamic>>? depositRules,
   }) async {
     final bookId = await _curBook();
     final uuid = SyncEngine.newUuid();
@@ -807,7 +808,7 @@ final w = await _api.getWallets();
       final id = await _api.addWallet(
           name: name, icon: icon, target: target,
           linkCategory: linkCategory, linkFrom: linkFrom, note: note,
-          linkLinks: linkLinks);
+          linkLinks: linkLinks, depositRules: depositRules);
       await LocalDb.instance.addOpLog(bookId,
           op: 'addWallet', entity: 'wallet', entityId: id, uuid: uuid,
           summary: '新增钱包 $name', status: 'ok');
@@ -819,6 +820,7 @@ final w = await _api.getWallets();
           'name': name, 'icon': icon, 'target': target,
           'link_category': linkCategory, 'link_from': linkFrom, 'note': note,
           if (linkLinks != null) 'link_links': linkLinks,
+          if (depositRules != null) 'deposit_rules': depositRules,
           'client_uuid': uuid,
         });
         await LocalDb.instance.addOpLog(bookId,
@@ -839,12 +841,14 @@ final w = await _api.getWallets();
     String linkCategory = '',
     String linkFrom = '',
     List<Map<String, String>>? linkLinks,
+    List<Map<String, dynamic>>? depositRules,
   }) =>
       _offlineWrite(
           op: 'updateWallet', entity: 'wallet', entityId: id,
           online: () => _api.updateWallet(
               id: id, name: name, icon: icon, target: target, note: note,
-              linkCategory: linkCategory, linkFrom: linkFrom, linkLinks: linkLinks),
+              linkCategory: linkCategory, linkFrom: linkFrom, linkLinks: linkLinks,
+              depositRules: depositRules),
           body: {
             'id': id, 'name': name, 'icon': icon, 'target': target, 'note': note,
             'link_category': linkCategory, 'link_from': linkFrom,
