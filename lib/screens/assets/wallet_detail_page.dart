@@ -5,7 +5,6 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/components/simple_date_picker.dart';
-import 'package:jizhang_android/screens/record/flow_detail_page.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
 
@@ -81,6 +80,25 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
       try { return Map<String, dynamic>.from(x as Map); }
       catch (_) { return null; }
     }).whereType<Map<String, dynamic>>().toList();
+  }
+  // 资金记录 + 月结 合并按日期倒序（月结穿插在手工记录之间，与网页端一致）
+  List<_RowItem> get _allTxns {
+    final items = <_RowItem>[];
+    for (final t in _rows) {
+      items.add(_RowItem(kind: 'manual', ymd: t.ymd, amount: t.amount, note: t.note, op: t.opUser, txn: t));
+    }
+    for (final m in _monthly) {
+      items.add(_RowItem(
+        kind: 'monthly',
+        ymd: (m['ymd'] ?? '').toString(),
+        amount: (m['amount'] as num? ?? 0).toDouble(),
+        note: '月结 · ${m['category'] ?? ''}',
+        op: (m['attribution'] ?? '').toString(),
+        txn: null,
+      ));
+    }
+    items.sort((a, b) => b.ymd.compareTo(a.ymd));
+    return items;
   }
 
   Future<bool> _confirm(String msg) async {
@@ -320,61 +338,41 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // 资金记录
+                // 资金记录（手工 + 自动月结按日期穿插，与网页端一致）
                 const Text('资金记录（日期 · 金额 · 操作人）', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 8),
-                if (rows.isEmpty)
+                if (_allTxns.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: Text('还没有资金记录', style: TextStyle(color: AppColors.textSecondary)),
                   )
                 else
-                  ...rows.map((t) => Card(
+                  ..._allTxns.map((it) => Card(
                         child: ListTile(
-                          title: Text(t.ymd),
-                          subtitle: t.note.isNotEmpty ? Text(t.note) : (t.opUser.isNotEmpty ? Text('操作人：${t.opUser}') : null),
+                          tileColor: it.kind == 'monthly' ? AppColors.background : null,
+                          title: Text(it.ymd),
+                          subtitle: Text(it.kind == 'monthly'
+                              ? '${it.note} · ${it.op} · 自动'
+                              : (it.note.isNotEmpty ? it.note : (it.op.isNotEmpty ? '操作人：${it.op}' : ''))),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text('${t.amount >= 0 ? '+' : '−'}${fmtMoney(t.amount.abs())}',
+                              Text('${it.amount >= 0 ? '+' : '−'}${fmtMoney(it.amount.abs())}',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: t.amount >= 0 ? AppColors.income : AppColors.expense)),
-                              const SizedBox(width: 4),
-                              TextButton(onPressed: () => _editTxn(t), child: const Text('改')),
-                              TextButton(
-                                onPressed: () => _deleteTxn(t),
-                                child: const Text('删', style: TextStyle(color: AppColors.expense)),
-                              ),
+                                      color: it.amount >= 0 ? AppColors.income : AppColors.expense)),
+                              if (it.kind == 'manual') ...[
+                                const SizedBox(width: 4),
+                                TextButton(onPressed: () => _editTxn(it.txn!), child: const Text('改')),
+                                TextButton(
+                                  onPressed: () => _deleteTxn(it.txn!),
+                                  child: const Text('删', style: TextStyle(color: AppColors.expense)),
+                                ),
+                              ],
                             ],
                           ),
                         ),
                       )),
-                // 关联分类月结（每月底自动按分类×归属人汇总，流水变动实时更新）
-                if (w.linkCategory.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text('关联分类月结 · ${w.linkCategory}（自 ${w.linkFrom}）',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  const SizedBox(height: 8),
-                  if (_monthly.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Text('该分类自关联日起暂无支出', style: TextStyle(color: AppColors.textSecondary)),
-                    )
-                  else
-                    ..._monthly.map((m) {
-                      final amt = (m['amount'] as num? ?? 0).toDouble();
-                      return Card(
-                        child: ListTile(
-                          title: Text('${m['ymd'] ?? ''}'),
-                          subtitle: Text('${m['ym'] ?? ''} 月结 · ${m['category'] ?? ''}'),
-                          trailing: Text('−${fmtMoney(amt.abs())}',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, color: AppColors.expense)),
-                        ),
-                      );
-                    }),
-                ],
                 if (showEmpty) ...[
                   const SizedBox(height: 16),
                   const Text('该钱包暂无资金记录与关联流水。',
@@ -400,6 +398,17 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
           ],
         ),
       );
+}
+
+// 资金记录 + 月结 合并行
+class _RowItem {
+  final String kind; // manual | monthly
+  final String ymd;
+  final double amount;
+  final String note;
+  final String op;
+  final _WalletTxn? txn; // manual 时非空
+  _RowItem({required this.kind, required this.ymd, required this.amount, required this.note, required this.op, this.txn});
 }
 
 class _WalletTxn {
