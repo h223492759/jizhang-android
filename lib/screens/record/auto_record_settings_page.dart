@@ -92,6 +92,61 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // 运行日志（最近 50 条，可一键复制给开发者定位）
+                Card(
+                  child: ExpansionTile(
+                    leading: const Icon(Icons.list_alt, size: 18),
+                    title: const Text("自动记账日志（最近 50 条）"),
+                    subtitle: ValueListenableBuilder(
+                      valueListenable: AutoRecordService.instance.logsListenable,
+                      builder: (c, v, _) => Text("已记录 ${v.length} 条"),
+                    ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                        child: Row(
+                          children: [
+                            TextButton.icon(
+                              icon: const Icon(Icons.copy, size: 14),
+                              label: const Text("复制全部"),
+                              onPressed: () async {
+                                final all = AutoRecordService.instance.getLogs().join("\n");
+                                await Clipboard.setData(ClipboardData(text: all));
+                                toast("已复制 ${AutoRecordService.instance.getLogs().length} 条日志");
+                              },
+                            ),
+                            const Spacer(),
+                            TextButton.icon(
+                              icon: const Icon(Icons.delete_outline, size: 14),
+                              label: const Text("清空"),
+                              onPressed: () {
+                                AutoRecordService.instance.clearLogs();
+                                toast("已清空");
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        height: 240,
+                        child: ValueListenableBuilder(
+                          valueListenable: AutoRecordService.instance.logsListenable,
+                          builder: (c, v, _) {
+                            if (v.isEmpty) return const Center(child: Text("暂无日志", style: TextStyle(color: Colors.grey)));
+                            return ListView(
+                              reverse: true,
+                              children: v.reversed.map((s) => Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                                child: Text(s, style: const TextStyle(fontSize: 11, fontFamily: "monospace")),
+                              )).toList(),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
                 // 总开关
                 Card(
                   child: SwitchListTile(

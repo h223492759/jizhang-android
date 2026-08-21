@@ -12,6 +12,19 @@ import 'package:jizhang_android/screens/record/auto_record_dialog.dart';
 /// 解析金额/方向/商户 → 排除规则 → 去重 → 直接自动记账（source=auto，带 AI 标识）。
 /// 误记时在流水详情页点「不再记」删除并加入忽略名单。
 class AutoRecordService {
+  // 运行日志（最近 50 条，可一键复制给开发者）
+  final List<String> _logs = [];
+  final ValueNotifier<List<String>> _logsListenable = ValueNotifier([]);
+  ValueNotifier<List<String>> get logsListenable => _logsListenable;
+  List<String> getLogs() => List.unmodifiable(_logs);
+  void clearLogs() { _logs.clear(); _logsListenable.value = List.from(_logs); }
+  void recordLog(String msg) {
+    final ts = DateTime.now().toString().substring(11, 19);
+    final line = "[$ts] $msg";
+    _logs.add(line);
+    if (_logs.length > 50) _logs.removeAt(0);
+    _logsListenable.value = List.from(_logs);
+  }
   static const _channel = MethodChannel('jizhang/auto_record');
   static const _kEnabled = 'auto_record_enabled';
   static const _kExcludeRepay = 'auto_exclude_repay';
@@ -212,9 +225,11 @@ class AutoRecordService {
     try {
       await ref.read(apiProvider).createFlow(body);
       ref.read(dataVersionProvider.notifier).state++;
+      recordLog("已记账：${p.merchant} ¥${p.amount.toStringAsFixed(2)} ");
       toast('已记账：${p.merchant} ¥${p.amount.toStringAsFixed(2)}');
     } catch (e) {
       // 落库失败（如网络）：本条保留在待处理队列，下轮重试
+      recordLog('记账失败：${e.toString().replaceFirst("ApiException: ", "")}');
       toast('记账失败：${e.toString().replaceFirst("ApiException: ", "")}');
     }
   }
