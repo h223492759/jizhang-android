@@ -52,6 +52,8 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
     setState(() => _loading = true);
     try {
       final api = ref.read(localApiProvider);
+      // 先拉服务器最新钱包刷新本地镜像（确保看到网页端新加/改的钱包）
+      try { await api.refreshWallets(); } catch (_) {}
       final d = await api.getWallets();
       final cats = await api.getCategories();
       if (mounted) {

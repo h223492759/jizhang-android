@@ -49,6 +49,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
   bool _loading = true;
   String _sortBy = 'amount'; // amount | time
   final ScrollController _periodScroll = ScrollController();
+  final List<GlobalKey> _periodKeys = [];
 
   // AppBar 标题：多分类 JSON 数组 → 显示「购物、运动 等N个」；单分类原样
   String _title() {
@@ -304,14 +305,17 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
   void _centerSelected() {
     final opts = _buildPeriodOpts();
     final idx = opts.indexWhere((o) => o.selected);
-    if (idx < 0 || !_periodScroll.hasClients) return;
-    const chipW = 64.0;
-    final max = _periodScroll.position.maxScrollExtent;
-    // 选中项无论是否"special"，一律居中。
-    final target = (idx * (chipW + 8) - (_periodScroll.position.viewportDimension / 2 - chipW / 2))
-        .clamp(0.0, max);
-    // 用 jumpTo 取代 animateTo，避免「先左移再居中」这种先飘再对位的视觉抖动。
-    _periodScroll.jumpTo(target);
+    if (idx < 0) return;
+    while (_periodKeys.length < opts.length) _periodKeys.add(GlobalKey());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _periodKeys[idx].currentContext;
+      if (ctx == null || !_periodScroll.hasClients) return;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.5,  // 0.5 = 居中
+        duration: Duration.zero,
+      );
+    });
   }
 
   Widget _periodSelector() {
@@ -322,7 +326,9 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: opts.map((o) {
+          while (_periodKeys.length <= opts.indexOf(o)) _periodKeys.add(GlobalKey());
           return GestureDetector(
+            key: _periodKeys[opts.indexOf(o)],
             onTap: () {
               setState(() => _period = DateTime(o.year, o.month));
               _load();

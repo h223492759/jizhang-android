@@ -98,10 +98,13 @@ class LocalFirstApi {
     } catch (_) {}
   }
 
+  /// 公共：刷新钱包镜像（从服务器拉最新 wallets 覆盖本地）
+  Future<void> refreshWallets() => _refreshWallets();
+
   Future<void> _refreshWallets() async {
     try {
       final bookId = await _curBook();
-      final w = await _api.getWallets();
+final w = await _api.getWallets();
       await LocalDb.instance.saveWalletsJson(
           bookId,
           jsonEncode({
@@ -112,9 +115,18 @@ class LocalFirstApi {
                       'icon': x.icon,
                       'target': x.target,
                       'note': x.note,
-                                            'balance': x.balance,
+                      'balance': x.balance,
+                      'manualBalance': x.manualBalance,
+                      'linked': x.linked,
+                      'total_in': x.totalIn,
+                      'total_out': x.totalOut,
+                      'count': x.count,
+                      'last_ymd': x.lastYmd,
+                      'percent': x.percent,
                       'link_from': x.linkFrom,
                       'link_category': x.linkCategory,
+                      'linkCategories': x.linkCategories,
+                      'linkLinks': x.linkLinks.map((l) => {'cat': l.cat, 'from': l.from}).toList(),
                     })
                 .toList(),
             'totalBalance': w.totalBalance,

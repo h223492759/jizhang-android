@@ -29,6 +29,8 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
   List<Category> _catMeta = [];
   bool _loading = true;
   final ScrollController _periodScroll = ScrollController();
+  // 每个 period chip 的 key（_centerSelected 用 Scrollable.ensureVisible 居中选中项）
+  final List<GlobalKey> _periodKeys = [];
 
   @override
   void initState() {
@@ -260,14 +262,20 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
   void _centerSelected() {
     final opts = _buildPeriodOpts();
     final idx = opts.indexWhere((o) => o.selected);
-    if (idx < 0 || !_periodScroll.hasClients) return;
-    const chipW = 64.0;
-    final max = _periodScroll.position.maxScrollExtent;
-    // 选中项无论是否"special"，一律居中。
-    final target = (idx * (chipW + 8) - (_periodScroll.position.viewportDimension / 2 - chipW / 2))
-        .clamp(0.0, max);
-    // 用 jumpTo 取代 animateTo，避免「先左移再居中」这种先飘再对位的视觉抖动。
-    _periodScroll.jumpTo(target);
+    if (idx < 0) return;
+    // 确保 _periodKeys 长度匹配
+    while (_periodKeys.length < opts.length) _periodKeys.add(GlobalKey());
+    // 下一帧再调（build 后才有 RenderBox）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _periodKeys[idx].currentContext;
+      if (ctx == null || !_periodScroll.hasClients) return;
+      // Scrollable.ensureVisible 会让目标 widget 滚动到 viewport 内指定对齐位置
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.5,  // 0.5 = 居中
+        duration: Duration.zero,
+      );
+    });
   }
 
   Widget _periodSelector() {
@@ -278,12 +286,15 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: opts.map((o) {
+          // 确保 key 列表够长
+          while (_periodKeys.length <= opts.indexOf(o)) _periodKeys.add(GlobalKey());
           return GestureDetector(
             onTap: () {
               setState(() => _period = DateTime(o.year, o.month));
               _load();
               WidgetsBinding.instance.addPostFrameCallback((_) => _centerSelected());
             },
+            key: _periodKeys[opts.indexOf(o)],
             child: Container(
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(vertical: 6),
