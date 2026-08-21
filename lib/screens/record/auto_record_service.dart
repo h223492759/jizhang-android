@@ -212,8 +212,10 @@ class AutoRecordService {
     try {
       await ref.read(apiProvider).createFlow(body);
       ref.read(dataVersionProvider.notifier).state++;
+      toast('已记账：${p.merchant} ¥${p.amount.toStringAsFixed(2)}');
     } catch (e) {
       // 落库失败（如网络）：本条保留在待处理队列，下轮重试
+      toast('记账失败：${e.toString().replaceFirst("ApiException: ", "")}');
     }
   }
 

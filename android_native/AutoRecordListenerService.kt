@@ -15,10 +15,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * 自动记账：监听支付类 App 的通知，把解析后的信息写入待处理队列，
- * 并拉起主 Activity，由 Flutter 侧弹窗确认后记账。
+ * 自动记账：监听支付类 App 的通知，必须命中强信号词（支付成功/到账/收款等）
+ * 才写入待处理队列 + 弹 heads-up。营销/虚拟积分类通知直接丢弃，
+ * 避免"检测到但没记账"的误导。
  *
- * 检测到支付通知时同时在系统通知栏弹一条 heads-up（点开直接进入主界面），
+ * 命中后：① 入队 ② 弹 heads-up（点开直接进入主界面）
  * 让用户即使在后台也能感知到"自动记账正在处理这笔"。
  */
 class AutoRecordListenerService : NotificationListenerService() {
@@ -35,11 +36,24 @@ class AutoRecordListenerService : NotificationListenerService() {
         val info = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
         val all = listOf(title, text, big, info).joinToString(" ") { it.trim() }.trim()
         if (all.length < 2) return
-        // 简单过滤：不含金额/付款相关字样就不处理
-        if (!all.contains("¥") && !all.contains("￥") && !all.contains("元") &&
-            !all.contains("支付") && !all.contains("付款") && !all.contains("收款") &&
-            !all.contains("转账") && !all.contains("消费") && !all.contains("支出")
-        ) return
+        // 强信号词过滤（与 Flutter _parse 一致）：必须是支付/收款完成类通知才入队 + 弹 heads-up
+        // 营销/虚拟积分通知（含金额/收款字眼但不是真实账单）直接丢弃，避免"检测到但没记账"误导
+        val strongKw = listOf(
+            "支付成功", "付款成功", "成功付款", "支付成功通知", "已支付", "已付款",
+            "收款成功", "已收款", "收款通知", "收款到账",
+            "转账成功", "转账", "已存入", "收到转账", "转入",
+            "扣款成功", "已扣款", "已消费",
+            "入账", "到账", "还款成功", "已还款", "退款成功", "已退款"
+        )
+        // 虚拟积分类（含"到账"也不记账）
+        val virtualKw = listOf(
+            "积分", "金币", "京豆", "里程", "成长值", "信用分", "蚂蚁积分",
+            "积分到账", "积分入账", "返积分", "送积分", "领积分",
+            "金币到账", "星星", "等级", "经验值", "会员积分"
+        )
+        val hasStrong = strongKw.any { all.contains(it) }
+        if (!hasStrong) return  // 没强信号词一律不入队（如营销「邀请店主领用收钱码可得20元」）
+        if (virtualKw.any { all.contains(it) }) return  // 虚拟积分直接丢弃
         // 抓一个金额作为通知摘要（取第一个 ¥/￥/元）
         val amtMatch = Regex("[¥￥]\\s*([0-9]+(?:\\.[0-9]{1,2})?)").find(all)
             ?: Regex("([0-9]+(?:\\.[0-9]{1,2})?)\\s*元").find(all)
