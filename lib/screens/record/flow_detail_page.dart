@@ -137,7 +137,8 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
               ),
             ),
           ),
-          // 操作按钮（从左到右：删除 / 归属 / 修改；AI 自动记账流水额外有「不再记」）
+          // 操作按钮（从左到右：删除 / 归属 / 修改；AI 自动记账流水额外有「拉黑删」）
+          // 「删除」只删除不拉黑（可能有记错的时候）；「拉黑删」= 删除 + 商户拉黑不再自动记账
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             child: Column(
@@ -177,7 +178,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                     child: OutlinedButton.icon(
                       onPressed: _neverAgain,
                       icon: const Icon(Icons.block, size: 18, color: AppColors.expense),
-                      label: const Text('不再记（删除该笔，以后此商户不自动记账）',
+                      label: const Text('拉黑删（删除该笔，以后该商户不再自动记账）',
                           style: TextStyle(color: AppColors.expense, fontSize: 13)),
                       style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.expense)),
                     ),
@@ -239,19 +240,19 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
     }
   }
 
-  // 不再记：AI 自动记账误记时，删除该笔 + 商户加入忽略名单（以后不再自动记账）
+  // 拉黑删：AI 自动记账误记时，删除该笔 + 商户加入忽略名单（以后不再自动记账）
   Future<void> _neverAgain() async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('不再记这笔？'),
+        title: const Text('拉黑删除这笔？'),
         content: Text('将删除「${widget.flow.description}」这笔流水，'
-            '并把该商户加入忽略名单，以后它不会自动记账。'),
+            '并把该商户拉黑，以后它不会自动记账。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('不再记', style: TextStyle(color: AppColors.expense)),
+            child: const Text('拉黑删', style: TextStyle(color: AppColors.expense)),
           ),
         ],
       ),
@@ -261,7 +262,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
       await AutoRecordService.instance.addIgnoreMerchant(widget.flow.description);
       await ref.read(localApiProvider).deleteFlow(widget.flow.id);
       ref.read(dataVersionProvider.notifier).state++;
-      toast('已忽略「${widget.flow.description}」，以后不再自动记账');
+      toast('已拉黑「${widget.flow.description}」，以后不再自动记账');
       if (mounted) Navigator.pop(context);
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
