@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart' hide Flow;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -48,6 +49,22 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
   bool _loading = true;
   String _sortBy = 'amount'; // amount | time
   final ScrollController _periodScroll = ScrollController();
+
+  // AppBar 标题：多分类 JSON 数组 → 显示「购物、运动 等N个」；单分类原样
+  String _title() {
+    final raw = widget.category;
+    if (raw.startsWith('[')) {
+      try {
+        final arr = jsonDecode(raw);
+        if (arr is List && arr.isNotEmpty) {
+          final names = arr.map((e) => e.toString()).toList();
+          if (names.length == 1) return names.first;
+          return '${names.first} 等${names.length}个';
+        }
+      } catch (_) {}
+    }
+    return raw;
+  }
 
   @override
   void initState() {
@@ -136,7 +153,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
     final color = widget.type == 'expense' ? AppColors.expense : AppColors.income;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(widget.category)),
+      appBar: AppBar(title: Text(_title())),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -368,7 +385,10 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
 
   List<Widget> _rankRows(Color color) {
     final list = _sorted;
-    if (list.isEmpty) return [const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('暂无记录')))];
+    if (list.isEmpty) {
+      final t = widget.type == 'income' ? '收入' : '支出';
+      return [Center(child: Padding(padding: const EdgeInsets.all(20), child: Text('该时间段无${t}记录', style: TextStyle(color: AppColors.textSecondary))))];
+    }
     final total = list.fold(0.0, (s, f) => s + f.amount);
     final maxVal = list.map((f) => f.amount).fold(0.0, (a, b) => b > a ? b : a);
     final iconMap = buildCatIconMap(_cats);

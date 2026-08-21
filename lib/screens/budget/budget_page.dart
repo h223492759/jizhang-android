@@ -75,16 +75,37 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     }
   }
 
-  // 多分类合并预算（category 存 JSON 数组字符串）显示为「餐饮、交通」；旧单分类原样
-  String _catLabel(BudgetCat c) => _catLabelOf(c.category);
-  String _catLabelOf(String raw) {
+  // 卡片标题：单分类显示分类名；多分类显示「多分类N」（N = 该多分类在列表中的序号，从 1 开始）
+  // 列表页/详情页传分类名显示（保留 _catLabel/_catLabelOf 旧 API）
+  String _catCardTitle(BudgetCat c, int i) {
+    final names = _parseNames(c.category);
+    if (names.length <= 1) return names.first;
+    final all = _data?.categories ?? <BudgetCat>[];
+    int n = 0;
+    for (int k = 0; k <= i && k < all.length; k++) {
+      if (_parseNames(all[k].category).length > 1) n++;
+    }
+    return '多分类$n';
+  }
+
+  // 解析多分类 JSON 数组 → 分类列表
+  List<String> _parseNames(String raw) {
     if (raw.startsWith('[')) {
       try {
         final arr = jsonDecode(raw);
-        if (arr is List) return arr.map((e) => e.toString()).join('、');
+        if (arr is List) return arr.map((e) => e.toString()).toList();
       } catch (_) {}
     }
-    return raw;
+    return [raw];
+  }
+
+  // 兼容旧 API：列表/调整弹窗标题解析（多分类显示「餐饮、交通」）
+  String _catLabel(BudgetCat c) {
+    final ns = _parseNames(c.category);
+    return ns.join('、');
+  }
+  String _catLabelOf(String raw) {
+    return _parseNames(raw).join('、');
   }
 
   Future<void> _setBudget({String? category}) async {
@@ -196,7 +217,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                 const SizedBox(height: 16),
                 const Text('分类预算', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 8),
-                ...d.categories.map((c) => _catCard(c)),
+                ...List.generate(d.categories.length, (i) => i).map((i) => _catCard(d.categories[i], i)),
               ],
             ),
     );
@@ -246,7 +267,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
         ),
       );
 
-  Widget _catCard(BudgetCat c) => Card(
+  Widget _catCard(BudgetCat c, int i) => Card(
         child: InkWell(
           onTap: () => Navigator.push(
             context,
@@ -267,7 +288,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  Text(_catLabel(c), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(_catCardTitle(c, i), style: const TextStyle(fontWeight: FontWeight.bold)),
                   const Spacer(),
                   TextButton(
                     onPressed: () => _setBudget(category: c.category),

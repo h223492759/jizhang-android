@@ -96,7 +96,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                 Card(
                   child: SwitchListTile(
                     title: const Text('自动记账', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('支付成功后识别通知并弹窗确认记账'),
+                    subtitle: const Text('识别支付/转账通知后直接入账（流水带 AI 标识），详情页可「拉黑删」'),
                     value: _enabled,
                     onChanged: (v) async {
                       setState(() => _enabled = v);
