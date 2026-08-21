@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/api.dart';
@@ -72,6 +73,18 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       setState(() => _year = picked);
       _load();
     }
+  }
+
+  // 多分类合并预算（category 存 JSON 数组字符串）显示为「餐饮、交通」；旧单分类原样
+  String _catLabel(BudgetCat c) {
+    final raw = c.category;
+    if (raw.startsWith('[')) {
+      try {
+        final arr = jsonDecode(raw);
+        if (arr is List) return arr.map((e) => e.toString()).join('、');
+      } catch (_) {}
+    }
+    return raw;
   }
 
   Future<void> _setBudget({String? category}) async {
@@ -253,7 +266,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  Text(c.category, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(_catLabel(c), style: const TextStyle(fontWeight: FontWeight.bold)),
                   const Spacer(),
                   TextButton(
                     onPressed: () => _setBudget(category: c.category),
