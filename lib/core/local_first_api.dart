@@ -92,6 +92,7 @@ class LocalFirstApi {
                     'category': r['category'] ?? '',
                     'amount': r['amount'] ?? 0,
                     'expression': r['expression'] ?? '',
+                    'sort': r['sort'] ?? 0,
                   })
               .toList());
     } catch (_) {}
@@ -673,6 +674,10 @@ class LocalFirstApi {
   // ---- 预算：读本地（设置镜像 + 本地算进度）/ 写离线 ----
   Future<BudgetData> getBudgets({int? year}) async {
     final bookId = await _curBook();
+    // 打开预算页先拉最新预算设置刷新本地镜像（网页端调序/修改后立即同步；失败用旧镜像）
+    try {
+      await _refreshBudgets();
+    } catch (_) {}
     final y = year ?? DateTime.now().year;
     final settings = await LocalDb.instance.getBudgetSettings(bookId);
     final rows = settings.where((r) => (r['year'] as int) == y).toList();
@@ -692,8 +697,17 @@ class LocalFirstApi {
     final totalAmount = ((totalRow.isEmpty ? null : totalRow.first['amount']) as num?)?.toDouble() ?? 0;
     final cats = catRows.map((r) {
       final cat = ((r['category'] as String?) ?? '');
+      // 多分类合并预算（category 存 JSON 数组字符串）：spent = 各分类支出之和
+      List<String> names = [];
+      if (cat.startsWith('[')) {
+        try {
+          final arr = jsonDecode(cat);
+          if (arr is List) names = arr.map((e) => e.toString()).toList();
+        } catch (_) {}
+      }
+      if (names.isEmpty) names = [cat];
       final amt = ((r['amount'] as num?) ?? 0).toDouble();
-      final spent = catSpent[cat] ?? 0;
+      final spent = names.fold<double>(0, (s, n) => s + (catSpent[n] ?? 0));
       return BudgetCat(
         category: cat,
         amount: amt,

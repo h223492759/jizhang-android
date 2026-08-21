@@ -76,8 +76,8 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   }
 
   // 多分类合并预算（category 存 JSON 数组字符串）显示为「餐饮、交通」；旧单分类原样
-  String _catLabel(BudgetCat c) {
-    final raw = c.category;
+  String _catLabel(BudgetCat c) => _catLabelOf(c.category);
+  String _catLabelOf(String raw) {
     if (raw.startsWith('[')) {
       try {
         final arr = jsonDecode(raw);
@@ -106,11 +106,12 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     final fmtAmt = (double v) =>
         v == v.toInt() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
     final ctrl = TextEditingController(text: curAmt > 0 ? fmtAmt(curAmt) : '');
+    final label = _catLabelOf(category ?? '');
     final picked = await showDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
-          title: Text(category == null ? '设置年度总预算' : '预算 · $category'),
+          title: Text(category == null ? '设置年度总预算' : '预算 · $label'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
