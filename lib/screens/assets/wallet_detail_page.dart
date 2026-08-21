@@ -45,20 +45,42 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
       final d = await ref.read(localApiProvider).getWalletTxns(widget.wallet.id);
       if (mounted) setState(() => _data = d);
     } catch (e) {
-      toast(e.toString().replaceFirst('ApiException: ', ''));
+      if (mounted) toast(e.toString().replaceFirst('ApiException: ', ''));
     } finally {
+      // mounted 检查兜底：即使组件已 dispose，也尝试更新（防止 _loading 卡死）
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  // 默认空数据（防止 build 抛异常时显示空白）
+  Map<String, dynamic> get _safeData => _data ?? const {
+        'rows': <dynamic>[],
+        'linkedRows': <dynamic>[],
+        'balance': 0,
+        'linkedSum': 0,
+        'monthly': <dynamic>[],
+      };
   List<_WalletTxn> get _rows {
-    final list = (_data?['rows'] as List? ?? []);
-    return list.map((x) => _WalletTxn.fromJson(x)).toList();
+    final list = (_safeData['rows'] as List? ?? []);
+    return list.map((x) {
+      try { return _WalletTxn.fromJson(x as Map<String, dynamic>); }
+      catch (_) { return null; }
+    }).whereType<_WalletTxn>().toList();
   }
-
   List<Flow> get _linked {
-    final list = (_data?['linkedRows'] as List? ?? []);
-    return list.map((x) => Flow.fromJson(x)).toList();
+    final list = (_safeData['linkedRows'] as List? ?? []);
+    return list.map((x) {
+      try { return Flow.fromJson(x as Map<String, dynamic>); }
+      catch (_) { return null; }
+    }).whereType<Flow>().toList();
+  }
+  // 月结（服务端聚合）：不依赖历史落库，仅当月/上月实时算也正常
+  List<Map<String, dynamic>> get _monthly {
+    final list = (_safeData['monthly'] as List? ?? []);
+    return list.map((x) {
+      try { return Map<String, dynamic>.from(x as Map); }
+      catch (_) { return null; }
+    }).whereType<Map<String, dynamic>>().toList();
   }
 
   Future<bool> _confirm(String msg) async {
@@ -201,8 +223,8 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
     final linked = _linked;
     final manualIn = rows.fold(0.0, (s, t) => s + (t.amount > 0 ? t.amount : 0));
     // 余额以接口返回的实时数据为准（手动记录合计 + 关联分类净额），新增 / 修改后立即刷新
-    final respBalance = (_data?['balance'] as num? ?? 0).toDouble();
-    final respLinked = (_data?['linkedSum'] as num? ?? 0).toDouble();
+    final respBalance = (_safeData['balance'] as num? ?? 0).toDouble();
+    final respLinked = (_safeData['linkedSum'] as num? ?? 0).toDouble();
     final curBalance = respBalance + respLinked;
     final showEmpty = rows.isEmpty && linked.isEmpty;
     return Scaffold(
@@ -328,32 +350,27 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
                           ),
                         ),
                       )),
-                // 关联分类自动记录
+                // 关联分类月结（每月底自动按分类×归属人汇总，流水变动实时更新）
                 if (w.linkCategory.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  Text('关联分类自动记录 · ${w.linkCategory}（自 ${w.linkFrom}）',
+                  Text('关联分类月结 · ${w.linkCategory}（自 ${w.linkFrom}）',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   const SizedBox(height: 8),
-                  if (linked.isEmpty)
+                  if (_monthly.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Text('该分类自关联日起暂无流水', style: TextStyle(color: AppColors.textSecondary)),
+                      child: Text('该分类自关联日起暂无支出', style: TextStyle(color: AppColors.textSecondary)),
                     )
                   else
-                    ...linked.map((f) {
-                      final expense = f.isExpense;
+                    ..._monthly.map((m) {
+                      final amt = (m['amount'] as num? ?? 0).toDouble();
                       return Card(
                         child: ListTile(
-                          title: Text(f.category),
-                          subtitle: Text('${datePart(f.flowTime)} ${f.description}'),
-                          trailing: Text('${expense ? '-' : '+'}${fmtMoney(f.amount)}',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: expense ? AppColors.expense : AppColors.income)),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
-                          ),
+                          title: Text('${m['ymd'] ?? ''}'),
+                          subtitle: Text('${m['ym'] ?? ''} 月结 · ${m['category'] ?? ''}'),
+                          trailing: Text('−${fmtMoney(amt.abs())}',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, color: AppColors.expense)),
                         ),
                       );
                     }),
