@@ -9,7 +9,8 @@ import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/record/auto_record_dialog.dart';
 
 /// 自动记账服务：从原生通知监听队列拉取待处理记录，
-/// 解析金额/方向/商户 → 排除规则 → 去重 → 弹窗确认 → AI 分类落库。
+/// 解析金额/方向/商户 → 排除规则 → 去重 → 直接自动记账（source=auto，带 AI 标识）。
+/// 误记时在流水详情页点「不再记」删除并加入忽略名单。
 class AutoRecordService {
   static const _channel = MethodChannel('jizhang/auto_record');
   static const _kEnabled = 'auto_record_enabled';
@@ -157,8 +158,10 @@ class AutoRecordService {
   }
 
   // ---------------- 主流程 ----------------
+  // 自动记账模式：识别到支付通知 → 直接落库（source=auto → 流水带 AI 标识），
+  // 不再弹确认框；误记在流水详情页点「不再记」删除并加入忽略名单。
   Future<void> _processQueue(WidgetRef ref, BuildContext context) async {
-    if (_showing) return; // 已有弹窗在展示，跳过本次轮询，避免叠加
+    if (_showing) return; // 重入保护（快速轮询/并发触发）
     if (!(await enabled)) return;
     final s = ref.read(sessionProvider);
     if (!s.hasToken || !s.hasBook) return;
@@ -167,13 +170,12 @@ class AutoRecordService {
     _showing = true;
     try {
       for (final raw in pending) {
-        if (!context.mounted) return;
         final parsed = _parse(raw);
         if (parsed == null) {
           await removePending(raw['id']?.toString() ?? '');
           continue;
         }
-        // 排除规则
+        // 排除规则（信用卡还款/本人转账/忽略商户等）
         if (await _excluded(parsed)) {
           await removePending(raw['id']?.toString() ?? '');
           continue;
@@ -184,27 +186,52 @@ class AutoRecordService {
           await removePending(raw['id']?.toString() ?? '');
           continue;
         }
-        // 弹窗确认（强制）
-        if (!context.mounted) return;
-        final result = await showDialog<AutoRecordAction>(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => AutoRecordDialog(parsed: parsed),
-        );
-        if (!context.mounted) continue;
-        await removePending(raw['id']?.toString() ?? '');
-        if (result == null) continue; // 忽略
-        if (result.ignore) continue;
-        if (result.neverAgain) {
-          await _addExcludeFromDialog(result);
-          continue;
-        }
         await _dedupMark(dedupKey);
-        await _saveFlow(ref, result);
+        // 直接自动记账（不弹窗）
+        await _saveParsedFlow(ref, parsed);
+        await removePending(raw['id']?.toString() ?? '');
       }
+    } catch (_) {
     } finally {
       _showing = false;
     }
+  }
+
+  /// 解析后的通知直接落库（自动记账）
+  Future<void> _saveParsedFlow(WidgetRef ref, ParsedNotification p) async {
+    final body = <String, dynamic>{
+      'type': p.isIncome ? 'income' : 'expense',
+      'amount': p.amount,
+      'category': _autoCategory('', p.isIncome),
+      'description': p.merchant,
+      'flow_time':
+          '${p.time.year}-${p.time.month.toString().padLeft(2, '0')}-${p.time.day.toString().padLeft(2, '0')}',
+      'payment_method': _pkgName(p.pkg),
+      'source': 'auto',
+    };
+    try {
+      await ref.read(apiProvider).createFlow(body);
+      ref.read(dataVersionProvider.notifier).state++;
+    } catch (e) {
+      // 落库失败（如网络）：本条保留在待处理队列，下轮重试
+    }
+  }
+
+  /// 商户 → 忽略名单（流水详情页「不再记」调用）
+  Future<void> addIgnoreMerchant(String merchant) async {
+    final list = await ignoreMerchants;
+    if (merchant.isNotEmpty && !list.contains(merchant)) {
+      list.add(merchant);
+      await setIgnoreMerchants(list);
+    }
+  }
+
+  /// 自动记账默认分类（通知解析未显式给出分类时）
+  String _autoCategory(String category, bool isIncome) {
+    if (category.isNotEmpty && category != '其他' && category != '其它') {
+      return category;
+    }
+    return isIncome ? '其他' : '餐饮';
   }
 
   // 解析通知文本 → 结构化记录
@@ -213,24 +240,35 @@ class AutoRecordService {
     if (text.trim().isEmpty) return null;
 
     // ---- ① 误识别过滤：强信号词（完成时态） ----
+    // 含微信/支付宝转账：转账成功/已存入零钱/收到转账
     const strongKw = [
       '支付成功', '付款成功', '成功付款', '支付成功通知', '已支付', '已付款',
-      '收款成功', '已收款', '收款通知', '收款到账',
+      '收款成功', '已收款', '收款通知', '收款到账', '收款',
+      '转账成功', '转账', '已存入', '收到转账', '转入',
       '扣款成功', '已扣款', '已消费',
       '入账', '到账', '还款成功', '已还款', '退款成功', '已退款',
     ];
-    const weakKw = [
-      '支付', '付款', '消费', '支出', '扣款', '还款', '退款', '收款', '入账',
+    // 虚拟积分/非现金类通知黑名单：即使含「到账/入账」也直接丢弃
+    // （支付宝积分到账、京豆、里程、信用分、金币、成长值等不是真实收支）
+    const virtualKw = [
+      '积分', '金币', '京豆', '里程', '成长值', '信用分', '蚂蚁积分',
+      '积分到账', '积分入账', '返积分', '送积分', '领积分', '兑换积分',
+      '豆', '金币到账', '星星', '等级', '经验值', '会员积分',
     ];
     // 营销/聊天黑名单：命中这些词且没有强支付信号 → 丢弃（接龙/价目/优惠等）
+    // 注意：不含「红包/领红包」——微信红包是真实收入（收到红包/领取红包），不能拦
     const marketingKw = [
-      '优惠', '秒杀', '限时', '活动', '领券', '抵扣', '红包', '接龙', '价目',
+      '优惠', '秒杀', '限时', '活动', '领券', '抵扣', '接龙', '价目',
       '团购', '热卖', '返利', '折扣', '会员日', '特惠', '立减', '满减',
-      '优惠券', '代金券', '促销', '特价', '砍价', '拼团', '领红包', '商品推荐',
+      '优惠券', '代金券', '促销', '特价', '砍价', '拼团', '商品推荐',
     ];
     final hasStrong = strongKw.any((kw) => text.contains(kw));
     if (!hasStrong) {
       // 无强信号：直接丢弃（哪怕是支付 App——营销/聊天也会在支付 App 里出现）
+      return null;
+    }
+    // 虚拟积分类通知（支付宝积分/京豆/里程等）直接丢弃，不当作记账
+    if (virtualKw.any((kw) => text.contains(kw))) {
       return null;
     }
     if (marketingKw.any((kw) => text.contains(kw))) {

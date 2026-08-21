@@ -439,11 +439,9 @@ class _RecordPageState extends ConsumerState<RecordPage> {
           );
     }
     setState(() {
+      // 只填名称（+ 匹配分类），金额由用户自己输入——不再自动填平均金额
       _name.text = p.name;
       if (matched != null) _cat = matched;
-      if (p.amount != null && p.amount! > 0) {
-        _expression = _formatComputed(p.amount!);
-      }
     });
   }
 

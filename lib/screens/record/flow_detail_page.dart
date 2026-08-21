@@ -7,6 +7,7 @@ import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/core/owner_color.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
+import 'auto_record_service.dart';
 import 'record_page.dart';
 
 class FlowDetailPage extends ConsumerStatefulWidget {
@@ -136,35 +137,52 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
               ),
             ),
           ),
-          // 操作按钮（从左到右：删除 / 归属 / 修改）
+          // 操作按钮（从左到右：删除 / 归属 / 修改；AI 自动记账流水额外有「不再记」）
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _deleteFlow,
-                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.expense),
-                    label: const Text('删除', style: TextStyle(color: AppColors.expense)),
-                    style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.expense)),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _deleteFlow,
+                        icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.expense),
+                        label: const Text('删除', style: TextStyle(color: AppColors.expense)),
+                        style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.expense)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _changeAttribution,
+                        icon: const Icon(Icons.person_outline, size: 18),
+                        label: const Text('归属'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _editFlow,
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('修改'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _changeAttribution,
-                    icon: const Icon(Icons.person_outline, size: 18),
-                    label: const Text('归属'),
+                if (f.isAiSource) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _neverAgain,
+                      icon: const Icon(Icons.block, size: 18, color: AppColors.expense),
+                      label: const Text('不再记（删除该笔，以后此商户不自动记账）',
+                          style: TextStyle(color: AppColors.expense, fontSize: 13)),
+                      style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.expense)),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _editFlow,
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('修改'),
-                  ),
-                ),
+                ],
               ],
             ),
           ),
@@ -215,6 +233,35 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
       });
       ref.read(dataVersionProvider.notifier).state++;
       toast('归属已更新');
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
+  }
+
+  // 不再记：AI 自动记账误记时，删除该笔 + 商户加入忽略名单（以后不再自动记账）
+  Future<void> _neverAgain() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('不再记这笔？'),
+        content: Text('将删除「${widget.flow.description}」这笔流水，'
+            '并把该商户加入忽略名单，以后它不会自动记账。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('不再记', style: TextStyle(color: AppColors.expense)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await AutoRecordService.instance.addIgnoreMerchant(widget.flow.description);
+      await ref.read(localApiProvider).deleteFlow(widget.flow.id);
+      ref.read(dataVersionProvider.notifier).state++;
+      toast('已忽略「${widget.flow.description}」，以后不再自动记账');
       if (mounted) Navigator.pop(context);
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));

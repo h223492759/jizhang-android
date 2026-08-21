@@ -353,7 +353,27 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
       final f = Flow.fromJson(x as Map<String, dynamic>);
       return Card(
         child: ListTile(
-          title: Text('${f.category} ${f.description.isNotEmpty ? '· ${f.description}' : ''}'),
+          title: Row(
+            children: [
+              if (f.isAiSource) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text('AI',
+                      style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 4),
+              ],
+              Expanded(
+                child: Text(
+                    '${f.category} ${f.description.isNotEmpty ? '· ${f.description}' : ''}',
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
           subtitle: Text(f.flowTime),
           trailing: Text('${isExpense ? '-' : '+'}${fmtMoney2(f.amount)}',
               style: TextStyle(

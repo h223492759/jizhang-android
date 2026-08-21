@@ -44,13 +44,16 @@ Widget compactFlowTile({
             children: [
               if (f.isAiSource) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(4),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1)),
+                    ],
                   ),
                   child: const Text('AI',
-                      style: TextStyle(fontSize: 9, color: AppColors.text, fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 4),
               ],
