@@ -279,11 +279,11 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                     margin: const EdgeInsets.only(bottom: 2),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppColors.primarySoft,
+                      color: AppPalette.cardSubtle(context),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text('🔗 关联 ${lk.cat} · 自 ${lk.from.isEmpty ? "（未设）" : lk.from}',
-                        style: TextStyle(fontSize: 12, color: AppColors.primaryDark)),
+                        style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
                   ),
                 const SizedBox(height: 4),
                 Text(

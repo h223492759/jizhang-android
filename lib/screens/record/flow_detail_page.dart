@@ -50,7 +50,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
     return Scaffold(
       backgroundColor: AppPalette.background(context),
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppPalette.primaryDim(context),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -63,7 +63,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
         children: [
           Container(
             width: double.infinity,
-            color: AppColors.primary,
+            color: AppPalette.primaryDim(context),
             padding: const EdgeInsets.only(bottom: 24),
             child: Column(
               children: [

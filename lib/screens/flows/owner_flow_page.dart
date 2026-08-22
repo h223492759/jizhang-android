@@ -296,7 +296,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(e.value,
-                  style: TextStyle(color: active ? AppPalette.text(context) : AppPalette.textSecondary(context))),
+                  style: TextStyle(color: active ? AppPalette.onPrimary(context) : AppPalette.textSecondary(context))),
             ),
           );
         }).toList(),
@@ -368,7 +368,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
           color: active ? AppColors.primary : AppPalette.background(context),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(label, style: TextStyle(color: active ? AppPalette.text(context) : AppPalette.textSecondary(context))),
+        child: Text(label, style: TextStyle(color: active ? AppPalette.onPrimary(context) : AppPalette.textSecondary(context))),
       ),
     );
   }
