@@ -206,7 +206,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
         padding: const EdgeInsets.all(12),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
         decoration: BoxDecoration(
-          color: isUser ? AppColors.primary : Colors.white,
+          color: isUser ? AppPalette.primaryDim(context) : AppPalette.card(context),
           borderRadius: BorderRadius.circular(12),
           border: isUser ? null : Border.all(color: AppPalette.divider(context)),
         ),
