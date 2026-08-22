@@ -181,7 +181,7 @@ class MePage extends ConsumerWidget {
         final build = snap.data?.buildNumber ?? BuildInfo.buildNumber;
         return Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
