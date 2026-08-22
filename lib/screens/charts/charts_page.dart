@@ -200,7 +200,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(e.value,
-                  style: TextStyle(color: active ? AppPalette.text(context) : AppPalette.textSecondary(context))),
+                  style: TextStyle(color: active ? AppPalette.onPrimary(context) : AppPalette.textSecondary(context))),
             ),
           );
         }).toList(),

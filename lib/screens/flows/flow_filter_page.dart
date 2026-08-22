@@ -79,7 +79,7 @@ class _FlowFilterPageState extends ConsumerState<FlowFilterPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                   children: buildGroupedFlows(
                     flows: _flows,
-                    tileBuilder: (f) => compactFlowTile(
+                    tileBuilder: (f) => compactFlowTile(context,
                       f: f,
                       iconBg: ownerColorFor(f, overrides, user),
                       iconChar: _iconOf(f.category),

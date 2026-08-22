@@ -10,7 +10,8 @@ import 'package:jizhang_android/core/util.dart';
 /// - onAmountTap → 点金额
 /// 若某项未单独指定，则回退到 onTap（整行通用点击，如查看明细）。
 /// - onLongPress → 整行长按（如首页弹出操作菜单）
-Widget compactFlowTile({
+Widget compactFlowTile(
+  BuildContext context, {
   required Flow f,
   required Color iconBg,
   required String iconChar,
@@ -61,7 +62,7 @@ Widget compactFlowTile({
                 child: Text(name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14, color: AppColors.text)),
+                    style: TextStyle(fontSize: 14, color: AppPalette.text(context))),
               ),
             ],
           ),

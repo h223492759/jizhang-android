@@ -82,7 +82,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                         child: Text('$y',
                             style: TextStyle(
                                 fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                                color: active ? AppPalette.text(context) : AppPalette.textSecondary(context))),
+                                color: active ? AppPalette.onPrimary(context) : AppPalette.textSecondary(context))),
                       ),
                     );
                   },
@@ -292,7 +292,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(e.value,
-                    style: TextStyle(color: active ? AppPalette.text(context) : AppPalette.textSecondary(context))),
+                    style: TextStyle(color: active ? AppPalette.onPrimary(context) : AppPalette.textSecondary(context))),
               ),
             );
           }).toList(),

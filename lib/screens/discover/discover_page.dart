@@ -181,8 +181,8 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
             runSpacing: 8,
             children: examples
                 .map((e) => ActionChip(
-                      label: Text(e, style: const TextStyle(fontSize: 13)),
-                      backgroundColor: AppPalette.card(context),
+                      label: Text(e, style: TextStyle(fontSize: 13, color: AppPalette.text(context))),
+                      backgroundColor: AppPalette.cardSubtle(context),
                       side: BorderSide(color: AppPalette.divider(context)),
                       onPressed: () {
                         // 只填到输入框，由用户确认/修改后再发送，避免示例直接记账造成误记

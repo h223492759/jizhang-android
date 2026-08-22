@@ -51,7 +51,7 @@ class _SavingsItemDetailPageState extends ConsumerState<SavingsItemDetailPage> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(color: AppPalette.cardSubtle(context), borderRadius: BorderRadius.circular(12)),
                   child: Column(
                     children: [
                       Text('¥${fmtMoney(item.amount)}',

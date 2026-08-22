@@ -216,7 +216,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
   Widget build(BuildContext context) {
     final color = _typeFilter == 'income' ? AppColors.income : AppColors.expense;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppPalette.background(context),
       appBar: AppBar(title: Text(widget.category != null ? '${widget.category} · ${widget.title}' : '${widget.title}的流水')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -238,7 +238,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                   child: _summaryRow(),
                 ),
-                const Divider(height: 1, thickness: 1, color: AppColors.divider),
+                Divider(height: 1, thickness: 1, color: AppPalette.divider(context)),
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -261,10 +261,10 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
     return Row(
       children: [
         Text('$label：¥${fmtMoney(total)}',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            style: const TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
         const Spacer(),
         Text('平均值：¥${fmtMoney(avg)}',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            style: const TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
       ],
     );
   }
@@ -283,7 +283,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
 
   Widget _seg(List<String> labels, int sel, void Function(int) onTap) {
     return Container(
-      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: AppPalette.background(context), borderRadius: BorderRadius.circular(20)),
       child: Row(
         children: labels.asMap().entries.map((e) {
           final active = e.key == sel;
@@ -296,7 +296,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(e.value,
-                  style: TextStyle(color: active ? AppColors.text : AppColors.textSecondary)),
+                  style: TextStyle(color: active ? AppPalette.text(context) : AppPalette.textSecondary(context))),
             ),
           );
         }).toList(),
@@ -328,13 +328,13 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: o.selected ? FontWeight.bold : FontWeight.normal,
-                          color: o.selected ? AppColors.text : AppColors.textSecondary)),
+                          color: o.selected ? AppPalette.text(context) : AppPalette.textSecondary(context))),
                   const SizedBox(height: 4),
                   Container(
                     height: 3,
                     width: 18,
                     decoration: BoxDecoration(
-                      color: o.selected ? AppColors.text : Colors.transparent,
+                      color: o.selected ? AppPalette.text(context) : Colors.transparent,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -365,10 +365,10 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? AppColors.primary : AppColors.background,
+          color: active ? AppColors.primary : AppPalette.background(context),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(label, style: TextStyle(color: active ? AppColors.text : AppColors.textSecondary)),
+        child: Text(label, style: TextStyle(color: active ? AppPalette.text(context) : AppPalette.textSecondary(context))),
       ),
     );
   }
@@ -423,13 +423,13 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
                     LinearProgressIndicator(
                       value: barPct,
                       minHeight: 6,
-                      backgroundColor: AppColors.background,
+                      backgroundColor: AppPalette.background(context),
                       valueColor: AlwaysStoppedAnimation(color),
                       borderRadius: BorderRadius.circular(3),
                     ),
                     const SizedBox(height: 4),
                     Text('${ymd(dt)} ${weekdayCn(dt)}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        style: const TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
                   ],
                 ),
               ),

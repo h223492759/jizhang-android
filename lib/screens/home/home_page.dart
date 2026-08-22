@@ -164,10 +164,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       ('定期', Icons.watch_later_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecurringPage()))),
     ];
     return Container(
-      color: AppColors.primary,
+      color: AppPalette.primaryDim(context),
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
       child: Container(
-        decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(color: AppPalette.cardSubtle(context), borderRadius: BorderRadius.circular(14)),
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: items
@@ -179,7 +179,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         children: [
                           Icon(e.$2, color: AppColors.primaryDark, size: 24),
                           const SizedBox(height: 4),
-                          Text(e.$1, style: const TextStyle(fontSize: 12)),
+                          Text(e.$1, style: Builder(builder: (ctx) => TextStyle(fontSize: 12, color: AppPalette.text(ctx)))),
                         ],
                       ),
                     ),
@@ -198,7 +198,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
     final widgets = buildGroupedFlows(
       flows: _flows,
-      tileBuilder: (f) => compactFlowTile(
+      tileBuilder: (f) => compactFlowTile(context,
         f: f,
         iconBg: ownerColorFor(f, overrides, user),
         iconChar: catIconOf(_iconMap, f.category),

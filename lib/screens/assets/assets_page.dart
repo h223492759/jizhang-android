@@ -168,7 +168,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                     onPressed: _updateAssets,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      foregroundColor: AppPalette.text(context),
+                      foregroundColor: AppPalette.onPrimary(context),
                     ),
                     child: const Text('更新资产和负债'),
                   ),
