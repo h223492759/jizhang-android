@@ -210,15 +210,17 @@ class MePage extends ConsumerWidget {
     );
   }
 
-  Widget _infoRow(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(
-            width: 80,
-            child: Text(label, style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 13)),
-          ),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-        ]),
+  Widget _infoRow(String label, String value) => Builder(
+        builder: (ctx) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(
+              width: 80,
+              child: Text(label, style: TextStyle(color: AppPalette.textSecondary(ctx), fontSize: 13)),
+            ),
+            Expanded(child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+          ]),
+        ),
       );
 
   Widget _aiRow(WidgetRef ref) {
