@@ -309,11 +309,11 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                       context,
                       MaterialPageRoute(builder: (_) => WalletDetailPage(wallet: w)),
                     ).then((_) => _load()),
-                    child: const Text('改'),
+                    child: Builder(builder: (ctx) => Text('改', style: TextStyle(color: AppPalette.text(ctx)))),
                   ),
                   TextButton(
                     onPressed: () => _deleteWallet(w),
-                    child: const Text('删', style: TextStyle(color: AppColors.expense)),
+                    child: Builder(builder: (ctx) => Text('删', style: TextStyle(color: AppColors.expense))),
                   ),
                 ],
               ),

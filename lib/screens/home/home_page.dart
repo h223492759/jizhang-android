@@ -102,7 +102,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _headerRegion() {
     final ov = _overview;
     return Container(
-      color: AppColors.primary,
+      color: AppPalette.primaryDim(context),
       child: SafeArea(
         bottom: false,
         top: true,

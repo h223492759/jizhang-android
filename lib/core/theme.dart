@@ -19,11 +19,16 @@ class AppColors {
   static const blue = Color(0xFF3A7BFF);
 
   // 深色模式颜色（系统切换时使用）
-  static const backgroundDark = Color(0xFF121212);
-  static const cardDark = Color(0xFF1E1E1E);
-  static const dividerDark = Color(0xFF2A2A2A);
-  static const textDark = Color(0xFFEEEEEE);
-  static const textSecondaryDark = Color(0xFFAAAAAA);
+  static const backgroundDark = Color(0xFF101012);  // 整体背景稍暗
+  static const cardDark = Color(0xFF242428);  // 卡片比背景亮一档，可见层次
+  static const cardSubtleDark = Color(0xFF1C1C1F);  // 次级卡片（介于背景和卡片之间）
+  static const dividerDark = Color(0xFF333338);
+  static const textDark = Color(0xFFF1F1F1);  // 主文字更亮
+  static const textSecondaryDark = Color(0xFFBFBFBF);  // 次文字更亮（之前 #AAA 太深）
+  // 黄色按钮文字色：深色模式下深灰色（之前白色在黄底上模糊）
+  static const onPrimaryDark = Color(0xFF222222);
+  // 大面积黄色 AppBar 叠加黑色 50% 后的近似色
+  static const primaryDimDark = Color(0xFF7A6A20);
 }
 
 class AppTheme {
@@ -107,5 +112,10 @@ class AppPalette {
   static Color textSecondary(BuildContext c) => isDark(c) ? AppColors.textSecondaryDark : AppColors.textSecondary;
   static Color background(BuildContext c) => isDark(c) ? AppColors.backgroundDark : AppColors.background;
   static Color card(BuildContext c) => isDark(c) ? AppColors.cardDark : AppColors.card;
+  static Color cardSubtle(BuildContext c) => isDark(c) ? AppColors.cardSubtleDark : AppColors.card;
   static Color divider(BuildContext c) => isDark(c) ? AppColors.dividerDark : AppColors.divider;
+  // 黄色按钮上的文字色：深色模式下用深灰色，比白色更清晰
+  static Color onPrimary(BuildContext c) => isDark(c) ? AppColors.onPrimaryDark : AppColors.text;
+  // 大面积黄色在深色模式下降饱和（叠加黑 50%）
+  static Color primaryDim(BuildContext c) => isDark(c) ? AppColors.primaryDimDark : AppColors.primary;
 }
