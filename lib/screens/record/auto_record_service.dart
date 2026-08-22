@@ -248,7 +248,8 @@ class AutoRecordService {
     if (category.isNotEmpty && category != '其他' && category != '其它') {
       return category;
     }
-    return isIncome ? '其他' : '餐饮';
+    // 无分类信息的支出通知保底用「餐饮」不符合直觉；改为「其他」（用户可在详情改）
+    return isIncome ? '其他' : '其他';
   }
 
   // 解析通知文本 → 结构化记录
@@ -360,7 +361,11 @@ class AutoRecordService {
         }
       }
       if (merchant.isEmpty || platformWords.any((w) => merchant == w)) {
-        merchant = isIncome ? '收款' : '支出';
+        // 保底：优先用平台名（微信支付/支付宝/云闪付），比笼统的「支出/收款」更有意义
+        final pkgName = _pkgName(raw['pkg']?.toString() ?? '');
+        merchant = pkgName.isNotEmpty
+            ? pkgName
+            : (isIncome ? '收款' : '支出');
       }
     }
     return ParsedNotification(
