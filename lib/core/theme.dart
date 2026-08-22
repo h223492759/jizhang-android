@@ -99,3 +99,13 @@ class AppTheme {
         ),
       );
 }
+
+/// 响应 BuildContext 的颜色（深色模式自动切换）
+class AppPalette {
+  static bool isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
+  static Color text(BuildContext c) => isDark(c) ? AppColors.textDark : AppColors.text;
+  static Color textSecondary(BuildContext c) => isDark(c) ? AppColors.textSecondaryDark : AppColors.textSecondary;
+  static Color background(BuildContext c) => isDark(c) ? AppColors.backgroundDark : AppColors.background;
+  static Color card(BuildContext c) => isDark(c) ? AppColors.cardDark : AppColors.card;
+  static Color divider(BuildContext c) => isDark(c) ? AppColors.dividerDark : AppColors.divider;
+}
