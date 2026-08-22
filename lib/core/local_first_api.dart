@@ -357,17 +357,29 @@ final w = await _api.getWallets();
   String _normStart(String s) => s.length <= 10 ? '$s 00:00:00' : s;
   String _normEnd(String s) => s.length <= 10 ? '$s 23:59:59' : s;
 
-  Flow _flowFromRow(Map<String, Object?> r) => Flow(
-        id: (r['id'] as num).toInt(),
-        type: (r['type'] ?? 'expense') as String,
-        amount: ((r['amount'] as num?) ?? 0).toDouble(),
-        category: (r['category'] ?? '') as String,
-        paymentMethod: (r['payment_method'] ?? '') as String,
-        description: (r['description'] ?? '') as String,
-        flowTime: (r['flow_time'] ?? '') as String,
-        attribution: (r['attribution'] ?? '') as String,
-        attributionColor: r['attribution_color'] as String?,
-      );
+  Flow _flowFromRow(Map<String, Object?> r) {
+    // 老版本没保存 source 字段（df09b37 之前），本地缓存里 source 也可能是空
+    // 根据 payment_method 推断 AI 自动记账（微信支付/支付宝/云闪付）
+    var source = (r['source'] as String?) ?? '';
+    if (source.isEmpty) {
+      final pm = (r['payment_method'] as String?) ?? '';
+      if (['微信支付', '支付宝', '云闪付'].contains(pm)) {
+        source = 'auto';
+      }
+    }
+    return Flow(
+      id: (r['id'] as num).toInt(),
+      type: (r['type'] ?? 'expense') as String,
+      amount: ((r['amount'] as num?) ?? 0).toDouble(),
+      category: (r['category'] ?? '') as String,
+      paymentMethod: (r['payment_method'] ?? '') as String,
+      description: (r['description'] ?? '') as String,
+      flowTime: (r['flow_time'] ?? '') as String,
+      attribution: (r['attribution'] ?? '') as String,
+      attributionColor: r['attribution_color'] as String?,
+      source: source,
+    );
+  }
 
   // ================= 写：在线直写 / 离线入队 =================
 
