@@ -24,6 +24,8 @@ class App extends ConsumerWidget {
     return MaterialApp(
       title: '记账本',
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       scaffoldMessengerKey: scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       locale: const Locale('zh', 'CN'),

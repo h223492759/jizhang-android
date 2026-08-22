@@ -127,6 +127,7 @@ final w = await _api.getWallets();
                       'link_category': x.linkCategory,
                       'linkCategories': x.linkCategories,
                       'linkLinks': x.linkLinks.map((l) => {'cat': l.cat, 'from': l.from}).toList(),
+                      'deposit_rules': x.depositRules.map((r) => {'cat': r.cat, 'owner': r.owner, 'amount': r.amount, 'start_ym': r.startYm, 'end_ym': r.endYm}).toList(),
                     })
                 .toList(),
             'totalBalance': w.totalBalance,

@@ -46,7 +46,7 @@ Widget compactFlowTile({
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
+                    color: AppColors.blue,
                     borderRadius: BorderRadius.circular(4),
                     boxShadow: const [
                       BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1)),

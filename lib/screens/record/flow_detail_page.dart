@@ -181,6 +181,17 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
+                      onPressed: _hideAiTag,
+                      icon: const Icon(Icons.label_off_outlined, size: 18, color: AppColors.blue),
+                      label: const Text('隐藏 AI 标签（清除来源标记，保留流水）',
+                          style: TextStyle(color: AppColors.blue, fontSize: 13)),
+                      style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.blue)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
                       onPressed: _neverAgain,
                       icon: const Icon(Icons.block, size: 18, color: AppColors.expense),
                       label: const Text('拉黑删（删除该笔，以后该商户不再自动记账）',
@@ -240,6 +251,22 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
       ref.read(dataVersionProvider.notifier).state++;
       toast('归属已更新');
       if (mounted) Navigator.pop(context);
+    } catch (e) {
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
+  }
+
+  // 隐藏 AI 标签：清空 source 字段（保留流水，只去掉「AI」标记 + 来源信息）
+  Future<void> _hideAiTag() async {
+    try {
+      await ref.read(localApiProvider).updateFlow(
+        widget.flow.id,
+        {"source": ""},
+      );
+      if (mounted) {
+        toast("已隐藏 AI 标签");
+        Navigator.pop(context, true); // 通知列表刷新
+      }
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     }
@@ -331,14 +358,14 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
 
   Widget _aiTag() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: AppColors.blue,
         borderRadius: BorderRadius.circular(4),
       ),
       child: const Text('AI',
           style: TextStyle(
-              fontSize: 9, color: AppColors.text, fontWeight: FontWeight.bold)),
+              fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
     );
   }
 }

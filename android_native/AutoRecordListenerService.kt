@@ -97,7 +97,7 @@ class AutoRecordListenerService : NotificationListenerService() {
                 "com.unionpay" -> "云闪付"
                 else -> pkg
             }
-            val titleStr = if (amount.isNotEmpty()) "检测到 $src ¥$amount" else "检测到 $src 通知"
+            val titleStr = if (amount.isNotEmpty()) "已记账 $src ¥$amount" else "已记账 $src 通知"
             val body = if (title.isNotEmpty()) title else "自动记账已加入待处理"
             val n = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -121,7 +121,7 @@ class AutoRecordListenerService : NotificationListenerService() {
             CHANNEL_ID, "自动记账",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "检测到支付类通知时弹出，点击进入主界面确认记账"
+            description = "已记账：自动从支付类通知记账，点击查看详情"
             enableVibration(true)
         }
         nm.createNotificationChannel(ch)
