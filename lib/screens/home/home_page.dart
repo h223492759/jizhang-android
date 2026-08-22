@@ -179,7 +179,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         children: [
                           Icon(e.$2, color: AppColors.primaryDark, size: 24),
                           const SizedBox(height: 4),
-                          Text(e.$1, style: Builder(builder: (ctx) => TextStyle(fontSize: 12, color: AppPalette.text(ctx)))),
+                          Text(e.$1, style: TextStyle(fontSize: 12, color: AppPalette.text(context))),  // 直接拿 build context
                         ],
                       ),
                     ),

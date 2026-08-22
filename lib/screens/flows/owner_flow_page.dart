@@ -261,10 +261,10 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
     return Row(
       children: [
         Text('$label：¥${fmtMoney(total)}',
-            style: const TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
+            style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
         const Spacer(),
         Text('平均值：¥${fmtMoney(avg)}',
-            style: const TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
+            style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
       ],
     );
   }
@@ -429,7 +429,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
                     ),
                     const SizedBox(height: 4),
                     Text('${ymd(dt)} ${weekdayCn(dt)}',
-                        style: const TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                        style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
                   ],
                 ),
               ),
