@@ -69,7 +69,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: AppPalette.card(context),
                     shape: BoxShape.circle,
                   ),
@@ -112,7 +112,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                   const Divider(height: 24),
                   Row(
                     children: [
-                      const Text('归属人',
+                      Text('归属人',
                           style: TextStyle(fontSize: 15, color: AppPalette.textSecondary(context))),
                       const SizedBox(width: 16),
                       Expanded(
@@ -363,7 +363,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
         color: AppColors.blue,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: const Text('AI',
+      child: Text('AI',
           style: TextStyle(
               fontSize: 9, color: AppPalette.card(context), fontWeight: FontWeight.bold)),
     );

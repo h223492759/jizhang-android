@@ -342,7 +342,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
                 const Text('资金记录（日期 · 金额 · 操作人）', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 8),
                 if (_allTxns.isEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: Text('还没有资金记录', style: TextStyle(color: AppPalette.textSecondary(context))),
                   )
@@ -375,7 +375,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
                       )),
                 if (showEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text('该钱包暂无资金记录与关联流水。',
+                  Text('该钱包暂无资金记录与关联流水。',
                       style: TextStyle(color: AppPalette.textSecondary(context))),
                 ],
                 const SizedBox(height: 24),

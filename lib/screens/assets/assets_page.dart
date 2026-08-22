@@ -110,7 +110,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
-                const Text('当前净资产', style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 12)),
+                Text('当前净资产', style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 12)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text('¥${fmtMoney(showNet)}',
@@ -127,11 +127,11 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 children: [
                   Text('资产 ${fmtMoney(showAsset)}',
                       style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
-                  const Text('｜', style: TextStyle(color: AppPalette.textSecondary(context))),
+                  Text('｜', style: TextStyle(color: AppPalette.textSecondary(context))),
                   Text('负债 ${fmtMoney(showLiability)}',
                       style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
                   if (hasTarget) ...[
-                    const Text('｜', style: TextStyle(color: AppPalette.textSecondary(context))),
+                    Text('｜', style: TextStyle(color: AppPalette.textSecondary(context))),
                     Text(
                         showRemaining > 0
                             ? '还差 ¥${fmtMoney(showRemaining)}'
@@ -154,7 +154,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 Text('已达成 $showPercent% · 目标 ¥${fmtMoney(s.target)}',
                     style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
               ] else
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Text('还没有设定目标，点右侧「修改目标」设定，例如 100 万。',
                       style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
@@ -227,7 +227,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             ),
           ],
         ]),
-        if (_ordering) const Padding(
+        if (_ordering) Padding(
           padding: EdgeInsets.only(bottom: 4),
           child: Text('调序模式：用卡片下方 ↑↓ 调整顺序，完成后点右上角「完成」',
               style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
@@ -236,7 +236,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         _itemGrid(s.items, false),
         if (s.expiredItems.isNotEmpty) ...[
           const SizedBox(height: 16),
-          const Text('已失效（不计入净资产，点「改」可延长或取消失效日期）',
+          Text('已失效（不计入净资产，点「改」可延长或取消失效日期）',
               style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
           const SizedBox(height: 10),
           _itemGrid(s.expiredItems, true),
@@ -851,7 +851,7 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('新记录会把该细则当前金额设为输入值，并记一条记录。',
+              Text('新记录会把该细则当前金额设为输入值，并记一条记录。',
                   style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
               const SizedBox(height: 8),
               // 日期录入：点击弹日历选择
@@ -1029,7 +1029,7 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _rows.isEmpty
-                      ? const Center(child: Text('暂无历史记录', style: TextStyle(color: AppPalette.textSecondary(context))))
+                      ? Center(child: Text('暂无历史记录', style: TextStyle(color: AppPalette.textSecondary(context))))
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           itemCount: _rows.length,

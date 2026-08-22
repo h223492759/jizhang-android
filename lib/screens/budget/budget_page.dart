@@ -228,7 +228,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
         decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
         child: Column(
           children: [
-            const Text('暂无年度预算', style: TextStyle(fontSize: 15, color: AppPalette.textSecondary(context))),
+            Text('暂无年度预算', style: TextStyle(fontSize: 15, color: AppPalette.textSecondary(context))),
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: () => _setBudget(),

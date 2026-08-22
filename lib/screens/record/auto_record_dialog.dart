@@ -175,7 +175,7 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
             const SizedBox(height: 10),
             // 第三区：分类（无"分类"文字，四行网格放完整，不截断）
             _aiLoading
-                ? const SizedBox(
+                ? SizedBox(
                     height: 80,
                     child: Center(
                       child: Text('AI 识别中…',

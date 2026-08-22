@@ -97,7 +97,7 @@ class _ServerListPageState extends ConsumerState<ServerListPage> {
       appBar: AppBar(title: const Text('服务器')),
       body: ListView(
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.all(16),
             child: Text('选择记账服务器（连接同一后端）',
                 style: TextStyle(color: AppPalette.textSecondary(context))),

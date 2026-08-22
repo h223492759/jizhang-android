@@ -175,7 +175,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                   child: _summaryRow(),
                 ),
-                const Divider(height: 1, thickness: 1, color: AppPalette.divider(context)),
+                Divider(height: 1, thickness: 1, color: AppPalette.divider(context)),
                 // SCROLLABLE: 归属人 + 排行榜 + 流水明细
                 Expanded(
                   child: ListView(

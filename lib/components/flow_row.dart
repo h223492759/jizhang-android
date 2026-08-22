@@ -53,7 +53,7 @@ Widget compactFlowTile({
                     ],
                   ),
                   child: const Text('AI',
-                      style: TextStyle(fontSize: 10, color: AppPalette.card(context), fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 10, color: AppColors.card, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -61,7 +61,7 @@ Widget compactFlowTile({
                 child: Text(name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14, color: AppPalette.text(context))),
+                    style: TextStyle(fontSize: 14, color: AppColors.text)),
               ),
             ],
           ),
@@ -113,14 +113,14 @@ List<Widget> buildGroupedFlows({
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
         child: Text(
           dt != null ? '${dt.month}月${dt.day}日 ${weekdayCn(dt)}' : k,
-          style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 12),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
       ));
     }
     for (final f in grouped[k]!) {
       out.add(tileBuilder(f));
     }
-    out.add(const Divider(height: 1, thickness: 1, color: AppPalette.divider(context)));
+    out.add(const Divider(height: 1, thickness: 1, color: AppColors.divider));
   }
   return out;
 }

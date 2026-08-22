@@ -176,7 +176,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                 const SizedBox(height: 12),
                 const Text('不记账规则', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                const Text('命中任一规则 → 不弹窗、不记账', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                Text('命中任一规则 → 不弹窗、不记账', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
                 const SizedBox(height: 8),
                 Card(
                   child: Column(children: [
@@ -230,7 +230,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                 ]),
                 Card(
                   child: _users.isEmpty
-                      ? const Padding(
+                      ? Padding(
                           padding: EdgeInsets.all(16),
                           child: Text('暂无名单。添加后可在弹窗点「不再记」快速加入。',
                               style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
@@ -247,7 +247,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                         ),
                 ),
                 const SizedBox(height: 16),
-                const Text('说明：支付成功通知会被识别为记账候选，弹窗确认后经 AI 自动分类并写入流水（来源标记为 AI 记账）。',
+                Text('说明：支付成功通知会被识别为记账候选，弹窗确认后经 AI 自动分类并写入流水（来源标记为 AI 记账）。',
                     style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
               ],
             ),

@@ -116,7 +116,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                       const SizedBox(height: 16),
                       ...d.wallets.map((w) => _walletCard(w)),
                       if (d.wallets.isEmpty)
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.only(top: 16),
                           child: Text(
                               '还没有钱包。点右下角「＋」新增养娃、买房等专项金，每月存一笔即可（记录带日期、金额与操作人）。',
@@ -260,7 +260,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                 Text('目标 ¥${fmtMoney(w.target)} · 已达成 $pct%',
                     style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context)))
               else
-                const Text('未设目标', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                Text('未设目标', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
               if (w.target > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),

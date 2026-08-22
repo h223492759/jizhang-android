@@ -160,7 +160,7 @@ class MePage extends ConsumerWidget {
                             fontWeight: b.id == s.bookId ? FontWeight.bold : FontWeight.normal,
                             color: b.id == s.bookId ? AppPalette.text(context) : AppPalette.textSecondary(context))),
                   ),
-                  if (b.id == s.bookId) const Text('当前', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                  if (b.id == s.bookId) Text('当前', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
                 ]),
               )),
         ],
@@ -196,11 +196,11 @@ class MePage extends ConsumerWidget {
               _infoRow('当前账号', s.user?.nickname ?? s.user?.username ?? '-'),
               _aiRow(ref),
               const Divider(height: 20),
-              const Text('本 App 为「记账本」安卓客户端，UI 参考鲨鱼记账的交互设计，'
+              Text('本 App 为「记账本」安卓客户端，UI 参考鲨鱼记账的交互设计，'
                   '后端对接 jizhang 服务。数据均存储在你自己的服务器上。',
                   style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 13)),
               const SizedBox(height: 8),
-              const Center(
+              Center(
                 child: Text('© 记账本', style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 12)),
               ),
             ],

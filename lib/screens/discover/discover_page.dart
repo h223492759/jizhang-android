@@ -102,7 +102,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
       appBar: AppBar(
         title: const Text('发现'),
         actions: [
-          TextButton(onPressed: _busy ? null : _analyze, child: const Text('本月分析', style: TextStyle(color: AppPalette.text(context)))),
+          TextButton(onPressed: _busy ? null : _analyze, child: Text('本月分析', style: TextStyle(color: AppPalette.text(context)))),
         ],
       ),
       body: Column(
@@ -162,7 +162,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
               color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('👋 用自然语言记账 & 问账',
@@ -174,7 +174,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('试试这些：', style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
+          Text('试试这些：', style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,

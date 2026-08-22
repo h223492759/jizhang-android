@@ -176,7 +176,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
 
   List<Widget> _expenseCats(List list) {
     if (list.isEmpty) {
-      return [const Text('无支出记录', style: TextStyle(color: AppPalette.textSecondary(context)))];
+      return [Text('无支出记录', style: TextStyle(color: AppPalette.textSecondary(context)))];
     }
     return list.map((x) {
       final cat = x['category'] ?? '';
@@ -284,7 +284,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
   Widget _compareBar(List rawList, bool isExpense) {
     final list = _futureFiltered(rawList);
     if (list.isEmpty) {
-      return const Text('暂无数据', style: TextStyle(color: AppPalette.textSecondary(context)));
+      return Text('暂无数据', style: TextStyle(color: AppPalette.textSecondary(context)));
     }
     final color = isExpense ? AppColors.expense : AppColors.income;
     return SizedBox(
@@ -347,7 +347,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
 
   List<Widget> _topFlows(List list, {required bool isExpense}) {
     if (list.isEmpty) {
-      return [const Text('无记录', style: TextStyle(color: AppPalette.textSecondary(context)))];
+      return [Text('无记录', style: TextStyle(color: AppPalette.textSecondary(context)))];
     }
     return list.map((x) {
       final f = Flow.fromJson(x as Map<String, dynamic>);
@@ -362,7 +362,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text('AI',
+                  child: Text('AI',
                       style: TextStyle(fontSize: 9, color: AppPalette.card(context), fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 4),
