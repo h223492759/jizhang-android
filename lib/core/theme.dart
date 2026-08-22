@@ -10,8 +10,15 @@ class AppColors {
   static const card = Colors.white;
   static const divider = Color(0xFFEEEEEE);
 
-  static const text = Color(0xFF222222);
-  static const textSecondary = Color(0xFF888888);
+  // text / textSecondary / background / card / divider 改为响应 BuildContext 的方法
+  // 兼容旧 const 引用：保留同名 const 字段（浅色值），新代码优先用同名方法
+  static const _textLight = Color(0xFF222222);
+  static const _textSecondaryLight = Color(0xFF888888);
+  static const _textDark = Color(0xFFEEEEEE);
+  static const _textSecondaryDark = Color(0xFFAAAAAA);
+  // 兼容 const 的静态浅色引用（请优先用响应式 getter）
+  static const text = _textLight;
+  static const textSecondary = _textSecondaryLight;
 
   static const expense = Color(0xFFF04438); // 支出 红
   static const income = Color(0xFF2BA471); //  收入 绿
@@ -98,4 +105,15 @@ class AppTheme {
           // 配合各 showDialog 调用在 content 用 SingleChildScrollView 包裹
         ),
       );
+}
+
+
+/// 响应 BuildContext 的颜色 getter（深色模式自动切换）
+class AppPalette {
+  static bool isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
+  static Color text(BuildContext c) => isDark(c) ? AppColors._textDark : AppColors._textLight;
+  static Color textSecondary(BuildContext c) => isDark(c) ? AppColors._textSecondaryDark : AppColors._textSecondaryLight;
+  static Color background(BuildContext c) => isDark(c) ? AppColors.backgroundDark : AppColors.background;
+  static Color card(BuildContext c) => isDark(c) ? AppColors.cardDark : AppColors.card;
+  static Color divider(BuildContext c) => isDark(c) ? AppColors.dividerDark : AppColors.divider;
 }

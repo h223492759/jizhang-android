@@ -120,7 +120,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                           padding: EdgeInsets.only(top: 16),
                           child: Text(
                               '还没有钱包。点右下角「＋」新增养娃、买房等专项金，每月存一笔即可（记录带日期、金额与操作人）。',
-                              style: TextStyle(color: AppColors.textSecondary)),
+                              style: TextStyle(color: AppPalette.textSecondary(ctx))),
                         ),
                       const SizedBox(height: 24),
                     ],
@@ -137,7 +137,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
   Widget _header(WalletsData d) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: AppPalette.card(ctx), borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
           _col('总余额', '¥${fmtMoney(d.totalBalance)}', true),
@@ -150,7 +150,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            Text(l, style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx))),
             const SizedBox(height: 4),
             Text(v,
                 style: TextStyle(
@@ -169,7 +169,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
     final total = ws.fold(0.0, (s, w) => s + w.balance);
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: AppPalette.card(ctx), borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -191,8 +191,8 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                     title: '${p.toStringAsFixed(0)}%',
                     color: c,
                     radius: 64,
-                    titleStyle: const TextStyle(
-                        fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                    titleStyle: TextStyle(
+                        fontSize: 11, color: AppPalette.card(ctx), fontWeight: FontWeight.bold),
                   );
                 }).toList(),
               ),
@@ -210,7 +210,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                   const SizedBox(width: 6),
                   Expanded(child: Text(w.name, overflow: TextOverflow.ellipsis)),
                   Text('¥${fmtMoney(w.balance)}',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(ctx))),
                 ],
               ),
             );
@@ -220,7 +220,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 '未计入分布（已存 ≤ 0）：${d.wallets.where((w) => w.balance <= 0).map((w) => w.name).join('、')}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx)),
               ),
             ),
         ],
@@ -246,8 +246,8 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                 children: [
                   CircleAvatar(backgroundColor: AppColors.primarySoft, child: Text(w.icon)),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(w.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
-                  Text('${w.count}笔', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  Expanded(child: Text(w.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
+                  Text('${w.count}笔', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx))),
                 ],
               ),
               const SizedBox(height: 6),
@@ -258,16 +258,16 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                       color: w.balance >= 0 ? AppColors.income : AppColors.expense)),
               if (w.target > 0)
                 Text('目标 ¥${fmtMoney(w.target)} · 已达成 $pct%',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))
+                    style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx)))
               else
-                const Text('未设目标', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                Text('未设目标', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx))),
               if (w.target > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: LinearProgressIndicator(
                     value: pct / 100,
                     minHeight: 6,
-                    backgroundColor: AppColors.background,
+                    backgroundColor: AppPalette.background(ctx),
                     valueColor: AlwaysStoppedAnimation(
                         w.balance >= w.target ? AppColors.income : AppColors.primaryDark),
                   ),
@@ -283,7 +283,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text('🔗 关联 ${lk.cat} · 自 ${lk.from.isEmpty ? "（未设）" : lk.from}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.primaryDark)),
+                        style: TextStyle(fontSize: 12, color: AppColors.primaryDark)),
                   ),
                 const SizedBox(height: 4),
                 Text(
@@ -295,9 +295,9 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
               ],
               const SizedBox(height: 4),
               Text('存入 ${fmtMoney(w.totalIn)}｜支出 ${fmtMoney(w.totalOut)}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx))),
               Text('最近 ${w.lastYmd.isEmpty ? '—' : w.lastYmd}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx))),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -343,7 +343,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                 ..._cats.map((c) => DropdownMenuItem(
                     value: c.name,
                     child: Text('${c.name}${c.type == 'income' ? '（收）' : '（支）'}',
-                        style: const TextStyle(fontSize: 12)))),
+                        style: TextStyle(fontSize: 12)))),
               ],
               onChanged: (v) => set(() => rows[i].cat = v ?? ''),
             ),

@@ -113,13 +113,13 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
             isYear
                 ? '这是 ${d['year']} 年的年度账单'
                 : '这是 ${d['year']} 年 ${d['month']} 月的月度账单',
-            style: const TextStyle(
-                fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.text),
+            style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.bold, color: AppPalette.text(ctx)),
           ),
           if (first.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text('从 $first 起已记账 $sc 天',
-                style: const TextStyle(fontSize: 13, color: AppColors.text)),
+                style: TextStyle(fontSize: 13, color: AppPalette.text(ctx))),
           ],
         ],
       ),
@@ -129,19 +129,19 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
   Widget _summary(Map m, Map d, bool isYear) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-            color: Colors.white, borderRadius: BorderRadius.circular(12)),
+            color: AppPalette.card(ctx), borderRadius: BorderRadius.circular(12)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               isYear ? '上年结余' : '上月结余',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx)),
             ),
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(fmtMoney2((d['lastMonthBalance'] ?? 0).toDouble()),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             Row(
@@ -151,7 +151,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
                 _col(isYear ? '年支出' : '月支出',
                     (m['expense'] ?? 0).toDouble(), AppColors.expense),
                 _col(isYear ? '年结余' : '月结余',
-                    (m['balance'] ?? 0).toDouble(), AppColors.text),
+                    (m['balance'] ?? 0).toDouble(), AppPalette.text(ctx)),
               ],
             ),
           ],
@@ -160,7 +160,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
 
   Widget _col(String l, double v, Color c) => Expanded(
         child: Column(children: [
-          Text(l, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          Text(l, style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx))),
           const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -172,11 +172,11 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
       );
 
   Widget _sectionTitle(String t) => Text(t,
-      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold));
+      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold));
 
   List<Widget> _expenseCats(List list) {
     if (list.isEmpty) {
-      return [const Text('无支出记录', style: TextStyle(color: AppColors.textSecondary))];
+      return [Text('无支出记录', style: TextStyle(color: AppPalette.textSecondary(ctx)))];
     }
     return list.map((x) {
       final cat = x['category'] ?? '';
@@ -190,15 +190,15 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
             children: [
               Row(
                 children: [
-                  Expanded(child: Text(cat, style: const TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(child: Text(cat, style: TextStyle(fontWeight: FontWeight.bold))),
                   Text('${fmtMoney2(amt)} · ${pct.toStringAsFixed(1)}%',
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                      style: TextStyle(color: AppPalette.textSecondary(ctx), fontSize: 13)),
                 ],
               ),
               const SizedBox(height: 6),
               LinearProgressIndicator(
                 value: (pct / 100).clamp(0, 1),
-                backgroundColor: AppColors.background,
+                backgroundColor: AppPalette.background(ctx),
                 color: AppColors.primary,
                 minHeight: 6,
               ),
@@ -248,23 +248,23 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
   Widget _statCard(String label, String value, String sub) => Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-            color: Colors.white, borderRadius: BorderRadius.circular(12)),
+            color: AppPalette.card(ctx), borderRadius: BorderRadius.circular(12)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label,
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx))),
             const SizedBox(height: 4),
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(value,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.expense)),
             ),
             if (sub.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(sub,
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                  style: TextStyle(fontSize: 11, color: AppPalette.textSecondary(ctx))),
             ],
           ],
         ),
@@ -284,7 +284,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
   Widget _compareBar(List rawList, bool isExpense) {
     final list = _futureFiltered(rawList);
     if (list.isEmpty) {
-      return const Text('暂无数据', style: TextStyle(color: AppColors.textSecondary));
+      return Text('暂无数据', style: TextStyle(color: AppPalette.textSecondary(ctx)));
     }
     final color = isExpense ? AppColors.expense : AppColors.income;
     return SizedBox(
@@ -314,7 +314,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
                   final i = v.toInt();
                   if (i < 0 || i >= list.length) return const Text('');
                   final m = list[i] as Map;
-                  return Text('${m['label']}', style: const TextStyle(fontSize: 10));
+                  return Text('${m['label']}', style: TextStyle(fontSize: 10));
                 },
               ),
             ),
@@ -325,7 +325,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
           gridData: const FlGridData(show: false),
           borderData: FlBorderData(
             show: true,
-            border: Border(bottom: BorderSide(color: AppColors.divider, width: 1)),
+            border: Border(bottom: BorderSide(color: AppPalette.divider(ctx), width: 1)),
           ),
           // 触摸提示：用 fmtMoney 格式化，避免裸 double 显示很多位小数
           barTouchData: BarTouchData(
@@ -335,7 +335,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
                 final label = (m['label'] ?? '').toString();
                 return BarTooltipItem(
                   '$label  ¥${fmtMoney2(rod.toY)}',
-                  const TextStyle(color: Colors.white, fontSize: 12),
+                  TextStyle(color: AppPalette.card(ctx), fontSize: 12),
                 );
               },
             ),
@@ -347,7 +347,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
 
   List<Widget> _topFlows(List list, {required bool isExpense}) {
     if (list.isEmpty) {
-      return [const Text('无记录', style: TextStyle(color: AppColors.textSecondary))];
+      return [Text('无记录', style: TextStyle(color: AppPalette.textSecondary(ctx)))];
     }
     return list.map((x) {
       final f = Flow.fromJson(x as Map<String, dynamic>);
@@ -362,8 +362,8 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text('AI',
-                      style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: Text('AI',
+                      style: TextStyle(fontSize: 9, color: AppPalette.card(ctx), fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 4),
               ],

@@ -102,7 +102,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
       appBar: AppBar(
         title: const Text('发现'),
         actions: [
-          TextButton(onPressed: _busy ? null : _analyze, child: const Text('本月分析', style: TextStyle(color: AppColors.text))),
+          TextButton(onPressed: _busy ? null : _analyze, child: Text('本月分析', style: TextStyle(color: AppPalette.text(ctx)))),
         ],
       ),
       body: Column(
@@ -119,7 +119,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
           if (_busy) const LinearProgressIndicator(),
           Container(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 84),
-            color: Colors.white,
+            color: AppPalette.card(ctx),
             child: Row(
               children: [
                 Expanded(
@@ -166,24 +166,24 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('👋 用自然语言记账 & 问账',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.text)),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppPalette.text(ctx))),
                 SizedBox(height: 6),
                 Text('直接说一句，比如「午饭花了38元」，AI 会自动识别金额、分类、时间，确认后即可入账。',
-                    style: TextStyle(fontSize: 13, color: AppColors.text)),
+                    style: TextStyle(fontSize: 13, color: AppPalette.text(ctx))),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          const Text('试试这些：', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          Text('试试这些：', style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(ctx))),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: examples
                 .map((e) => ActionChip(
-                      label: Text(e, style: const TextStyle(fontSize: 13)),
-                      backgroundColor: Colors.white,
-                      side: BorderSide(color: AppColors.divider),
+                      label: Text(e, style: TextStyle(fontSize: 13)),
+                      backgroundColor: AppPalette.card(ctx),
+                      side: BorderSide(color: AppPalette.divider(ctx)),
                       onPressed: () {
                         // 只填到输入框，由用户确认/修改后再发送，避免示例直接记账造成误记
                         _ctrl.text = e;
@@ -206,9 +206,9 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
         padding: const EdgeInsets.all(12),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
         decoration: BoxDecoration(
-          color: isUser ? AppColors.primary : Colors.white,
+          color: isUser ? AppColors.primary : AppPalette.card(ctx),
           borderRadius: BorderRadius.circular(12),
-          border: isUser ? null : Border.all(color: AppColors.divider),
+          border: isUser ? null : Border.all(color: AppPalette.divider(ctx)),
         ),
         child: m.parse != null ? _parseCard(m) : Text(m.text),
       ),
@@ -222,7 +222,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(m.text, style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text(m.text, style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 6),
         Wrap(spacing: 6, runSpacing: 4, children: [
           Chip(label: Text(typeLabel, style: TextStyle(color: color)), backgroundColor: color.withOpacity(0.12)),

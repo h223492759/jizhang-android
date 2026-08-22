@@ -76,13 +76,13 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                       child: Container(
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: active ? AppColors.primary : AppColors.background,
+                          color: active ? AppColors.primary : AppPalette.background(ctx),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text('$y',
                             style: TextStyle(
                                 fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                                color: active ? AppColors.text : AppColors.textSecondary)),
+                                color: active ? AppPalette.text(ctx) : AppPalette.textSecondary(ctx))),
                       ),
                     );
                   },
@@ -142,7 +142,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.background,
+                    color: AppPalette.background(ctx),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -172,24 +172,24 @@ class _BillsPageState extends ConsumerState<BillsPage> {
     );
   }
 
-  TextStyle _headStyle() => const TextStyle(
-      fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.bold);
+  TextStyle _headStyle() => TextStyle(
+      fontSize: 12, color: AppPalette.textSecondary(ctx), fontWeight: FontWeight.bold);
 
   Widget _summary(BillRow s) => Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: AppPalette.card(ctx), borderRadius: BorderRadius.circular(12)),
         child: Row(
           children: [
             _col('收入', s.income, AppColors.income),
             _col('支出', s.expense, AppColors.expense),
-            _col('结余', s.balance, AppColors.text),
+            _col('结余', s.balance, AppPalette.text(ctx)),
           ],
         ),
       );
 
   Widget _col(String l, double v, Color c) => Expanded(
         child: Column(children: [
-          Text(l, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          Text(l, style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx))),
           const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -231,8 +231,8 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                   width: 56,
                   child: Text(
                     _trimLabel(r),
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.text),
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold, color: AppPalette.text(ctx)),
                   ),
                 ),
                 Expanded(
@@ -240,7 +240,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerRight,
                     child: Text(fmtMoney2(r.income),
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 14,
                             color: AppColors.income,
                             fontWeight: FontWeight.w500)),
@@ -252,7 +252,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerRight,
                     child: Text(fmtMoney2(r.expense),
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 14,
                             color: AppColors.expense,
                             fontWeight: FontWeight.w500)),
@@ -264,14 +264,14 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerRight,
                     child: Text(fmtMoney2(r.balance),
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 14,
-                            color: AppColors.text,
+                            color: AppPalette.text(ctx),
                             fontWeight: FontWeight.w500)),
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, size: 20, color: AppColors.textSecondary),
+                Icon(Icons.chevron_right, size: 20, color: AppPalette.textSecondary(ctx)),
               ],
             ),
           ),
@@ -279,7 +279,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
       );
 
   Widget _seg(List<String> labels, int sel, void Function(int) onTap) => Container(
-        decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(color: AppPalette.background(ctx), borderRadius: BorderRadius.circular(20)),
         child: Row(
           children: labels.asMap().entries.map((e) {
             final active = e.key == sel;
@@ -292,7 +292,7 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(e.value,
-                    style: TextStyle(color: active ? AppColors.text : AppColors.textSecondary)),
+                    style: TextStyle(color: active ? AppPalette.text(ctx) : AppPalette.textSecondary(ctx))),
               ),
             );
           }).toList(),

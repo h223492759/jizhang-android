@@ -128,8 +128,8 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
             child: Text('确认记账', style: TextStyle(fontSize: 16))),
         if (payLabel.isNotEmpty)
           Text(payLabel,
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary)),
+              style: TextStyle(
+                  fontSize: 11, color: AppPalette.textSecondary(ctx))),
       ]),
       content: SingleChildScrollView(
         child: Column(
@@ -146,26 +146,26 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
               const SizedBox(width: 8),
               Text('¥${fmtMoney(p.amount)}',
                   style:
-                      const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const Spacer(),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (payLabel.isNotEmpty)
                     Text(payLabel,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                        style: TextStyle(
+                            fontSize: 12, color: AppPalette.textSecondary(ctx))),
                   const SizedBox(height: 2),
                   Text(dateText,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary)),
+                      style: TextStyle(
+                          fontSize: 12, color: AppPalette.textSecondary(ctx))),
                 ],
               ),
             ]),
             const SizedBox(height: 4),
             Text(p.merchant,
                 style:
-                    const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    TextStyle(fontSize: 13, color: AppPalette.textSecondary(ctx))),
             const SizedBox(height: 12),
             TextField(
               controller: _nameCtrl,
@@ -180,7 +180,7 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                     child: Center(
                       child: Text('AI 识别中…',
                           style: TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary)),
+                              fontSize: 12, color: AppPalette.textSecondary(ctx))),
                     ),
                   )
                 : GridView.count(
@@ -195,7 +195,7 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                             Center(
                                 child: Text(_category,
                                     style:
-                                        const TextStyle(fontSize: 12)))
+                                        TextStyle(fontSize: 12)))
                           ]
                         : _cats.map((c) {
                             final on = c.name == _category;
@@ -210,12 +210,12 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                                 decoration: BoxDecoration(
                                   color: on
                                       ? AppColors.primary
-                                      : AppColors.background,
+                                      : AppPalette.background(ctx),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
                                     color: on
                                         ? AppColors.primaryDark
-                                        : AppColors.divider,
+                                        : AppPalette.divider(ctx),
                                     width: on ? 1.2 : 1,
                                   ),
                                 ),
@@ -225,8 +225,8 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: on
-                                        ? Colors.white
-                                        : AppColors.text,
+                                        ? AppPalette.card(ctx)
+                                        : AppPalette.text(ctx),
                                     fontWeight:
                                         on ? FontWeight.w600 : FontWeight.normal,
                                   ),

@@ -47,7 +47,7 @@ class MePage extends ConsumerWidget {
                         : (user?.username ?? '?');
                     final initial = display.isNotEmpty ? display[0] : '?';
                     return Text(initial,
-                        style: const TextStyle(color: Colors.white, fontSize: 24));
+                        style: TextStyle(color: AppPalette.card(ctx), fontSize: 24));
                   }),
                 ),
                 const SizedBox(width: 14),
@@ -56,8 +56,8 @@ class MePage extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(user?.nickname ?? user?.username ?? '未登录',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text('@${user?.username ?? ''}', style: const TextStyle(color: AppColors.textSecondary)),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('@${user?.username ?? ''}', style: TextStyle(color: AppPalette.textSecondary(ctx))),
                     ],
                   ),
                 ),
@@ -152,15 +152,15 @@ class MePage extends ConsumerWidget {
                 child: Row(children: [
                   Icon(Icons.book,
                       size: 18,
-                      color: b.id == s.bookId ? AppColors.primaryDark : AppColors.textSecondary),
+                      color: b.id == s.bookId ? AppColors.primaryDark : AppPalette.textSecondary(ctx)),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(b.name,
                         style: TextStyle(
                             fontWeight: b.id == s.bookId ? FontWeight.bold : FontWeight.normal,
-                            color: b.id == s.bookId ? AppColors.text : AppColors.textSecondary)),
+                            color: b.id == s.bookId ? AppPalette.text(ctx) : AppPalette.textSecondary(ctx))),
                   ),
-                  if (b.id == s.bookId) const Text('当前', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  if (b.id == s.bookId) Text('当前', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(ctx))),
                 ]),
               )),
         ],
@@ -181,7 +181,7 @@ class MePage extends ConsumerWidget {
         final build = snap.data?.buildNumber ?? BuildInfo.buildNumber;
         return Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: AppPalette.card(ctx), borderRadius: BorderRadius.circular(12)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -196,12 +196,12 @@ class MePage extends ConsumerWidget {
               _infoRow('当前账号', s.user?.nickname ?? s.user?.username ?? '-'),
               _aiRow(ref),
               const Divider(height: 20),
-              const Text('本 App 为「记账本」安卓客户端，UI 参考鲨鱼记账的交互设计，'
+              Text('本 App 为「记账本」安卓客户端，UI 参考鲨鱼记账的交互设计，'
                   '后端对接 jizhang 服务。数据均存储在你自己的服务器上。',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  style: TextStyle(color: AppPalette.textSecondary(ctx), fontSize: 13)),
               const SizedBox(height: 8),
               const Center(
-                child: Text('© 记账本', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                child: Text('© 记账本', style: TextStyle(color: AppPalette.textSecondary(ctx), fontSize: 12)),
               ),
             ],
           ),
@@ -215,9 +215,9 @@ class MePage extends ConsumerWidget {
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SizedBox(
             width: 80,
-            child: Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            child: Text(label, style: TextStyle(color: AppPalette.textSecondary(ctx), fontSize: 13)),
           ),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+          Expanded(child: Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
         ]),
       );
 

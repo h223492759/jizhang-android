@@ -135,7 +135,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
   Widget build(BuildContext context) {
     final color = _type == 'expense' ? AppColors.expense : AppColors.income;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppPalette.background(ctx),
       extendBody: false,
       body: SafeArea(
         child: _loading
@@ -146,7 +146,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
                   _modeAndTypeBar(color),
                   const SizedBox(height: 8),
                   _periodSelector(),
-                  const Divider(height: 1, thickness: 1, color: AppColors.divider),
+                  Divider(height: 1, thickness: 1, color: AppPalette.divider(ctx)),
                   const SizedBox(height: 10),
                   _totalRow(color),
                   const SizedBox(height: 12),
@@ -154,7 +154,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
                     height: 220,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                      color: AppPalette.card(ctx), borderRadius: BorderRadius.circular(12)),
                     child: _barChart(color),
                   ),
                   const SizedBox(height: 16),
@@ -187,7 +187,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
 
   Widget _seg(List<String> labels, int sel, void Function(int) onTap) {
     return Container(
-      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: AppPalette.background(ctx), borderRadius: BorderRadius.circular(20)),
       child: Row(
         children: labels.asMap().entries.map((e) {
           final active = e.key == sel;
@@ -200,7 +200,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(e.value,
-                  style: TextStyle(color: active ? AppColors.text : AppColors.textSecondary)),
+                  style: TextStyle(color: active ? AppPalette.text(ctx) : AppPalette.textSecondary(ctx))),
             ),
           );
         }).toList(),
@@ -305,13 +305,13 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: o.selected ? FontWeight.bold : FontWeight.normal,
-                          color: o.selected ? AppColors.text : AppColors.textSecondary)),
+                          color: o.selected ? AppPalette.text(ctx) : AppPalette.textSecondary(ctx))),
                   const SizedBox(height: 4),
                   Container(
                     height: 3,
                     width: 18,
                     decoration: BoxDecoration(
-                      color: o.selected ? AppColors.text : Colors.transparent,
+                      color: o.selected ? AppPalette.text(ctx) : Colors.transparent,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -332,10 +332,10 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       child: Row(
         children: [
           Text('总${_type == 'expense' ? '支出' : '收入'}：¥${fmtMoney(total)}',
-              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(ctx))),
           const Spacer(),
           Text('平均值：¥${fmtMoney(avg)}',
-              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(ctx))),
         ],
       ),
     );
@@ -373,7 +373,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
                   : '${group.x.toInt() + 1}日';
               return BarTooltipItem(
                 '$label  ¥${fmtMoney(rod.toY)}',
-                const TextStyle(color: Colors.white, fontSize: 12),
+                TextStyle(color: AppPalette.card(ctx), fontSize: 12),
               );
             },
           ),
@@ -385,11 +385,11 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
               final i = v.toInt();
               if (_yearMode) {
                 if (i % 2 != 0) return const Text('');
-                return Text('${i + 1}月', style: const TextStyle(fontSize: 10));
+                return Text('${i + 1}月', style: TextStyle(fontSize: 10));
               } else {
                 final days = data.length;
                 if (i % (days > 15 ? 5 : 3) != 0) return const Text('');
-                return Text('${i + 1}', style: const TextStyle(fontSize: 10));
+                return Text('${i + 1}', style: TextStyle(fontSize: 10));
               }
             },
           )),
@@ -400,7 +400,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
         gridData: const FlGridData(show: false),
         borderData: FlBorderData(
           show: true,
-          border: Border(bottom: BorderSide(color: AppColors.divider, width: 1)),
+          border: Border(bottom: BorderSide(color: AppPalette.divider(ctx), width: 1)),
         ),
       ),
     );
@@ -449,15 +449,15 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('总${_type == 'expense' ? '支出' : '收入'}：¥${fmtMoney(barTotal)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              const Text('最大 3 笔：', style: TextStyle(color: AppColors.textSecondary)),
+              Text('最大 3 笔：', style: TextStyle(color: AppPalette.textSecondary(ctx))),
               ...top.map((t) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Text('${t.date}  ${t.name}  ¥${fmtMoney(t.amount)}',
-                        style: const TextStyle(fontSize: 13)),
+                        style: TextStyle(fontSize: 13)),
                   )),
-              if (top.isEmpty) const Text('无', style: TextStyle(color: AppColors.textSecondary)),
+              if (top.isEmpty) Text('无', style: TextStyle(color: AppPalette.textSecondary(ctx))),
             ],
           ),
         ),
@@ -485,14 +485,14 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
 
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: AppPalette.card(ctx), borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (segs.length == 1) ...[
             Text(
               '${_ownerLabel(segs.first)}  ¥${fmtMoney(segs.first.value)}  ${(segs.first.value / total * 100).toStringAsFixed(0)}%',
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: 12),
             ),
           ] else ...[
             Row(
@@ -500,13 +500,13 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
                 Expanded(
                   child: Text(
                     '${_ownerLabel(leftSeg)}  ¥${fmtMoney(leftSeg.value)}  ${(leftSeg.value / total * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(fontSize: 12),
+                    style: TextStyle(fontSize: 12),
                   ),
                 ),
                 Expanded(
                   child: Text(
                     '${(rightSeg.value / total * 100).toStringAsFixed(0)}%  ¥${fmtMoney(rightSeg.value)}  ${rightSeg.attr.isEmpty ? '其他' : rightSeg.attr}',
-                    style: const TextStyle(fontSize: 12),
+                    style: TextStyle(fontSize: 12),
                     textAlign: TextAlign.right,
                   ),
                 ),
@@ -593,7 +593,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
               CircleAvatar(
                 radius: 18,
                 backgroundColor: AppColors.primarySoft,
-                child: Text(catIconOf(iconMap, c.name), style: const TextStyle(fontSize: 16)),
+                child: Text(catIconOf(iconMap, c.name), style: TextStyle(fontSize: 16)),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -604,14 +604,14 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
                       children: [
                         Expanded(child: Text('${c.name}    ${(pct * 100).toStringAsFixed(0)}%')),
                         Text('¥${fmtMoney(c.value)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const SizedBox(height: 4),
                     LinearProgressIndicator(
                       value: barPct,
                       minHeight: 6,
-                      backgroundColor: AppColors.background,
+                      backgroundColor: AppPalette.background(ctx),
                       valueColor: AlwaysStoppedAnimation(color),
                       borderRadius: BorderRadius.circular(3),
                     ),

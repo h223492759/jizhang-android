@@ -35,7 +35,7 @@ Widget compactFlowTile({
     crossAxisAlignment: CrossAxisAlignment.center,
     children: [
       _tap(onIconTap ?? onTap,
-          CircleAvatar(radius: 18, backgroundColor: iconBg, child: Text(iconChar, style: const TextStyle(fontSize: 16)))),
+          CircleAvatar(radius: 18, backgroundColor: iconBg, child: Text(iconChar, style: TextStyle(fontSize: 16)))),
       const SizedBox(width: 10),
       Expanded(
         child: _tap(
@@ -52,8 +52,8 @@ Widget compactFlowTile({
                       BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1)),
                     ],
                   ),
-                  child: const Text('AI',
-                      style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: Text('AI',
+                      style: TextStyle(fontSize: 10, color: AppPalette.card(ctx), fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -61,7 +61,7 @@ Widget compactFlowTile({
                 child: Text(name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14, color: AppColors.text)),
+                    style: TextStyle(fontSize: 14, color: AppPalette.text(ctx))),
               ),
             ],
           ),
@@ -113,14 +113,14 @@ List<Widget> buildGroupedFlows({
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
         child: Text(
           dt != null ? '${dt.month}月${dt.day}日 ${weekdayCn(dt)}' : k,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          style: TextStyle(color: AppPalette.textSecondary(ctx), fontSize: 12),
         ),
       ));
     }
     for (final f in grouped[k]!) {
       out.add(tileBuilder(f));
     }
-    out.add(const Divider(height: 1, thickness: 1, color: AppColors.divider));
+    out.add(Divider(height: 1, thickness: 1, color: AppPalette.divider(ctx)));
   }
   return out;
 }
