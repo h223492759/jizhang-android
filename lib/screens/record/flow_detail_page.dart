@@ -48,7 +48,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
     final ownerColor = ownerColorFor(f, ref.watch(ownerColorsProvider), user);
     final ownerLabel = f.attribution.isEmpty ? '我' : f.attribution;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppPalette.background(context),
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
@@ -70,7 +70,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: const BoxDecoration(
-                    color: Colors.white,
+                    color: AppPalette.card(context),
                     shape: BoxShape.circle,
                   ),
                   child: Text(
@@ -113,7 +113,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                   Row(
                     children: [
                       const Text('归属人',
-                          style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
+                          style: TextStyle(fontSize: 15, color: AppPalette.textSecondary(context))),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Row(
@@ -130,8 +130,8 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                             const SizedBox(width: 8),
                             Text(
                               ownerLabel,
-                              style: const TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.text),
+                              style: TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.bold, color: AppPalette.text(context)),
                             ),
                           ],
                         ),
@@ -153,7 +153,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _deleteFlow,
-                        icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.expense),
+                        icon: Icon(Icons.delete_outline, size: 18, color: AppColors.expense),
                         label: const Text('删除', style: TextStyle(color: AppColors.expense)),
                         style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.expense)),
                       ),
@@ -182,7 +182,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: _hideAiTag,
-                      icon: const Icon(Icons.label_off_outlined, size: 18, color: AppColors.blue),
+                      icon: Icon(Icons.label_off_outlined, size: 18, color: AppColors.blue),
                       label: const Text('隐藏 AI 标签（清除来源标记，保留流水）',
                           style: TextStyle(color: AppColors.blue, fontSize: 13)),
                       style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.blue)),
@@ -193,7 +193,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: _neverAgain,
-                      icon: const Icon(Icons.block, size: 18, color: AppColors.expense),
+                      icon: Icon(Icons.block, size: 18, color: AppColors.expense),
                       label: const Text('拉黑删（删除该笔，以后该商户不再自动记账）',
                           style: TextStyle(color: AppColors.expense, fontSize: 13)),
                       style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.expense)),
@@ -332,7 +332,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
     return Row(
       children: [
         Text(label,
-            style: const TextStyle(fontSize: 15, color: AppColors.textSecondary)),
+            style: TextStyle(fontSize: 15, color: AppPalette.textSecondary(context))),
         const SizedBox(width: 16),
         Expanded(
           child: Row(
@@ -346,7 +346,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                   style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: valueColor ?? AppColors.text),
+                      color: valueColor ?? AppPalette.text(context)),
                 ),
               ),
             ],
@@ -365,7 +365,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
       ),
       child: const Text('AI',
           style: TextStyle(
-              fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+              fontSize: 9, color: AppPalette.card(context), fontWeight: FontWeight.bold)),
     );
   }
 }

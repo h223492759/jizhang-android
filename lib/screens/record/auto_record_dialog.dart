@@ -128,8 +128,8 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
             child: Text('确认记账', style: TextStyle(fontSize: 16))),
         if (payLabel.isNotEmpty)
           Text(payLabel,
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary)),
+              style: TextStyle(
+                  fontSize: 11, color: AppPalette.textSecondary(context))),
       ]),
       content: SingleChildScrollView(
         child: Column(
@@ -153,19 +153,19 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                 children: [
                   if (payLabel.isNotEmpty)
                     Text(payLabel,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                        style: TextStyle(
+                            fontSize: 12, color: AppPalette.textSecondary(context))),
                   const SizedBox(height: 2),
                   Text(dateText,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary)),
+                      style: TextStyle(
+                          fontSize: 12, color: AppPalette.textSecondary(context))),
                 ],
               ),
             ]),
             const SizedBox(height: 4),
             Text(p.merchant,
                 style:
-                    const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
             const SizedBox(height: 12),
             TextField(
               controller: _nameCtrl,
@@ -180,7 +180,7 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                     child: Center(
                       child: Text('AI 识别中…',
                           style: TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary)),
+                              fontSize: 12, color: AppPalette.textSecondary(context))),
                     ),
                   )
                 : GridView.count(
@@ -210,12 +210,12 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                                 decoration: BoxDecoration(
                                   color: on
                                       ? AppColors.primary
-                                      : AppColors.background,
+                                      : AppPalette.background(context),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
                                     color: on
                                         ? AppColors.primaryDark
-                                        : AppColors.divider,
+                                        : AppPalette.divider(context),
                                     width: on ? 1.2 : 1,
                                   ),
                                 ),
@@ -226,7 +226,7 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                                     fontSize: 11,
                                     color: on
                                         ? Colors.white
-                                        : AppColors.text,
+                                        : AppPalette.text(context),
                                     fontWeight:
                                         on ? FontWeight.w600 : FontWeight.normal,
                                   ),

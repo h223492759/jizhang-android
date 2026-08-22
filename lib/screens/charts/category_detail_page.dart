@@ -153,7 +153,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
   Widget build(BuildContext context) {
     final color = widget.type == 'expense' ? AppColors.expense : AppColors.income;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppPalette.background(context),
       appBar: AppBar(title: Text(_title())),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -175,7 +175,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                   child: _summaryRow(),
                 ),
-                const Divider(height: 1, thickness: 1, color: AppColors.divider),
+                const Divider(height: 1, thickness: 1, color: AppPalette.divider(context)),
                 // SCROLLABLE: 归属人 + 排行榜 + 流水明细
                 Expanded(
                   child: ListView(
@@ -206,10 +206,10 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
     return Row(
       children: [
         Text('$label：¥${fmtMoney(total)}',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
         const Spacer(),
         Text('平均值：¥${fmtMoney(avg)}',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
       ],
     );
   }
@@ -233,7 +233,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
 
   Widget _seg(List<String> labels, int sel, void Function(int) onTap) {
     return Container(
-      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: AppPalette.background(context), borderRadius: BorderRadius.circular(20)),
       child: Row(
         children: labels.asMap().entries.map((e) {
           final active = e.key == sel;
@@ -246,7 +246,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(e.value,
-                  style: TextStyle(color: active ? AppColors.text : AppColors.textSecondary)),
+                  style: TextStyle(color: active ? AppPalette.text(context) : AppPalette.textSecondary(context))),
             ),
           );
         }).toList(),
@@ -344,13 +344,13 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: o.selected ? FontWeight.bold : FontWeight.normal,
-                          color: o.selected ? AppColors.text : AppColors.textSecondary)),
+                          color: o.selected ? AppPalette.text(context) : AppPalette.textSecondary(context))),
                   const SizedBox(height: 4),
                   Container(
                     height: 3,
                     width: 18,
                     decoration: BoxDecoration(
-                      color: o.selected ? AppColors.text : Colors.transparent,
+                      color: o.selected ? AppPalette.text(context) : Colors.transparent,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -381,10 +381,10 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? AppColors.primary : AppColors.background,
+          color: active ? AppColors.primary : AppPalette.background(context),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(label, style: TextStyle(color: active ? AppColors.text : AppColors.textSecondary)),
+        child: Text(label, style: TextStyle(color: active ? AppPalette.text(context) : AppPalette.textSecondary(context))),
       ),
     );
   }
@@ -393,7 +393,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
     final list = _sorted;
     if (list.isEmpty) {
       final t = widget.type == 'income' ? '收入' : '支出';
-      return [Center(child: Padding(padding: const EdgeInsets.all(20), child: Text('该时间段无${t}记录', style: TextStyle(color: AppColors.textSecondary))))];
+      return [Center(child: Padding(padding: const EdgeInsets.all(20), child: Text('该时间段无${t}记录', style: TextStyle(color: AppPalette.textSecondary(context)))))];
     }
     final total = list.fold(0.0, (s, f) => s + f.amount);
     final maxVal = list.map((f) => f.amount).fold(0.0, (a, b) => b > a ? b : a);
@@ -434,13 +434,13 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                     LinearProgressIndicator(
                       value: barPct,
                       minHeight: 6,
-                      backgroundColor: AppColors.background,
+                      backgroundColor: AppPalette.background(context),
                       valueColor: AlwaysStoppedAnimation(color),
                       borderRadius: BorderRadius.circular(3),
                     ),
                     const SizedBox(height: 4),
                     Text('${ymd(dt)} ${weekdayCn(dt)}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
                   ],
                 ),
               ),
@@ -467,7 +467,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
 
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

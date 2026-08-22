@@ -110,7 +110,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 24),
-            const Icon(Icons.account_balance_wallet, size: 64, color: AppColors.primaryDark),
+            Icon(Icons.account_balance_wallet, size: 64, color: AppColors.primaryDark),
             const SizedBox(height: 8),
             const Center(child: Text('记账本', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
             const SizedBox(height: 32),
@@ -145,7 +145,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               onPressed: _loading ? null : _login,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.text,
+                foregroundColor: AppPalette.text(context),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: _loading

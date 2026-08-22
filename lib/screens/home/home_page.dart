@@ -73,7 +73,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _pickMonth() async {
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppPalette.card(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -122,13 +122,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text('${_month.year}',
-                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                            style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
                         Text('${_month.month}月',
                             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down, size: 20, color: AppColors.textSecondary),
+                    Icon(Icons.arrow_drop_down, size: 20, color: AppPalette.textSecondary(context)),
                   ],
                 ),
               ),
@@ -146,7 +146,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            Text(label, style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
             const SizedBox(height: 4),
             Text(fmtMoney(v),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c)),
@@ -167,7 +167,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       color: AppColors.primary,
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
       child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(14)),
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: items
@@ -219,7 +219,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _showFlowMenu(Flow f) async {
     final action = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppPalette.card(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -230,9 +230,9 @@ class _HomePageState extends ConsumerState<HomePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _menuItem('删除', Icons.delete_outline, AppColors.expense, 'delete'),
-              _menuItem('修改', Icons.edit_outlined, AppColors.text, 'edit'),
-              _menuItem('更换归属人', Icons.swap_horiz, AppColors.text, 'owner'),
-              _menuItem('查看明细', Icons.visibility_outlined, AppColors.text, 'detail'),
+              _menuItem('修改', Icons.edit_outlined, AppPalette.text(context), 'edit'),
+              _menuItem('更换归属人', Icons.swap_horiz, AppPalette.text(context), 'owner'),
+              _menuItem('查看明细', Icons.visibility_outlined, AppPalette.text(context), 'detail'),
             ],
           ),
         ),
@@ -341,7 +341,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _editCategory(Flow f) async {
     final name = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppPalette.card(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -356,7 +356,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _editName(Flow f) async {
     final name = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppPalette.card(context),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -372,7 +372,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _editAmount(Flow f) async {
     final res = await showModalBottomSheet<_AmountResult>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppPalette.card(context),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -389,7 +389,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final overrides = ref.watch(ownerColorsProvider);
     final user = ref.watch(sessionProvider).user;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppPalette.background(context),
       extendBody: false,
       body: CustomScrollView(
         slivers: [
@@ -464,7 +464,7 @@ class _YearMonthPickerState extends State<_YearMonthPicker> {
                   onTap: () => Navigator.pop(context, DateTime(_year, m)),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: sel ? AppColors.primary : AppColors.background,
+                      color: sel ? AppColors.primary : AppPalette.background(context),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     alignment: Alignment.center,
@@ -472,7 +472,7 @@ class _YearMonthPickerState extends State<_YearMonthPicker> {
                       '$m月',
                       style: TextStyle(
                         fontWeight: sel ? FontWeight.bold : FontWeight.normal,
-                        color: sel ? AppColors.text : AppColors.textSecondary,
+                        color: sel ? AppPalette.text(context) : AppPalette.textSecondary(context),
                       ),
                     ),
                   ),
@@ -536,7 +536,7 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: AppColors.background,
+                            color: AppPalette.background(context),
                             shape: BoxShape.circle,
                           ),
                           padding: const EdgeInsets.all(10),
@@ -899,10 +899,10 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('¥ $display',
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: AppColors.text)),
+                    style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: AppPalette.text(context))),
                 if (_hasOperator && _computedAmount != null)
                   Text('= ${_formatComputed(_computedAmount!)}',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
               ],
             ),
           ),
@@ -974,16 +974,16 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
         margin: const EdgeInsets.all(0.5),
         decoration: BoxDecoration(
           color: primary ? AppColors.primaryDark : Colors.white,
-          border: Border.all(color: AppColors.divider, width: 0.5),
+          border: Border.all(color: AppPalette.divider(context), width: 0.5),
         ),
         child: Center(
           child: icon != null
-              ? Icon(icon, size: 22, color: primary ? Colors.white : AppColors.text)
+              ? Icon(icon, size: 22, color: primary ? Colors.white : AppPalette.text(context))
               : Text(label,
                   style: TextStyle(
                       fontSize: primary ? 18 : 20,
                       fontWeight: FontWeight.bold,
-                      color: primary ? Colors.white : AppColors.text)),
+                      color: primary ? Colors.white : AppPalette.text(context))),
         ),
       ),
     );

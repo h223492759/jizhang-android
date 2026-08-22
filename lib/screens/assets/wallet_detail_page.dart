@@ -255,7 +255,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
                 // 汇总
                 Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
                   child: Row(
                     children: [
                       _sumCol('当前余额（手动+关联）', fmtMoney(curBalance),
@@ -272,7 +272,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
                 // 新增资金
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -330,7 +330,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: _addFunds,
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.text),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppPalette.text(context)),
                           child: const Text('新增资金'),
                         ),
                       ),
@@ -344,12 +344,12 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
                 if (_allTxns.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text('还没有资金记录', style: TextStyle(color: AppColors.textSecondary)),
+                    child: Text('还没有资金记录', style: TextStyle(color: AppPalette.textSecondary(context))),
                   )
                 else
                   ..._allTxns.map((it) => Card(
                         child: ListTile(
-                          tileColor: it.kind == 'monthly' ? AppColors.background : null,
+                          tileColor: it.kind == 'monthly' ? AppPalette.background(context) : null,
                           title: Text(it.ymd),
                           subtitle: Text(it.kind == 'monthly'
                               ? '${it.note} · ${it.op} · 自动'
@@ -376,7 +376,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
                 if (showEmpty) ...[
                   const SizedBox(height: 16),
                   const Text('该钱包暂无资金记录与关联流水。',
-                      style: TextStyle(color: AppColors.textSecondary)),
+                      style: TextStyle(color: AppPalette.textSecondary(context))),
                 ],
                 const SizedBox(height: 24),
               ],
@@ -388,13 +388,13 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            Text(l, style: TextStyle(fontSize: 11, color: AppPalette.textSecondary(context))),
             const SizedBox(height: 4),
             Text(v,
                 style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: c ?? AppColors.text)),
+                    color: c ?? AppPalette.text(context))),
           ],
         ),
       );

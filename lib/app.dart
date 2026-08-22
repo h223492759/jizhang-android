@@ -132,7 +132,7 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
-        color: Colors.white,
+        color: AppPalette.card(context),
         child: SizedBox(
           height: 56,
           child: Row(
@@ -159,12 +159,12 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon,
-                color: active ? AppColors.primaryDark : AppColors.textSecondary),
+                color: active ? AppColors.primaryDark : AppPalette.textSecondary(context)),
             const SizedBox(height: 2),
             Text(label,
                 style: TextStyle(
                     fontSize: 11,
-                    color: active ? AppColors.primaryDark : AppColors.textSecondary)),
+                    color: active ? AppColors.primaryDark : AppPalette.textSecondary(context))),
           ],
         ),
       ),
@@ -186,7 +186,7 @@ class _SyncIndicator extends StatelessWidget {
           return Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.85),
+              color: AppPalette.card(context).withOpacity(0.85),
               shape: BoxShape.circle,
             ),
             child: const SizedBox(
@@ -200,10 +200,10 @@ class _SyncIndicator extends StatelessWidget {
           return Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.85),
+              color: AppPalette.card(context).withOpacity(0.85),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.cloud_off, size: 13, color: AppColors.textSecondary),
+            child: Icon(Icons.cloud_off, size: 13, color: AppPalette.textSecondary(context)),
           );
         }
         return const SizedBox.shrink();

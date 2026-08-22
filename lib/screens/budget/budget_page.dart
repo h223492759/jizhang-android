@@ -225,10 +225,10 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
 
   Widget _emptyTotal() => Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
         child: Column(
           children: [
-            const Text('暂无年度预算', style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
+            const Text('暂无年度预算', style: TextStyle(fontSize: 15, color: AppPalette.textSecondary(context))),
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: () => _setBudget(),
@@ -241,7 +241,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
 
   Widget _totalCard(BudgetData d) => Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
         child: Column(
           children: [
             Row(children: [
@@ -253,7 +253,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
             LinearProgressIndicator(
               value: (d.totalAmount <= 0 ? 0.0 : d.totalPercent / 100).clamp(0.0, 1.0),
               minHeight: 14,
-              backgroundColor: AppColors.background,
+              backgroundColor: AppPalette.background(context),
               valueColor: AlwaysStoppedAnimation(
                 d.totalPercent > 100 ? AppColors.expense : AppColors.primaryDark),
             ),
@@ -298,13 +298,13 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                 LinearProgressIndicator(
                   value: (c.amount <= 0 ? 0.0 : c.percent / 100).clamp(0.0, 1.0),
                   minHeight: 10,
-                  backgroundColor: AppColors.background,
+                  backgroundColor: AppPalette.background(context),
                   valueColor: AlwaysStoppedAnimation(
                     c.percent > 100 ? AppColors.expense : AppColors.primaryDark),
                 ),
                 const SizedBox(height: 6),
                 Text('已花 ${fmtMoney(c.spent)} / 预算 ${fmtMoney(c.amount)}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
               ],
             ),
           ),

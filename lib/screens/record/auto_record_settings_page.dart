@@ -166,7 +166,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                 // 权限引导
                 Card(
                   child: ListTile(
-                    leading: const Icon(Icons.notification_important, color: AppColors.primaryDark),
+                    leading: Icon(Icons.notification_important, color: AppColors.primaryDark),
                     title: const Text('开启通知使用权'),
                     subtitle: const Text('系统设置 → 通知使用权 → 允许记账本，才能监听支付通知'),
                     trailing: const Icon(Icons.chevron_right),
@@ -176,7 +176,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                 const SizedBox(height: 12),
                 const Text('不记账规则', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                const Text('命中任一规则 → 不弹窗、不记账', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                const Text('命中任一规则 → 不弹窗、不记账', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
                 const SizedBox(height: 8),
                 Card(
                   child: Column(children: [
@@ -233,7 +233,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                       ? const Padding(
                           padding: EdgeInsets.all(16),
                           child: Text('暂无名单。添加后可在弹窗点「不再记」快速加入。',
-                              style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                              style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
                         )
                       : Column(
                           children: _users.map((u) => ListTile(
@@ -248,7 +248,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                 ),
                 const SizedBox(height: 16),
                 const Text('说明：支付成功通知会被识别为记账候选，弹窗确认后经 AI 自动分类并写入流水（来源标记为 AI 记账）。',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
               ],
             ),
     );

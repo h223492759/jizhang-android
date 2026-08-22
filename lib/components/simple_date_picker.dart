@@ -10,7 +10,7 @@ Future<DateTime?> pickSimpleDate(
 }) async {
   return showModalBottomSheet<DateTime>(
     context: context,
-    backgroundColor: Colors.white,
+    backgroundColor: AppPalette.card(context),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),

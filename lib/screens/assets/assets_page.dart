@@ -67,8 +67,8 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         bottom: TabBar(
           controller: _tab,
           tabs: const [Tab(text: '存款'), Tab(text: '资金细则')],
-          indicatorColor: AppColors.text,
-          labelColor: AppColors.text,
+          indicatorColor: AppPalette.text(context),
+          labelColor: AppPalette.text(context),
         ),
       ),
       body: _loading
@@ -105,12 +105,12 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         // 净资产 + 目标
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
-                const Text('当前净资产', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                const Text('当前净资产', style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 12)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text('¥${fmtMoney(showNet)}',
@@ -126,12 +126,12 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 runSpacing: 4,
                 children: [
                   Text('资产 ${fmtMoney(showAsset)}',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                  const Text('｜', style: TextStyle(color: AppColors.textSecondary)),
+                      style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
+                  const Text('｜', style: TextStyle(color: AppPalette.textSecondary(context))),
                   Text('负债 ${fmtMoney(showLiability)}',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
                   if (hasTarget) ...[
-                    const Text('｜', style: TextStyle(color: AppColors.textSecondary)),
+                    const Text('｜', style: TextStyle(color: AppPalette.textSecondary(context))),
                     Text(
                         showRemaining > 0
                             ? '还差 ¥${fmtMoney(showRemaining)}'
@@ -147,17 +147,17 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 LinearProgressIndicator(
                   value: (showPercent / 100).clamp(0.0, 1.0),
                   minHeight: 12,
-                  backgroundColor: AppColors.background,
+                  backgroundColor: AppPalette.background(context),
                   valueColor: AlwaysStoppedAnimation(showNet >= s.target ? AppColors.income : AppColors.primaryDark),
                 ),
                 const SizedBox(height: 6),
                 Text('已达成 $showPercent% · 目标 ¥${fmtMoney(s.target)}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
               ] else
                 const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Text('还没有设定目标，点右侧「修改目标」设定，例如 100 万。',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
                 ),
               const SizedBox(height: 12),
               Row(
@@ -168,7 +168,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                     onPressed: _updateAssets,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.text,
+                      foregroundColor: AppPalette.text(context),
                     ),
                     child: const Text('更新资产和负债'),
                   ),
@@ -211,7 +211,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
           if (_ordering)
             TextButton.icon(
               onPressed: () => setState(() => _ordering = false),
-              icon: const Icon(Icons.check, size: 18, color: AppColors.income),
+              icon: Icon(Icons.check, size: 18, color: AppColors.income),
               label: const Text('完成', style: TextStyle(color: AppColors.income)),
             )
           else ...[
@@ -230,14 +230,14 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         if (_ordering) const Padding(
           padding: EdgeInsets.only(bottom: 4),
           child: Text('调序模式：用卡片下方 ↑↓ 调整顺序，完成后点右上角「完成」',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
         ),
         const SizedBox(height: 6),
         _itemGrid(s.items, false),
         if (s.expiredItems.isNotEmpty) ...[
           const SizedBox(height: 16),
           const Text('已失效（不计入净资产，点「改」可延长或取消失效日期）',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
           const SizedBox(height: 10),
           _itemGrid(s.expiredItems, true),
         ],
@@ -249,7 +249,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   Widget _itemGrid(List<SavingsItem> items, bool expired) {
     if (items.isEmpty) {
       return Text(expired ? '无' : '还没有资金细则。点「新增细则」把现金、微信余额、信用卡账单等逐项加进来。',
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13));
+          style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 13));
     }
     // Wrap 两列自适应高度：GridView 固定 childAspectRatio 会裁切卡片内容（图四问题）
     return LayoutBuilder(
@@ -296,7 +296,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             if (it.note.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text(it.note, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                child: Text(it.note, style: TextStyle(fontSize: 11, color: AppPalette.textSecondary(context)),
                     maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
             if (it.asOf.isNotEmpty || it.asOfEnd.isNotEmpty)
@@ -304,7 +304,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
                   it.asOfEnd.isNotEmpty ? '失效 ${it.asOfEnd}' : '生效 ${it.asOf}',
-                  style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 10, color: AppPalette.textSecondary(context)),
                 ),
               ),
             const SizedBox(height: 4),
@@ -356,7 +356,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         : 0.0;
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -364,7 +364,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text('目标基线 ¥${fmtMoney(s.target)}（虚线）',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
             ),
           ...list.map((m) {
             // 横向条：从起始值 yMin 起画到该月净值，长度 = (net-yMin)/range
@@ -376,7 +376,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 5),
               child: Row(children: [
-                SizedBox(width: 52, child: Text(ym, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                SizedBox(width: 52, child: Text(ym, style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context)))),
                 Expanded(
                   child: LayoutBuilder(
                     builder: (ctx, constraints) {
@@ -387,7 +387,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                           Container(
                             height: 18,
                             decoration: BoxDecoration(
-                                color: AppColors.background,
+                                color: AppPalette.background(context),
                                 borderRadius: BorderRadius.circular(4)),
                           ),
                           // 值条（从 yMin 基准起）
@@ -404,7 +404,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                               left: targetFrac * w,
                               top: 0,
                               bottom: 0,
-                              child: Container(width: 2, color: AppColors.text),
+                              child: Container(width: 2, color: AppPalette.text(context)),
                             ),
                         ],
                       );
@@ -420,7 +420,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
           }).toList(),
           const SizedBox(height: 8),
           Text('说明：柱状图起始值取 5 的倍数且低于最低净资产，如最低 59 万则从 55 万起',
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+              style: TextStyle(fontSize: 11, color: AppPalette.textSecondary(context))),
         ],
       ),
     );
@@ -436,11 +436,11 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
       TextSpan(children: [
         TextSpan(
             text: intPart,
-            style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.bold, color: AppPalette.textSecondary(context))),
         TextSpan(
             text: '$fracPart%',
-            style: const TextStyle(fontSize: 9, color: AppColors.textSecondary)),
+            style: TextStyle(fontSize: 9, color: AppPalette.textSecondary(context))),
       ]),
       textAlign: TextAlign.end,
     );
@@ -465,10 +465,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                     children: [
                       Text(ym, style: const TextStyle(fontWeight: FontWeight.bold)),
                       Text('操作人：${m.opUser.isNotEmpty ? m.opUser : '—'}',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                          style: TextStyle(fontSize: 11, color: AppPalette.textSecondary(context))),
                       const SizedBox(height: 4),
                       Text('资产 ¥${fmtMoney(m.asset)} ｜ 负债 ¥${fmtMoney(m.liability)}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
                       Text('净资产 ¥${fmtMoney(m.net)}',
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
                               color: m.net >= 0 ? AppColors.income : AppColors.expense)),
@@ -677,7 +677,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   )),
                   const Divider(),
                   Text('资产合计 ¥${fmtMoney(asset)}', style: const TextStyle(fontSize: 13)),
-                  Text('负债合计 ¥${fmtMoney(liab)}', style: const TextStyle(fontSize: 13, color: AppColors.expense)),
+                  Text('负债合计 ¥${fmtMoney(liab)}', style: TextStyle(fontSize: 13, color: AppColors.expense)),
                   Text('净资产 ¥${fmtMoney(asset - liab)}',
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                 ],
@@ -761,7 +761,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   )),
                   const Divider(),
                   Text('资产合计 ¥${fmtMoney(asset)}', style: const TextStyle(fontSize: 13)),
-                  Text('负债合计 ¥${fmtMoney(liab)}', style: const TextStyle(fontSize: 13, color: AppColors.expense)),
+                  Text('负债合计 ¥${fmtMoney(liab)}', style: TextStyle(fontSize: 13, color: AppColors.expense)),
                   Text('净资产 ¥${fmtMoney(asset - liab)}',
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                 ],
@@ -852,7 +852,7 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('新记录会把该细则当前金额设为输入值，并记一条记录。',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
               const SizedBox(height: 8),
               // 日期录入：点击弹日历选择
               InkWell(
@@ -869,10 +869,10 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.divider),
+                      border: Border.all(color: AppPalette.divider(context)),
                       borderRadius: BorderRadius.circular(8)),
                   child: Row(children: [
-                    const Icon(Icons.calendar_today, size: 16, color: AppColors.textSecondary),
+                    Icon(Icons.calendar_today, size: 16, color: AppPalette.textSecondary(context)),
                     const SizedBox(width: 8),
                     Text('日期：${DateFormat('yyyy-MM-dd').format(date)}',
                         style: const TextStyle(fontSize: 14)),
@@ -1029,7 +1029,7 @@ class _ItemHistoryDialogState extends ConsumerState<_ItemHistoryDialog> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _rows.isEmpty
-                      ? const Center(child: Text('暂无历史记录', style: TextStyle(color: AppColors.textSecondary)))
+                      ? const Center(child: Text('暂无历史记录', style: TextStyle(color: AppPalette.textSecondary(context))))
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           itemCount: _rows.length,

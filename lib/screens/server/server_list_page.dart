@@ -100,11 +100,11 @@ class _ServerListPageState extends ConsumerState<ServerListPage> {
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text('选择记账服务器（连接同一后端）',
-                style: TextStyle(color: AppColors.textSecondary)),
+                style: TextStyle(color: AppPalette.textSecondary(context))),
           ),
           // 离线模式（暂未开放）
           ListTile(
-            leading: const Icon(Icons.cloud_off, color: AppColors.textSecondary),
+            leading: Icon(Icons.cloud_off, color: AppPalette.textSecondary(context)),
             title: const Text('离线记账模式'),
             subtitle: const Text('无需连接服务器，本地记账（暂未开放）'),
             trailing: Switch(value: false, onChanged: (_) => toast('离线模式暂未开放')),
@@ -129,7 +129,7 @@ class _ServerListPageState extends ConsumerState<ServerListPage> {
                       icon: const Icon(Icons.edit, size: 20),
                       onPressed: () => _showEdit(initial: url, index: e.key)),
                   IconButton(
-                      icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                      icon: Icon(Icons.delete, size: 20, color: Colors.red),
                       onPressed: () => _delete(e.key)),
                 ],
               ),
