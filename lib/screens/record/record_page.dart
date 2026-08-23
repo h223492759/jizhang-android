@@ -522,7 +522,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     ];
     return Container(
       height: 260,
-      color: AppColors.divider,
+      color: AppPalette.divider(context),
       child: Column(
         children: rows
             .map((row) => Expanded(
@@ -577,7 +577,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         margin: const EdgeInsets.all(0.5),
         decoration: BoxDecoration(
           color: primary ? AppColors.primaryDark : AppPalette.card(context),
-          border: Border.all(color: AppColors.divider, width: 0.5),
+          border: Border.all(color: AppPalette.divider(context), width: 0.5),
         ),
         child: Center(
           child: icon != null

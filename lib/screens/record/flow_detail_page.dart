@@ -293,11 +293,15 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
         widget.flow.id,
         {"source": toRestore ? "auto" : ""},
       );
-      // 关键：通知首页/列表刷新（home_page 监听 dataVersionProvider 自动 _load）
+      // 通知首页/列表刷新（home_page 监听 dataVersionProvider 自动 _load）
       ref.read(dataVersionProvider.notifier).state++;
       if (mounted) {
+        // 不 pop：setState 立即更新 _source，按钮文字和图标在当前页立刻切换
+        // （"隐藏"/"恢复"按钮切换给用户即时反馈）
+        setState(() {
+          _source = toRestore ? "auto" : "";
+        });
         toast(toRestore ? "已恢复 AI 标签" : "已隐藏 AI 标签");
-        Navigator.pop(context, true);
       }
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
