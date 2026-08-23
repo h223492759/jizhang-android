@@ -330,7 +330,7 @@ class _WalletDetailPageState extends ConsumerState<WalletDetailPage> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: _addFunds,
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppPalette.text(context)),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppPalette.onPrimary(context)),
                           child: const Text('新增资金'),
                         ),
                       ),

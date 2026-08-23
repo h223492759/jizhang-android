@@ -477,7 +477,7 @@ class _YearMonthPickerState extends State<_YearMonthPicker> {
                       '$m月',
                       style: TextStyle(
                         fontWeight: sel ? FontWeight.bold : FontWeight.normal,
-                        color: sel ? AppPalette.text(context) : AppPalette.textSecondary(context),
+                        color: sel ? AppPalette.onPrimary(context) : AppPalette.textSecondary(context),
                       ),
                     ),
                   ),

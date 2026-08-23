@@ -386,7 +386,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   Widget _buildInputPanel() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppPalette.card(context),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -474,11 +474,14 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         children: [
           TextField(
             controller: _name,
-            decoration: const InputDecoration(
+            style: TextStyle(color: AppPalette.text(context)),
+            decoration: InputDecoration(
               labelText: '名称（可选）',
               hintText: '请输入名称',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: const OutlineInputBorder(),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              filled: true,
+              fillColor: AppPalette.background(context),
             ),
           ),
           if (display.isNotEmpty) ...[
@@ -573,7 +576,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       child: Container(
         margin: const EdgeInsets.all(0.5),
         decoration: BoxDecoration(
-          color: primary ? AppColors.primaryDark : Colors.white,
+          color: primary ? AppColors.primaryDark : AppPalette.card(context),
           border: Border.all(color: AppColors.divider, width: 0.5),
         ),
         child: Center(
