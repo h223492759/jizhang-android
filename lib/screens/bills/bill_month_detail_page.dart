@@ -103,7 +103,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: AppPalette.primaryDim(context),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -359,7 +359,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
+                    color: AppPalette.primaryDim(context),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text('AI',

@@ -102,7 +102,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _headerRegion() {
     final ov = _overview;
     return Container(
-      color: AppColors.primary,
+      color: AppPalette.primaryDim(context),
       child: SafeArea(
         bottom: false,
         top: true,
@@ -164,7 +164,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       ('定期', Icons.watch_later_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecurringPage()))),
     ];
     return Container(
-      color: AppColors.primary,
+      color: AppPalette.primaryDim(context),
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
       child: Container(
         decoration: BoxDecoration(color: AppPalette.cardSubtle(context), borderRadius: BorderRadius.circular(14)),
@@ -636,7 +636,7 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('修改名称', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text('修改名称', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppPalette.text(context))),
           const SizedBox(height: 12),
           TextField(
             controller: _name,
@@ -657,8 +657,8 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
                     .map((p) => Container(
                           margin: const EdgeInsets.only(right: 8),
                           child: ActionChip(
-                            label: Text(p.name, style: const TextStyle(fontSize: 12)),
-                            backgroundColor: Colors.grey.shade200,
+                            label: Text(p.name, style: TextStyle(fontSize: 12, color: AppPalette.text(context))),
+                            backgroundColor: AppPalette.cardSubtle(context),
                             side: BorderSide.none,
                             onPressed: () => _name.text = p.name,
                           ),
@@ -978,7 +978,7 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
       child: Container(
         margin: const EdgeInsets.all(0.5),
         decoration: BoxDecoration(
-          color: primary ? AppColors.primaryDark : Colors.white,
+          color: primary ? AppColors.primaryDark : AppPalette.card(context),
           border: Border.all(color: AppPalette.divider(context), width: 0.5),
         ),
         child: Center(
