@@ -190,7 +190,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                 // 按钮区显示条件：曾经是 AI 自动记账的流水
                 // （隐藏后 f.source 可能为空，但 paymentMethod 是平台或原 source='auto'/'ai'）
                 // 这样隐藏后再进入也能看到"恢复"按钮
-                if (f.isAiSource ||
+                if (f.source.isNotEmpty ||
                     ['微信支付', '支付宝', '云闪付', '招行信用卡'].contains(f.paymentMethod) ||
                     _source == 'auto') ...[
                   const SizedBox(height: 8),
@@ -295,7 +295,10 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
     try {
       await ref.read(localApiProvider).updateFlow(
         widget.flow.id,
-        {"source": toRestore ? "auto" : ""},
+        // 隐藏时写 'manual' 而非 ''：
+        // - isAiSource 只认 'ai'/'auto'，manual 不显示 AI 标签
+        // - 但 manual 是持久标记，下次进入还能识别'曾经是 AI 流水'，显示恢复按钮
+        {"source": toRestore ? "auto" : "manual"},
       );
       // 通知首页/列表刷新（home_page 监听 dataVersionProvider 自动 _load）
       ref.read(dataVersionProvider.notifier).state++;
