@@ -42,13 +42,13 @@ class AutoRecordListenerService : NotificationListenerService() {
             "支付成功", "付款成功", "成功付款", "支付成功通知", "已支付", "已付款",
             "收款成功", "已收款", "收款通知", "收款到账",
             "转账成功", "转账", "已存入", "收到转账", "转入",
-            "扣款成功", "已扣款", "已消费",
+            "扣款成功", "已扣款", "已消费", "消费", "扣款", "交易提醒",
             "入账", "到账", "还款成功", "已还款", "退款成功", "已退款"
         )
         // 虚拟积分类（含"到账"也不记账）
         val virtualKw = listOf(
             "积分", "金币", "京豆", "里程", "成长值", "信用分", "蚂蚁积分",
-            "积分到账", "积分入账", "返积分", "送积分", "领积分",
+            "积分到账", "积分入账", "返积分", "送积分", "领积分", "待领取",
             "金币到账", "星星", "等级", "经验值", "会员积分"
         )
         val hasStrong = strongKw.any { all.contains(it) }
@@ -95,6 +95,7 @@ class AutoRecordListenerService : NotificationListenerService() {
                 "com.eg.android.AlipayGphone" -> "支付宝"
                 "com.tencent.mm", "com.tencent.wepay" -> "微信支付"
                 "com.unionpay" -> "云闪付"
+                "com.cmbchina.cc", "com.cmbchina.biz", "com.cmbchina.mobilebank" -> "招行信用卡"
                 else -> pkg
             }
             val titleStr = if (amount.isNotEmpty()) "已记账 $src ¥$amount" else "已记账 $src 通知"
@@ -142,6 +143,9 @@ object AutoRecordStore {
         "com.tencent.mm",              // 微信
         "com.unionpay",                // 云闪付
         "com.tencent.wepay",           // 微信支付组件
+        "com.cmbchina.cc",             // 招商银行 掌上生活
+        "com.cmbchina.biz",            // 招商银行 企业银行
+        "com.cmbchina.mobilebank",     // 招商银行 手机银行
     )
     private const val KEY = "auto_record_queue"
 
