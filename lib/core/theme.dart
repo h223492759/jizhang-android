@@ -114,10 +114,10 @@ class AppPalette {
   static Color card(BuildContext c) => isDark(c) ? AppColors.cardDark : AppColors.card;
   static Color cardSubtle(BuildContext c) => isDark(c) ? AppColors.cardSubtleDark : AppColors.card;
   static Color divider(BuildContext c) => isDark(c) ? AppColors.dividerDark : AppColors.divider;
-  // 黄色按钮上的文字色：
-  //   浅色模式：按钮底亮黄 #FFD23F → 文字 #222 深灰
-  //   深色模式：按钮底降饱和 #7A6A20 → 文字 #F1F1F1 浅（深色字在深橄榄底看不清）
-  static Color onPrimary(BuildContext c) => isDark(c) ? AppColors.textDark : AppColors.text;
+  // 黄色按钮上的文字色：全模式 #222 深色字（按钮底为纯黄 primary）
+  //   浅色模式：纯黄 #FFD23F + #222 黑字 = 经典黄底黑字
+  //   深色模式：纯黄 #FFD23F + #222 黑字 = 深色模式下深色字在黄底上对比强
+  static Color onPrimary(BuildContext c) => AppColors.text;
   // 大面积黄色在深色模式下降饱和（叠加黑 50%）
   static Color primaryDim(BuildContext c) => isDark(c) ? AppColors.primaryDimDark : AppColors.primary;
 }

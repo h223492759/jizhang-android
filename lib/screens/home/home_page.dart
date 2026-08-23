@@ -904,7 +904,7 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('¥ $display',
-                    style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: AppPalette.text(context))),
+                    style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: AppPalette.onPrimary(context))),
                 if (_hasOperator && _computedAmount != null)
                   Text('= ${_formatComputed(_computedAmount!)}',
                       style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),

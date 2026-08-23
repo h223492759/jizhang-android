@@ -358,15 +358,10 @@ final w = await _api.getWallets();
   String _normEnd(String s) => s.length <= 10 ? '$s 23:59:59' : s;
 
   Flow _flowFromRow(Map<String, Object?> r) {
-    // 老版本没保存 source 字段（df09b37 之前），本地缓存里 source 也可能是空
-    // 根据 payment_method 推断 AI 自动记账（微信支付/支付宝/云闪付）
-    var source = (r['source'] as String?) ?? '';
-    if (source.isEmpty) {
-      final pm = (r['payment_method'] as String?) ?? '';
-      if (['微信支付', '支付宝', '云闪付'].contains(pm)) {
-        source = 'auto';
-      }
-    }
+    // 注意：不要在本函数里推断 source！用户明确点"隐藏 AI 标签"
+    // 后本地 source 会被清空('')，如果在这里推断回去，隐藏操作就无效了。
+    // AI 标签推断统一在 server 端 GET /flows 时做（flows.js 回填老数据）。
+    final source = (r['source'] as String?) ?? '';
     return Flow(
       id: (r['id'] as num).toInt(),
       type: (r['type'] ?? 'expense') as String,

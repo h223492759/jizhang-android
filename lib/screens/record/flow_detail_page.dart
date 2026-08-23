@@ -74,7 +74,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
         children: [
           Container(
             width: double.infinity,
-            color: AppColors.primary,
+            color: AppPalette.primaryDim(context),
             padding: const EdgeInsets.only(bottom: 24),
             child: Column(
               children: [

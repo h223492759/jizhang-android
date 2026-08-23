@@ -328,7 +328,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
           child: Center(
             child: Text(label,
                 style: TextStyle(
-                    color: active ? Colors.white : AppColors.text,
+                    color: active ? AppPalette.onPrimary(context) : AppColors.text,
                     fontWeight: FontWeight.w600,
                     fontSize: 14)),
           ),
@@ -417,8 +417,8 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         children: [
           Text(
             '¥ $display',
-            style: const TextStyle(
-                fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.text),
+            style: TextStyle(
+                fontSize: 32, fontWeight: FontWeight.bold, color: AppPalette.onPrimary(context)),
           ),
           if (_hasOperator && _computedAmount != null)
             Text(
@@ -578,12 +578,12 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         ),
         child: Center(
           child: icon != null
-              ? Icon(icon, size: 22, color: primary ? Colors.white : AppColors.text)
+              ? Icon(icon, size: 22, color: primary ? AppPalette.onPrimary(context) : AppPalette.text(context))
               : Text(label,
                   style: TextStyle(
                       fontSize: primary ? 18 : 20,
                       fontWeight: FontWeight.bold,
-                      color: primary ? Colors.white : AppColors.text)),
+                      color: primary ? AppPalette.onPrimary(context) : AppPalette.text(context)),
         ),
       ),
     );
