@@ -206,10 +206,14 @@ class _HomePageState extends ConsumerState<HomePage> {
         onNameTap: () => _editName(f),
         onAmountTap: () => _editAmount(f),
         onLongPress: () => _showFlowMenu(f),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
-        ),
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
+          );
+          // 返回时强制重读本地：detail 页可能改了 source/字段
+          await _load();
+        },
       ),
     );
     return SliverList(delegate: SliverChildListDelegate(widgets));
@@ -274,10 +278,11 @@ class _HomePageState extends ConsumerState<HomePage> {
       _changeOwner(f);
     } else if (action == 'detail') {
       if (!mounted) return;
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => FlowDetailPage(flow: f)),
       );
+      await _load();
     }
   }
 

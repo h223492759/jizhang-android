@@ -268,7 +268,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     final color = it.isLiability ? AppColors.expense : AppColors.income;
     return Card(
       margin: EdgeInsets.zero,
-      color: expired ? Colors.grey[100] : Colors.white,
+      color: expired ? AppPalette.cardSubtle(context) : AppPalette.card(context),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _showItemHistory(it),
