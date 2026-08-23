@@ -45,7 +45,7 @@ Widget compactFlowTile(
             children: [
               if (f.isAiSource) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
                   decoration: BoxDecoration(
                     color: AppColors.blue,
                     borderRadius: BorderRadius.circular(4),
@@ -54,7 +54,7 @@ Widget compactFlowTile(
                     ],
                   ),
                   child: const Text('AI',
-                      style: TextStyle(fontSize: 10, color: AppColors.card, fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 9, color: AppColors.card, fontWeight: FontWeight.bold, height: 1.2)),
                 ),
                 const SizedBox(width: 4),
               ],

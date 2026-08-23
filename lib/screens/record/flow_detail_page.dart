@@ -21,11 +21,14 @@ class FlowDetailPage extends ConsumerStatefulWidget {
 class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
   late List<Category> _cats;
   bool _loaded = false;
+  // 流水最新 source（widget.flow 不可变，每次进页面从本地重新读）
+  late String _source;
 
   @override
   void initState() {
     super.initState();
     _cats = [];
+    _source = widget.flow.source;
     _load();
   }
 
@@ -35,6 +38,13 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
     } catch (_) {
       _cats = [];
     }
+    // 从本地 DB 读最新 source（widget.flow 不可变，用户隐藏/恢复后再次进入要反映最新）
+    try {
+      final row = await LocalDb.instance.flowById(widget.flow.id);
+      if (row != null && mounted) {
+        _source = (row['source'] as String?) ?? widget.flow.source;
+      }
+    } catch (_) {}
     if (mounted) setState(() => _loaded = true);
   }
 
@@ -176,18 +186,28 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                     ),
                   ],
                 ),
-                if (f.isAiSource) ...[
+                // _source == 'auto' 时显示 "隐藏 AI 标签"按钮；source 空时显示 "恢复 AI 标签"
+                if (f.isAiSource || _source == 'auto') ...[
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: _hideAiTag,
-                      icon: Icon(Icons.label_off_outlined, size: 18, color: AppColors.blue),
-                      label: const Text('隐藏 AI 标签（清除来源标记，保留流水）',
-                          style: TextStyle(color: AppColors.blue, fontSize: 13)),
+                      onPressed: _source == 'auto' ? _hideAiTag : _showAiTag,
+                      icon: Icon(
+                        _source == 'auto' ? Icons.label_off_outlined : Icons.label_outlined,
+                        size: 18,
+                        color: AppColors.blue,
+                      ),
+                      label: Text(
+                        _source == 'auto'
+                            ? '隐藏 AI 标签（清除来源标记，保留流水）'
+                            : '恢复 AI 标签（标记为 AI 自动记账）',
+                        style: const TextStyle(color: AppColors.blue, fontSize: 13),
+                      ),
                       style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.blue)),
                     ),
                   ),
+                  // 拉黑删只在有 AI 来源时显示（隐藏后保留该选项，避免 user 困惑）
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
@@ -258,14 +278,25 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
 
   // 隐藏 AI 标签：清空 source 字段（保留流水，只去掉「AI」标记 + 来源信息）
   Future<void> _hideAiTag() async {
+    await _toggleAiSource(toRestore: false);
+  }
+
+  // 恢复：把 source 从 '' 改回 'auto'，列表/详情立即显示 AI 标签
+  Future<void> _showAiTag() async {
+    await _toggleAiSource(toRestore: true);
+  }
+
+  Future<void> _toggleAiSource({required bool toRestore}) async {
     try {
       await ref.read(localApiProvider).updateFlow(
         widget.flow.id,
-        {"source": ""},
+        {"source": toRestore ? "auto" : ""},
       );
+      // 关键：通知首页/列表刷新（home_page 监听 dataVersionProvider 自动 _load）
+      ref.read(dataVersionProvider.notifier).state++;
       if (mounted) {
-        toast("已隐藏 AI 标签");
-        Navigator.pop(context, true); // 通知列表刷新
+        toast(toRestore ? "已恢复 AI 标签" : "已隐藏 AI 标签");
+        Navigator.pop(context, true);
       }
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
@@ -358,14 +389,14 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
 
   Widget _aiTag() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
       decoration: BoxDecoration(
         color: AppColors.blue,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text('AI',
           style: TextStyle(
-              fontSize: 9, color: AppPalette.card(context), fontWeight: FontWeight.bold)),
+              fontSize: 8, color: AppPalette.onPrimary(context), fontWeight: FontWeight.bold, height: 1.2)),
     );
   }
 }
