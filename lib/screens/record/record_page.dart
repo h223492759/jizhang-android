@@ -261,7 +261,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppPalette.background(context),
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
@@ -364,7 +364,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: sel ? AppColors.primary : AppColors.background,
+                  color: sel ? AppColors.primary : AppPalette.cardSubtle(context),
                   shape: BoxShape.circle,
                   border: Border.all(
                       color: sel ? AppColors.primaryDark : Colors.transparent),
@@ -374,7 +374,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
               ),
               const SizedBox(height: 4),
               Text(c.name,
-                  style: const TextStyle(fontSize: 12),
+                  style: TextStyle(fontSize: 12, color: AppPalette.text(context)),
                   overflow: TextOverflow.ellipsis),
             ],
           ),
@@ -492,7 +492,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                     margin: const EdgeInsets.only(right: 8),
                     child: ActionChip(
                       label: Text(p.name, style: const TextStyle(fontSize: 12)),
-                      backgroundColor: Colors.grey.shade200,
+                      backgroundColor: AppPalette.cardSubtle(context),
                       side: BorderSide.none,
                       onPressed: () => _applyPreset(p),
                     ),

@@ -103,7 +103,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppPalette.primaryDim(context),
+        color: AppColors.primary,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -199,7 +199,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
               LinearProgressIndicator(
                 value: (pct / 100).clamp(0, 1),
                 backgroundColor: AppPalette.background(context),
-                color: AppPalette.isDark(context) ? AppPalette.primaryDim(context) : AppColors.primary,
+                color: AppPalette.isDark(context) ? AppColors.primary : AppColors.primary,
                 minHeight: 6,
               ),
             ],
@@ -359,7 +359,7 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                   decoration: BoxDecoration(
-                    color: AppPalette.primaryDim(context),
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text('AI',

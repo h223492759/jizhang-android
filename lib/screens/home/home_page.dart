@@ -102,7 +102,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _headerRegion() {
     final ov = _overview;
     return Container(
-      color: AppPalette.primaryDim(context),
+      color: AppColors.primary,
       child: SafeArea(
         bottom: false,
         top: true,
@@ -164,7 +164,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       ('定期', Icons.watch_later_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecurringPage()))),
     ];
     return Container(
-      color: AppPalette.primaryDim(context),
+      color: AppColors.primary,
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
       child: Container(
         decoration: BoxDecoration(color: AppPalette.cardSubtle(context), borderRadius: BorderRadius.circular(14)),

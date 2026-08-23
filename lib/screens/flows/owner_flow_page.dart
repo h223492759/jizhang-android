@@ -292,7 +292,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
               decoration: BoxDecoration(
-                color: active ? AppPalette.primaryDim(context) : Colors.transparent,
+                color: active ? AppColors.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(e.value,
@@ -365,7 +365,7 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? AppPalette.primaryDim(context) : AppPalette.background(context),
+          color: active ? AppColors.primary : AppPalette.background(context),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(label, style: TextStyle(color: active ? AppPalette.onPrimary(context) : AppPalette.textSecondary(context))),
