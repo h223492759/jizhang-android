@@ -137,6 +137,14 @@ class LocalDb {
       )''');
   }
 
+  // 补一列（如果表里没有）
+  Future<void> _addColumnIfMissing(DatabaseExecutor d, String table, String col, String ddl) async {
+    final cols = await d.rawQuery("PRAGMA table_info($table)");
+    if (!cols.any((c) => c['name'] == col)) {
+      await d.execute("ALTER TABLE $table ADD COLUMN $ddl");
+    }
+  }
+
   Future<void> _createV2Tables(DatabaseExecutor d) async {
     await d.execute('''
       CREATE TABLE IF NOT EXISTS budgets(
@@ -146,9 +154,15 @@ class LocalDb {
         category TEXT NOT NULL DEFAULT '',
         amount REAL NOT NULL DEFAULT 0,
         expression TEXT NOT NULL DEFAULT '',
+        sort INTEGER NOT NULL DEFAULT 0,
         dirty INTEGER NOT NULL DEFAULT 0
       )''');
     await d.execute('CREATE INDEX IF NOT EXISTS idx_budgets_book ON budgets(book_id, year)');
+    // 补 sort 列（v1.4.40 之前老库没这列）
+    final budgetCols = await d.rawQuery('PRAGMA table_info(budgets)');
+    if (!budgetCols.any((c) => c['name'] == 'sort')) {
+      await d.execute('ALTER TABLE budgets ADD COLUMN sort INTEGER NOT NULL DEFAULT 0');
+    }
     await d.execute('''
       CREATE TABLE IF NOT EXISTS recurring(
         id INTEGER PRIMARY KEY,
@@ -559,8 +573,14 @@ class LocalDb {
 
   Future<List<Map<String, Object?>>> getBudgetSettings(int bookId) async {
     final d = await db;
-    return d.query('budgets',
-        where: 'book_id=?', whereArgs: [bookId], orderBy: 'year, sort, category');
+    try {
+      return d.query('budgets',
+          where: 'book_id=?', whereArgs: [bookId], orderBy: 'year, sort, category');
+    } catch (e) {
+      // 老数据库没 sort 列，降级
+      return d.query('budgets',
+          where: 'book_id=?', whereArgs: [bookId], orderBy: 'year, category');
+    }
   }
 
   Future<void> upsertBudgetLocal(int bookId, int year, String category,
