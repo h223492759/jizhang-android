@@ -190,9 +190,9 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
                 // 按钮区显示条件：曾经是 AI 自动记账的流水
                 // （隐藏后 f.source 可能为空，但 paymentMethod 是平台或原 source='auto'/'ai'）
                 // 这样隐藏后再进入也能看到"恢复"按钮
-                final _isAiLike = f.isAiSource ||
-                    ['微信支付', '支付宝', '云闪付', '招行信用卡'].contains(f.paymentMethod);
-                if (_isAiLike || _source == 'auto') ...[
+                if (f.isAiSource ||
+                    ['微信支付', '支付宝', '云闪付', '招行信用卡'].contains(f.paymentMethod) ||
+                    _source == 'auto') ...[
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
