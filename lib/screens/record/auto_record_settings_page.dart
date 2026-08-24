@@ -356,6 +356,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                                 onDeleted: () => _removeOrKw(kw),
                               )).toList(),
                         ),
+                        ),
                 ),
                 const SizedBox(height: 12),
                 Row(children: [
