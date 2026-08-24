@@ -387,6 +387,17 @@ class LocalDb {
         orderBy: 'flow_time DESC, id DESC');
   }
 
+  /// 整个账簿最早一笔流水的年份（用于预算页年份选择的下限）
+  Future<int> minFlowYear(int bookId) async {
+    final d = await db;
+    final rows = await d.rawQuery(
+        'SELECT MIN(flow_time) AS m FROM flows WHERE book_id=? AND flow_time IS NOT NULL',
+        [bookId]);
+    final m = rows.isNotEmpty ? rows.first['m'] as String? : null;
+    if (m == null || m.length < 4) return DateTime.now().year;
+    return int.tryParse(m.substring(0, 4)) ?? DateTime.now().year;
+  }
+
   // ---------------- categories ----------------
   Future<void> replaceCategories(int bookId, List<Map<String, Object?>> rows) async {
     final d = await db;

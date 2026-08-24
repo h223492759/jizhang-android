@@ -8,6 +8,7 @@ import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/charts/category_detail_page.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
+import 'package:jizhang_android/core/db.dart';
 
 class BudgetPage extends ConsumerStatefulWidget {
   const BudgetPage({super.key});
@@ -42,17 +43,25 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   }
 
   Future<void> _pickYear() async {
-    // 平铺展示当前年 + 前后各 2 年，共 5 年（如果数据库有更早/未来年度预算可扩展）
-    final current = _year;
-    final years = [for (var i = -2; i <= 2; i++) current + i];
+    // 滚动降序显示：未来一年 → 第一笔记账的年份（从本地 DB 查最早流水年份）
+    final nowY = DateTime.now().year;
+    final maxY = nowY + 1; // 未来一年
+    int minY = nowY;
+    try {
+      final bookId = ref.read(sessionProvider).bookId ?? 0;
+      final row = await LocalDb.instance.minFlowYear(bookId);
+      minY = row;
+    } catch (_) {}
+    if (minY > maxY) minY = maxY;
+    final years = [for (var y = maxY; y >= minY; y--) y];
     final picked = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('选择年份'),
         content: SizedBox(
           width: 320,
+          height: (years.length / 4).ceil() * 64.0 + 24,
           child: GridView.count(
-            shrinkWrap: true,
             crossAxisCount: 4,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,

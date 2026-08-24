@@ -680,6 +680,10 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context, _name.text.trim()),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.text,
+                  ),
                   child: const Text('保存'),
                 ),
               ),
