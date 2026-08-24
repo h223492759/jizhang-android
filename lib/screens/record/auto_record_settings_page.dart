@@ -322,7 +322,6 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                                   onPressed: () => _removeAndGroup(e.key),
                                 ),
                               )).toList(),
-                          ),
                         ),
                 ),
                 const SizedBox(height: 12),
