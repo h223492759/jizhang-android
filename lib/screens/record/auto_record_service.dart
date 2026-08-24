@@ -357,6 +357,16 @@ class AutoRecordService {
         if (v != null && v > 0) amount = v;
       }
     }
+    // 4) 强信号下识别裸数字（X.XX 两位小数）：支付宝'转账红包'类通知故意不显示金额文字，
+    // 但通知原文如'给你转了1笔钱'可能不含数字，改为识别'0.27'这种'纯小数'形式。
+    // 仅在 hasStrong（强信号词）下启用，避免误识别其他场景的数字（如 1.50 版本号）。
+    if (amount == null && hasStrong) {
+      final m = RegExp(r'(?:^|[^\d.])([0-9]+\.[0-9]{2})(?=[^\d.]|$)').firstMatch(text);
+      if (m != null) {
+        final v = double.tryParse(m.group(1) ?? '');
+        if (v != null && v > 0 && v <= 100000) amount = v;
+      }
+    }
     if (amount == null) return null;
     // 金额合理性区间（0.01 ~ 10万），防异常识别
     if (amount <= 0 || amount > 100000) return null;

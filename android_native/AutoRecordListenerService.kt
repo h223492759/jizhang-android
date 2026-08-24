@@ -98,7 +98,10 @@ class AutoRecordListenerService : NotificationListenerService() {
                 "com.cmbchina.cc", "com.cmbchina.biz", "com.cmbchina.mobilebank" -> "招行信用卡"
                 else -> pkg
             }
-            val titleStr = if (amount.isNotEmpty()) "已记账 $src ¥$amount" else "已记账 $src 通知"
+            // 文案：'已加入待处理'（不是'已记账'，避免误导）。
+            // 真正是否记账成功要等 Flutter _parse + _recordFlow 完成，
+            // 弹 heads-up 时 native 不知道 Flutter 是否会丢弃（如通知没金额）。
+            val titleStr = "已加入待处理 $src"
             val body = if (title.isNotEmpty()) title else "自动记账已加入待处理"
             val n = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
