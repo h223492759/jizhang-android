@@ -22,6 +22,8 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
     'fromUsers': false,
   };
   List<String> _users = [];
+  List<List<String>> _andGroups = [];
+  List<String> _orKws = [];
   bool _loading = true;
 
   @override
@@ -35,6 +37,8 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
     _enabled = await svc.enabled;
     _ex = await svc.excludes;
     _users = await svc.userList;
+    _andGroups = await svc.andGroups;
+    _orKws = await svc.orKeywords;
     if (mounted) setState(() => _loading = false);
   }
 
@@ -81,6 +85,84 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
   Future<void> _removeUser(String name) async {
     setState(() => _users.remove(name));
     await AutoRecordService.instance.setUserList(_users);
+  }
+
+  // 添加「同时出现才屏蔽」组：输入多个关键词（逗号/空格分隔）→ 一组 AND 规则
+  Future<void> _addAndGroup() async {
+    final ctrl = TextEditingController();
+    final input = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('添加同时出现才屏蔽'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+              hintText: '多个关键词用逗号或空格分隔，如：还款, 信用卡',
+              border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('添加')),
+        ],
+      ),
+    );
+    if (input == null || input.isEmpty) return;
+    final kws = input
+        .split(RegExp(r'[,，\s]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (kws.length < 2) {
+      toast('至少输入 2 个关键词（同时出现才屏蔽）');
+      return;
+    }
+    setState(() => _andGroups.add(kws));
+    await AutoRecordService.instance.setAndGroups(_andGroups);
+  }
+
+  Future<void> _removeAndGroup(int i) async {
+    setState(() => _andGroups.removeAt(i));
+    await AutoRecordService.instance.setAndGroups(_andGroups);
+  }
+
+  // 添加「单词出现就屏蔽」：输入关键词（逗号分隔）→ 多个 OR 规则
+  Future<void> _addOrKw() async {
+    final ctrl = TextEditingController();
+    final input = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('添加单词出现就屏蔽'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+              hintText: '多个关键词用逗号分隔，如：转账, 转入',
+              border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('添加')),
+        ],
+      ),
+    );
+    if (input == null || input.isEmpty) return;
+    final kws = input
+        .split(RegExp(r'[,，\s]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    setState(() => _orKws.addAll(kws.where((k) => !_orKws.contains(k))));
+    await AutoRecordService.instance.setOrKeywords(_orKws);
+  }
+
+  Future<void> _removeOrKw(String kw) async {
+    setState(() => _orKws.remove(kw));
+    await AutoRecordService.instance.setOrKeywords(_orKws);
   }
 
   @override
@@ -182,22 +264,14 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                   child: Column(children: [
                     SwitchListTile(
                       title: const Text('信用卡还款'),
-                      subtitle: const Text('通知含「还款/信用卡」时忽略'),
+                      subtitle: const Text('同时含「还款」+「信用卡」或「还款」+「花呗」时忽略'),
                       value: _ex['repay'] ?? false,
                       onChanged: (v) => setState(() {
                         _ex['repay'] = v;
                         _saveEx();
                       }),
                     ),
-                    SwitchListTile(
-                      title: const Text('本人银行卡转账'),
-                      subtitle: const Text('通知含「转账/转入」时忽略'),
-                      value: _ex['selfTransfer'] ?? false,
-                      onChanged: (v) => setState(() {
-                        _ex['selfTransfer'] = v;
-                        _saveEx();
-                      }),
-                    ),
+
                     SwitchListTile(
                       title: const Text('转给指定用户'),
                       subtitle: const Text('对方在下方名单中（支出）'),
@@ -217,6 +291,69 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                       }),
                     ),
                   ]),
+                ),
+                const SizedBox(height: 12),
+                // 自定义「同时出现才屏蔽」：每组所有关键词同时出现才忽略
+                Row(children: [
+                  const Text('同时出现才屏蔽', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _addAndGroup,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('添加'),
+                  ),
+                ]),
+                Text('组内关键词同时出现才生效（如：还款 信用卡 → 还款+信用卡同时出现才屏蔽）',
+                    style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                const SizedBox(height: 4),
+                Card(
+                  child: _andGroups.isEmpty
+                      ? Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('暂无规则。添加后：通知同时含组内所有关键词时忽略。',
+                              style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
+                        )
+                      : Column(
+                          children: _andGroups.asMap().entries.map((e) => ListTile(
+                                dense: true,
+                                title: Text(e.value.join(' + ')),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.close, size: 18),
+                                  onPressed: () => _removeAndGroup(e.key),
+                                ),
+                              )).toList(),
+                        ),
+                ),
+                const SizedBox(height: 12),
+                // 自定义「单词出现就屏蔽」：任一关键词出现即忽略
+                Row(children: [
+                  const Text('单词出现就屏蔽', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _addOrKw,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('添加'),
+                  ),
+                ]),
+                Text('任一关键词出现即生效（如：转账 → 所有含「转账」的通知忽略）',
+                    style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                const SizedBox(height: 4),
+                Card(
+                  child: _orKws.isEmpty
+                      ? Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('暂无规则。添加后：通知含任一词时忽略。',
+                              style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
+                        )
+                      : Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          padding: const EdgeInsets.all(12),
+                          children: _orKws.map((kw) => InputChip(
+                                label: Text(kw),
+                                onDeleted: () => _removeOrKw(kw),
+                              )).toList(),
+                        ),
                 ),
                 const SizedBox(height: 12),
                 Row(children: [

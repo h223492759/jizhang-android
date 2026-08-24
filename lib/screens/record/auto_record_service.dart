@@ -33,6 +33,8 @@ class AutoRecordService {
   static const _kExcludeToUsers = 'auto_exclude_to_users';
   static const _kExcludeFromUsers = 'auto_exclude_from_users';
   static const _kUserList = 'auto_user_list';
+  static const _kAndGroups = 'auto_exclude_and_groups';
+  static const _kOrKeywords = 'auto_exclude_or_keywords';
   static const _kIgnoreMerchants = 'auto_ignore_merchants';
   static const _kDedupSeen = 'auto_dedup_seen';
 
@@ -73,6 +75,34 @@ class AutoRecordService {
     await sp.setBool(_kExcludeSelfTransfer, v['selfTransfer'] ?? false);
     await sp.setBool(_kExcludeToUsers, v['toUsers'] ?? false);
     await sp.setBool(_kExcludeFromUsers, v['fromUsers'] ?? false);
+  }
+
+  // 自定义「同时出现才屏蔽」规则：每组 = 多个关键词，全部同时出现才忽略
+  Future<List<List<String>>> get andGroups async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_kAndGroups);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      return (jsonDecode(raw) as List).map((g) => (g as List).cast<String>()).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> setAndGroups(List<List<String>> groups) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(_kAndGroups, jsonEncode(groups));
+  }
+
+  // 自定义「单词出现就屏蔽」：任一关键词出现即忽略
+  Future<List<String>> get orKeywords async {
+    final sp = await SharedPreferences.getInstance();
+    return sp.getStringList(_kOrKeywords) ?? [];
+  }
+
+  Future<void> setOrKeywords(List<String> kws) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setStringList(_kOrKeywords, kws);
   }
 
   Future<List<String>> get userList async =>
@@ -388,17 +418,28 @@ class AutoRecordService {
     final ex = await excludes;
     final users = await userList;
     final ignore = await ignoreMerchants;
+    final andGroups = await this.andGroups;
+    final orKws = await orKeywords;
     // 商户忽略名单（弹窗「不再记」加入）
     if (ignore.contains(p.merchant)) return true;
-    // 信用卡还款
-    if (ex['repay'] == true &&
-        (p.text.contains('还款') || p.text.contains('信用卡'))) {
-      return true;
+    // 信用卡还款：同时含「还款」+「信用卡」或「还款」+「花呗」才忽略（AND）
+    if (ex['repay'] == true) {
+      final hasRepay = p.text.contains('还款');
+      final hasCard = p.text.contains('信用卡');
+      final hasHuabei = p.text.contains('花呗');
+      if (hasRepay && (hasCard || hasHuabei)) return true;
     }
-    // 本人银行卡转账
-    if (ex['selfTransfer'] == true &&
-        (p.text.contains('转账') || p.text.contains('转入'))) {
-      return true;
+    // 自定义「同时出现才屏蔽」：每组全部关键词同时出现 → 忽略
+    for (final group in andGroups) {
+      if (group.isNotEmpty && group.every((k) => p.text.contains(k))) {
+        return true;
+      }
+    }
+    // 自定义「单词出现就屏蔽」：任一关键词出现 → 忽略
+    for (final kw in orKws) {
+      if (kw.isNotEmpty && p.text.contains(kw)) {
+        return true;
+      }
     }
     // 转给指定用户（支出）/ 指定用户转来（收入）
     if (users.isNotEmpty) {
