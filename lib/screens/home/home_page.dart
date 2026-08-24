@@ -658,7 +658,7 @@ class _NameEditorSheetState extends ConsumerState<_NameEditorSheet> {
                           margin: const EdgeInsets.only(right: 8),
                           child: ActionChip(
                             label: Text(p.name, style: TextStyle(fontSize: 12, color: AppPalette.text(context))),
-                            backgroundColor: AppPalette.cardSubtle(context),
+                            backgroundColor: AppPalette.divider(context),
                             side: BorderSide.none,
                             onPressed: () => _name.text = p.name,
                           ),

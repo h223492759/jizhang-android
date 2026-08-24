@@ -42,31 +42,50 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   }
 
   Future<void> _pickYear() async {
-    int y = _year;
+    // 平铺展示当前年 + 前后各 2 年，共 5 年（如果数据库有更早/未来年度预算可扩展）
+    final current = _year;
+    final years = [for (var i = -2; i <= 2; i++) current + i];
     final picked = await showDialog<int>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setStateD) => AlertDialog(
-          title: const Text('选择年份'),
-          content: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: () => setStateD(() => y--)),
-              Text('$y 年',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: () => setStateD(() => y++)),
-            ],
+      builder: (ctx) => AlertDialog(
+        title: const Text('选择年份'),
+        content: SizedBox(
+          width: 320,
+          child: GridView.count(
+            shrinkWrap: true,
+            crossAxisCount: 4,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1,
+            children: years.map((y) {
+              final sel = y == _year;
+              return InkWell(
+                onTap: () => Navigator.pop(ctx, y),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: sel ? AppColors.primary : AppPalette.cardSubtle(context),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: sel ? AppColors.primaryDark : Colors.transparent,
+                        width: sel ? 2 : 0),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '$y',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                      color: sel ? AppColors.text : AppPalette.text(context),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, y), child: const Text('确定')),
-          ],
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+        ],
       ),
     );
     if (picked != null) {

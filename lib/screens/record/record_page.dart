@@ -495,7 +495,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                     margin: const EdgeInsets.only(right: 8),
                     child: ActionChip(
                       label: Text(p.name, style: const TextStyle(fontSize: 12)),
-                      backgroundColor: AppPalette.cardSubtle(context),
+                      backgroundColor: AppPalette.divider(context),
                       side: BorderSide.none,
                       onPressed: () => _applyPreset(p),
                     ),
