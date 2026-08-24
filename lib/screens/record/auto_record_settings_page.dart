@@ -322,6 +322,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                                   onPressed: () => _removeAndGroup(e.key),
                                 ),
                               )).toList(),
+                          ),
                         ),
                 ),
                 const SizedBox(height: 12),
@@ -345,10 +346,11 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                           child: Text('暂无规则。添加后：通知含任一词时忽略。',
                               style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
                         )
-                      : Wrap(
+                      : Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          padding: const EdgeInsets.all(12),
                           children: _orKws.map((kw) => InputChip(
                                 label: Text(kw),
                                 onDeleted: () => _removeOrKw(kw),
