@@ -197,6 +197,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
     }
     final widgets = buildGroupedFlows(
+      context,
       flows: _flows,
       tileBuilder: (f) => compactFlowTile(context,
         f: f,

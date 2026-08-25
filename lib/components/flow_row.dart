@@ -90,7 +90,8 @@ Widget compactFlowTile(
 
 /// 把流水按日期分组，返回可直接放进 SliverList / ListView 的 widget 列表。
 /// 每个日期分组前加一行「m月d日 周X」标题，并用 1 像素横线与上一天分开。
-List<Widget> buildGroupedFlows({
+List<Widget> buildGroupedFlows(
+  BuildContext context, {
   required List<Flow> flows,
   required Widget Function(Flow) tileBuilder,
   bool showDateHeader = true,
@@ -121,7 +122,8 @@ List<Widget> buildGroupedFlows({
     for (final f in grouped[k]!) {
       out.add(tileBuilder(f));
     }
-    out.add(const Divider(height: 1, thickness: 1, color: AppColors.divider));
+    // 深色模式分隔线用 dividerDark(#333338) 更柔和，浅色模式保持 #EEEEEE
+    out.add(Divider(height: 1, thickness: 1, color: AppPalette.divider(context)));
   }
   return out;
 }
