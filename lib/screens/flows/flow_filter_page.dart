@@ -78,6 +78,7 @@ class _FlowFilterPageState extends ConsumerState<FlowFilterPage> {
               : ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                   children: buildGroupedFlows(
+                    context,
                     flows: _flows,
                     tileBuilder: (f) => compactFlowTile(context,
                       f: f,
