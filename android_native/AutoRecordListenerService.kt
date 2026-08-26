@@ -142,13 +142,22 @@ class AutoRecordListenerService : NotificationListenerService() {
 /** 待处理队列存储（SharedPreferences，JSON 数组） */
 object AutoRecordStore {
     val ALLOWED_PACKAGES = setOf(
-        "com.eg.android.AlipayGphone", // 支付宝
-        "com.tencent.mm",              // 微信
-        "com.unionpay",                // 云闪付
+        // 支付宝多包名（不同版本/子应用）
+        "com.eg.android.AlipayGphone", // 支付宝 主 app
+        "com.aliyun.snotif",           // 支付宝 阿里云推送通道（聚合通知走这条）
+        "com.alipay.consumer",         // 支付宝 消费者版
+        "com.alipay.android.uiapay",   // 支付宝 内嵌支付 SDK
+        "com.alipay.mobile",           // 支付宝 老包名
+        // 微信
+        "com.tencent.mm",              // 微信 主 app
         "com.tencent.wepay",           // 微信支付组件
-        "com.cmbchina.cc",             // 招商银行 掌上生活
-        "com.cmbchina.biz",            // 招商银行 企业银行
-        "com.cmbchina.mobilebank",     // 招商银行 手机银行
+        // 其他
+        "com.unionpay",                // 云闪付
+        // 招商银行多包名
+        "com.cmbchina.cc",             // 掌上生活
+        "com.cmbchina.biz",            // 企业银行
+        "com.cmbchina.mobilebank",     // 手机银行
+        "com.cmbwallet",               // 招行信用卡独立 app（最常见包名）
     )
     private const val KEY = "auto_record_queue"
 

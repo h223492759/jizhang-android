@@ -430,24 +430,37 @@ class AutoRecordService {
     final ignore = await ignoreMerchants;
     final andGroups = await this.andGroups;
     final orKws = await orKeywords;
+    String? skipReason; // 记录为什么被忽略（用户调试用）
     // 商户忽略名单（弹窗「不再记」加入）
-    if (ignore.contains(p.merchant)) return true;
+    if (ignore.contains(p.merchant)) {
+      skipReason = '商户忽略名单:${p.merchant}';
+      recordLog('跳过记账:${p.merchant} | ${skipReason}');
+      return true;
+    }
     // 信用卡还款：同时含「还款」+「信用卡」或「还款」+「花呗」才忽略（AND）
     if (ex['repay'] == true) {
       final hasRepay = p.text.contains('还款');
       final hasCard = p.text.contains('信用卡');
       final hasHuabei = p.text.contains('花呗');
-      if (hasRepay && (hasCard || hasHuabei)) return true;
+      if (hasRepay && (hasCard || hasHuabei)) {
+        skipReason = '信用卡还款规则';
+        recordLog('跳过记账:${p.merchant} | ${skipReason}');
+        return true;
+    }
     }
     // 自定义「同时出现才屏蔽」：每组全部关键词同时出现 → 忽略
     for (final group in andGroups) {
       if (group.isNotEmpty && group.every((k) => p.text.contains(k))) {
+        skipReason = '同时出现组:${group.join("+")}';
+        recordLog('跳过记账:${p.merchant} | ${skipReason}');
         return true;
       }
     }
     // 自定义「单词出现就屏蔽」：任一关键词出现 → 忽略
     for (final kw in orKws) {
       if (kw.isNotEmpty && p.text.contains(kw)) {
+        skipReason = '单词屏蔽:${kw}';
+        recordLog('跳过记账:${p.merchant} | ${skipReason}');
         return true;
       }
     }
@@ -455,8 +468,16 @@ class AutoRecordService {
     if (users.isNotEmpty) {
       final hitUser = users.where((u) => p.text.contains(u)).isNotEmpty;
       if (hitUser) {
-        if (p.isIncome && ex['fromUsers'] == true) return true;
-        if (!p.isIncome && ex['toUsers'] == true) return true;
+        if (p.isIncome && ex['fromUsers'] == true) {
+          skipReason = '指定用户转来:${users.join(",")}';
+          recordLog('跳过记账:${p.merchant} | ${skipReason}');
+          return true;
+        }
+        if (!p.isIncome && ex['toUsers'] == true) {
+          skipReason = '转给指定用户:${users.join(",")}';
+          recordLog('跳过记账:${p.merchant} | ${skipReason}');
+          return true;
+        }
       }
     }
     return false;
