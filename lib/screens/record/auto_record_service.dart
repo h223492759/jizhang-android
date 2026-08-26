@@ -243,11 +243,15 @@ class AutoRecordService {
 
   /// 解析后的通知直接落库（自动记账）
   Future<void> _saveParsedFlow(WidgetRef ref, ParsedNotification p) async {
+    // 0 元占位流水：name 格式「支付方式HH:mm待录入」（如「支付宝16:53待录入」）
+    final desc = p.amount == 0
+        ? '${p.merchant}${_hhmm(p.time)}待录入'
+        : p.merchant;
     final body = <String, dynamic>{
       'type': p.isIncome ? 'income' : 'expense',
       'amount': p.amount,
       'category': _autoCategory('', p.isIncome),
-      'description': p.merchant,
+      'description': desc,
       'flow_time':
           '${p.time.year}-${p.time.month.toString().padLeft(2, '0')}-${p.time.day.toString().padLeft(2, '0')}',
       'payment_method': _pkgName(p.pkg),
@@ -367,9 +371,14 @@ class AutoRecordService {
         if (v != null && v > 0 && v <= 100000) amount = v;
       }
     }
-    if (amount == null) return null;
-    // 金额合理性区间（0.01 ~ 10万），防异常识别
-    if (amount <= 0 || amount > 100000) return null;
+    // amount 解析失败但命中强信号 → 生成 0 元待录入占位流水（user 后续补金额）
+    // amount 解析成功 → 常规记录
+    if (amount == null) {
+      if (!hasStrong) return null;  // 无强信号直接丢
+      amount = 0;  // 占位：让 user 后续在流水列表补金额
+    }
+    // 金额合理性区间（0.01 ~ 10万），防异常识别。占位 0 跳过此检查
+    if (amount != 0 && (amount <= 0 || amount > 100000)) return null;
 
     // ---- ③ 方向 ----
     final isIncome =
@@ -547,3 +556,8 @@ class ParsedNotification {
     required this.merchant,
   });
 }
+
+
+// 工具：HH:mm 格式（待录入占位流水 name 用）
+String _hhmm(DateTime t) =>
+    '${t.hour.toString().padLeft(2, "0")}:${t.minute.toString().padLeft(2, "0")}';
