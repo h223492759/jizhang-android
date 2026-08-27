@@ -18,6 +18,7 @@ import 'package:jizhang_android/screens/me/me_page.dart';
 import 'package:jizhang_android/screens/record/record_page.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
+import 'package:jizhang_android/core/sync_engine.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -68,6 +69,17 @@ class _HomePageState extends ConsumerState<HomePage> {
         toast(e.toString().replaceFirst('ApiException: ', ''));
       }
     }
+  }
+
+  // 首页下拉：先强制同步（推送本地改动 + 拉取 server 最新），再重读本地
+  Future<void> _onPullRefresh() async {
+    try {
+      final bookId = ref.read(sessionProvider).bookId;
+      if (bookId != null) {
+        await SyncEngine.instance.syncNow(bookId).catchError((_) {});
+      }
+    } catch (_) {}
+    await _load();
   }
 
   Future<void> _pickMonth() async {
@@ -397,15 +409,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Scaffold(
       backgroundColor: AppPalette.background(context),
       extendBody: false,
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _headerRegion()),
-          SliverToBoxAdapter(child: _quickModules()),
-          _loading
-              ? const SliverToBoxAdapter(
-                  child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())))
-              : _flowList(overrides, user),
-        ],
+      body: RefreshIndicator(
+        onRefresh: _onPullRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: _headerRegion()),
+            SliverToBoxAdapter(child: _quickModules()),
+            _loading
+                ? const SliverToBoxAdapter(
+                    child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())))
+                : _flowList(overrides, user),
+          ],
+        ),
       ),
     );
   }
