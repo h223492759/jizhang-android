@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 import 'package:jizhang_android/screens/record/auto_record_dialog.dart';
 
 /// 自动记账服务：从原生通知监听队列拉取待处理记录，
