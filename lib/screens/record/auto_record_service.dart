@@ -258,12 +258,14 @@ class AutoRecordService {
       'source': 'auto',
     };
     try {
-      await ref.read(apiProvider).createFlow(body);
+      // 走 localApiProvider：断网时本地入队 + enqueue outbox，连上后自动重试
+      // （与手动记账行为一致：断网也能写本地）
+      await ref.read(localApiProvider).createFlow(body);
       ref.read(dataVersionProvider.notifier).state++;
       recordLog("已记账：${p.merchant} ¥${p.amount.toStringAsFixed(2)} ");
       toast('已记账：${p.merchant} ¥${p.amount.toStringAsFixed(2)}');
     } catch (e) {
-      // 落库失败（如网络）：本条保留在待处理队列，下轮重试
+      // 真正的非网络错（如参数错）才提示失败
       recordLog('记账失败：${e.toString().replaceFirst("ApiException: ", "")}');
       toast('记账失败：${e.toString().replaceFirst("ApiException: ", "")}');
     }

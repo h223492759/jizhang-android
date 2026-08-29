@@ -66,6 +66,8 @@ class SyncEngine extends ChangeNotifier {
           _pullFlows(bookId, a),
         ]);
       }
+      // 同步完成（无论 unchanged）：刷新 lastSyncAt → '我的'页能立即显示新时间
+      lastSyncAt = DateTime.now();
       status = SyncStatus.idle;
       lastError = null;
       _syncTick++;
