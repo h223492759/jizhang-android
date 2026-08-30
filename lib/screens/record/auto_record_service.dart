@@ -41,6 +41,16 @@ class AutoRecordService {
     SharedPreferences.getInstance().then((sp) => sp.setString(_logSpKey, '[]'));
   }
 
+  // 监听 native 端弹窗日志推送（native 用 _channel.invokeMethod 调）
+  void _initMethodHandler() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'nativeLog' && call.arguments is String) {
+        recordLog(call.arguments as String);
+      }
+      return null;
+    });
+  }
+
   void recordLog(String msg) {
     final ts = DateTime.now().toString().substring(11, 19);
     final line = "[$ts] $msg";
