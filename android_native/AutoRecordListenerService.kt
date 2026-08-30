@@ -57,7 +57,6 @@ class AutoRecordListenerService : NotificationListenerService() {
             "金币到账", "星星", "等级", "经验值", "会员积分"
         )
         val hasStrong = strongKw.any { all.contains(it) }
-        Log.d("AutoRecord", "hasStrong=$hasStrong amt=$amt")
         if (!hasStrong) return  // 没强信号词一律不入队（如营销「邀请店主领用收钱码可得20元」）
         if (virtualKw.any { all.contains(it) }) return  // 虚拟积分直接丢弃
         // 抓一个金额作为通知摘要（取第一个 ¥/￥/元）
