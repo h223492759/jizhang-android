@@ -113,10 +113,8 @@ class AutoRecordListenerService : NotificationListenerService() {
             val now = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.CHINA).format(java.util.Date())
             val logLine = if (amount.isNotEmpty()) "[$now][弹窗] $titleStr ¥$amount | $body"
                           else "[$now][弹窗] $titleStr | $body"
-            // 通过 MethodChannel 通知 Flutter 写入 FlutterSharedPreferences 持久化日志
-            try {
-                _channel.invokeMethod("nativeLog", logLine)
-            } catch (_: Exception) {}
+            // 直接写文件到 app 私有目录（Flutter 端通过 path_provider 读同一文件）
+            AutoRecordStore.appendLog(this, logLine)
             val n = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle(titleStr)
