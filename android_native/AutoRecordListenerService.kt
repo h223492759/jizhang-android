@@ -64,6 +64,7 @@ class AutoRecordListenerService : NotificationListenerService() {
         val amtMatch = Regex("[¥￥]\\s*([0-9]+(?:\\.[0-9]{1,2})?)").find(all)
             ?: Regex("([0-9]+(?:\\.[0-9]{1,2})?)\\s*元").find(all)
         val amt = amtMatch?.groupValues?.getOrNull(1) ?: ""
+        Log.d("AutoRecord", "hasStrong=$hasStrong amt=$amt")
         val id = "${System.currentTimeMillis()}_${pkg}"
         val item = JSONObject()
             .put("id", id)
