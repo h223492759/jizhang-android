@@ -244,10 +244,13 @@ class AutoRecordService {
 
   /// 解析后的通知直接落库（自动记账）
   Future<void> _saveParsedFlow(WidgetRef ref, ParsedNotification p) async {
-    // 0 元占位流水：name 格式「支付方式HH:mm待录入」（如「支付宝16:53待录入」）
-    final desc = p.amount == 0
-        ? '${p.merchant}${_hhmm(p.time)}待录入'
-        : p.merchant;
+    // AI 自动记账统一 name 规则：支付方式hh:mm关键词（如「支付宝12:07交易提醒」）
+    // 0 元占位额外加「待录入」
+    final pay = _pkgName(p.pkg);
+    final kw = p.merchant;
+    final hhmm = _hhmm(p.time);
+    final base = pay == kw ? '$pay$hhmm' : '$pay$hhmm$kw';
+    final desc = p.amount == 0 ? '${base}待录入' : base;
     final body = <String, dynamic>{
       'type': p.isIncome ? 'income' : 'expense',
       'amount': p.amount,
