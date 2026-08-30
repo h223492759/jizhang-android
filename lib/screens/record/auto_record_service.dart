@@ -214,27 +214,38 @@ class AutoRecordService {
     if (pending.isEmpty) return;
     _showing = true;
     try {
+      // 聚合通知合并：支付宝同一笔支付常常连续 2-3 条 heads-up
+      //（'服务通知' + '交易提醒/你有一笔 6.89 元的支出'），
+      // 按 pkg + 10 秒桶分组，取 text 最长的（通常含金额那条）——避免
+      // 0 元占位+有金额分别记两笔。
+      final merged = <String, Map<String, dynamic>>{};
       for (final raw in pending) {
-        final parsed = _parse(raw);
-        if (parsed == null) {
-          await removePending(raw['id']?.toString() ?? '');
-          continue;
+        final t = (raw['time'] as int?) ?? 0;
+        final pkg = (raw['pkg'] as String?) ?? '';
+        final bucket = t ~/ 10000; // 10 秒窗口
+        final key = '$pkg|$bucket';
+        final txt = (raw['text'] as String?) ?? '';
+        if (merged.containsKey(key)) {
+          if (txt.length > ((merged[key]!['text'] as String?) ?? '').length) {
+            merged[key] = Map<String, dynamic>.from(raw);
+          }
+        } else {
+          merged[key] = Map<String, dynamic>.from(raw);
         }
-        // 排除规则（信用卡还款/本人转账/忽略商户等）
-        if (await _excluded(parsed)) {
-          await removePending(raw['id']?.toString() ?? '');
-          continue;
-        }
-        // 去重：商户+金额+2分钟
-        final dedupKey = '${parsed.merchant}|${parsed.amount.toStringAsFixed(2)}';
-        if (await _dedupHit(dedupKey)) {
-          await removePending(raw['id']?.toString() ?? '');
-          continue;
-        }
-        await _dedupMark(dedupKey);
-        // 直接自动记账（不弹窗）
-        await _saveParsedFlow(ref, parsed);
+      }
+      // 原始队列全部出队（合并后只处理 1 条）
+      for (final raw in pending) {
         await removePending(raw['id']?.toString() ?? '');
+      }
+      // 处理合并后的
+      for (final raw in merged.values) {
+        final parsed = _parse(raw);
+        if (parsed == null) continue;
+        if (await _excluded(parsed)) continue;
+        final dedupKey = '${parsed.merchant}|${parsed.amount.toStringAsFixed(2)}';
+        if (await _dedupHit(dedupKey)) continue;
+        await _dedupMark(dedupKey);
+        await _saveParsedFlow(ref, parsed);
       }
     } catch (_) {
     } finally {
