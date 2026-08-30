@@ -420,13 +420,10 @@ final w = await _api.getWallets();
       // 必须切页重进才触发重新同步才会刷新
       if (existing != null) {
         final updated = <String, Object?>{...existing, ...body, 'id': id, 'dirty': 0};
-        // 与 server stampSaveTime 保持一致：没传 flow_time 时，保留原日期 +
-        // 当前时间补时分秒（这样修改后流水立即跳到当天最上方，且本地/server 一致，
-        // 不会出现'修改后在最下方，刷新后才在最上方'）。
+        // 与 server stampSaveTime 一致：没传 flow_time 时，完全用当前时刻
+        // （日期也更新为今天）→ 修改后流水立即跳到今天最上方，本地/server 一致
         if (!body.containsKey('flow_time')) {
-          final ft = (existing['flow_time'] as String?) ?? '';
-          final day = ft.length >= 10 ? ft.substring(0, 10) : _todayYmd();
-          updated['flow_time'] = '$day ${_nowHms()}';
+          updated['flow_time'] = _nowFull();
         }
         await db.upsertFlow(updated);
       }
@@ -1515,4 +1512,12 @@ String _todayYmd() {
 String _nowHms() {
   final n = DateTime.now();
   return '${n.hour.toString().padLeft(2, '0')}:${n.minute.toString().padLeft(2, '0')}:${n.second.toString().padLeft(2, '0')}';
+}
+
+
+// 工具：完整当前时间 YYYY-MM-DD HH:mm:ss（修改流水用，让流水跳今天最上方）
+String _nowFull() {
+  final n = DateTime.now();
+  final pad = (int v) => v.toString().padLeft(2, '0');
+  return '${n.year}-${pad(n.month)}-${pad(n.day)} ${pad(n.hour)}:${pad(n.minute)}:${pad(n.second)}';
 }
