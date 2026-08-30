@@ -321,12 +321,12 @@ class AutoRecordService {
     final hasStrong = strongKw.any((kw) => text.contains(kw));
     if (!hasStrong) {
       // 无强信号：直接丢弃（哪怕是支付 App——营销/聊天也会在支付 App 里出现）
-      recordLog('AI解析跳过:无强信号 text='${text.take(80)}'');
+      recordLog("AI解析跳过:无强信号 text=${text.take(80)}");
       return null;
     }
     // 虚拟积分类通知（支付宝积分/京豆/里程等）直接丢弃，不当作记账
     if (virtualKw.any((kw) => text.contains(kw))) {
-      recordLog('AI解析跳过:虚拟积分词匹配 text='${text.take(80)}'');
+      recordLog("AI解析跳过:虚拟积分词匹配 text=${text.take(80)}");
       return null;
     }
     if (marketingKw.any((kw) => text.contains(kw))) {
