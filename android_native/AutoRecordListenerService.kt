@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import android.util.Log
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
@@ -27,7 +28,10 @@ class AutoRecordListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
         val pkg = sbn.packageName ?: return
-        if (!AutoRecordStore.ALLOWED_PACKAGES.contains(pkg)) return
+        if (!AutoRecordStore.ALLOWED_PACKAGES.contains(pkg)) {
+            Log.d("AutoRecord", "skip pkg not in whitelist: $pkg")
+            return
+        }
         val n: Notification = sbn.notification
         val extras = n.extras ?: return
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
@@ -35,6 +39,7 @@ class AutoRecordListenerService : NotificationListenerService() {
         val big = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
         val info = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
         val all = listOf(title, text, big, info).joinToString(" ") { it.trim() }.trim()
+        Log.d("AutoRecord", "onPosted pkg=$pkg all=${all.take(200)}")
         if (all.length < 2) return
         // 强信号词过滤（与 Flutter _parse 一致）：必须是支付/收款完成类通知才入队 + 弹 heads-up
         // 营销/虚拟积分通知（含金额/收款字眼但不是真实账单）直接丢弃，避免"检测到但没记账"误导
@@ -52,6 +57,7 @@ class AutoRecordListenerService : NotificationListenerService() {
             "金币到账", "星星", "等级", "经验值", "会员积分"
         )
         val hasStrong = strongKw.any { all.contains(it) }
+        Log.d("AutoRecord", "hasStrong=$hasStrong amt=$amt")
         if (!hasStrong) return  // 没强信号词一律不入队（如营销「邀请店主领用收钱码可得20元」）
         if (virtualKw.any { all.contains(it) }) return  // 虚拟积分直接丢弃
         // 抓一个金额作为通知摘要（取第一个 ¥/￥/元）
@@ -66,6 +72,7 @@ class AutoRecordListenerService : NotificationListenerService() {
             .put("text", all)
             .put("time", sbn.postTime)
         AutoRecordStore.appendPending(this, item)
+        Log.d("AutoRecord", "enqueued id=$id pkg=$pkg amt=$amt")
         // 在系统通知栏弹一条 heads-up
         postHeadsUp(pkg, title, amt)
         // 拉起主界面（若已在后台则回到前台）
