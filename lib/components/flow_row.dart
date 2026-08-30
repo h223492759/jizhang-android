@@ -96,9 +96,14 @@ List<Widget> buildGroupedFlows(
   required Widget Function(Flow) tileBuilder,
   bool showDateHeader = true,
 }) {
-  // 显式按时间由近到远排序（flow_time DESC，同时间按 id DESC），
-  // 保证首页当天流水顺序稳定（不依赖上游数组顺序）
+  // 排序规则（用户约定）：
+  // 1) 同日期分组内：最后修改的（updated_at 新）排最上方；
+  // 2) 没有 updated_at（旧数据/新建未改）时按 flow_time DESC + id DESC 兜底
   final sorted = [...flows]..sort((a, b) {
+    if (a.updatedAt.isNotEmpty || b.updatedAt.isNotEmpty) {
+      final c = b.updatedAt.compareTo(a.updatedAt);
+      if (c != 0) return c;
+    }
     final c = b.flowTime.compareTo(a.flowTime);
     return c != 0 ? c : b.id.compareTo(a.id);
   });

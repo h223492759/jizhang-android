@@ -105,6 +105,8 @@ class Flow {
   final String? attributionColor;
   /// 来源：'' 手动 | 'ai' AI识别 | 'auto' 通知自动记账
   final String source;
+  /// 最后修改时间（排序用：同日期分组内修改过的排最上方）
+  final String updatedAt;
   Flow({
     required this.id,
     required this.type,
@@ -116,6 +118,7 @@ class Flow {
     required this.attribution,
     this.attributionColor,
     this.source = '',
+    this.updatedAt = '',
   });
   factory Flow.fromJson(Map<String, dynamic> j) => Flow(
         id: j['id'],
@@ -128,6 +131,7 @@ class Flow {
         attribution: j['attribution'] ?? '',
         attributionColor: j['attribution_color'],
         source: j['source'] ?? '',
+        updatedAt: j['updated_at'] ?? '',
       );
   static List<Flow> listFrom(dynamic v) =>
       (v as List? ?? []).map((e) => Flow.fromJson(e)).toList();

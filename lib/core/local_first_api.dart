@@ -373,6 +373,7 @@ final w = await _api.getWallets();
       attribution: (r['attribution'] ?? '') as String,
       attributionColor: r['attribution_color'] as String?,
       source: source,
+      updatedAt: (r['updated_at'] ?? '') as String,
     );
   }
 
@@ -420,11 +421,12 @@ final w = await _api.getWallets();
       // 必须切页重进才触发重新同步才会刷新
       if (existing != null) {
         final updated = <String, Object?>{...existing, ...body, 'id': id, 'dirty': 0};
-        // 与 server stampSaveTime 一致：没传 flow_time 时，完全用当前时刻
-        // （日期也更新为今天）→ 修改后流水立即跳到今天最上方，本地/server 一致
+        // flow_time 保持原值（用户澄清：不改时间就留在原日期分组），
+        // 修改时间写 updated_at → 该日期分组内修改过的流水排最上方
         if (!body.containsKey('flow_time')) {
-          updated['flow_time'] = _nowFull();
+          updated['flow_time'] = existing['flow_time'];
         }
+        updated['updated_at'] = _nowFull();
         await db.upsertFlow(updated);
       }
       _syncAfterWrite();
