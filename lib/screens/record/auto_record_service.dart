@@ -241,6 +241,7 @@ class AutoRecordService {
 
   /// 立即处理一次待处理队列（App 启动 / 回到前台时调用）
   Future<void> processNow(WidgetRef ref, BuildContext context) async {
+    _initMethodHandler(); // 兜底：startPolling 之前也能监听 native 日志
     try {
       await _processQueue(ref, context);
     } catch (_) {}
