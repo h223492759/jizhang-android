@@ -17,15 +17,49 @@ class AutoRecordService {
   // 运行日志（最近 50 条，可一键复制给开发者）
   final List<String> _logs = [];
   final ValueNotifier<List<String>> _logsListenable = ValueNotifier([]);
+  static const _logSpKey = 'auto_record_logs';
   ValueNotifier<List<String>> get logsListenable => _logsListenable;
   List<String> getLogs() => List.unmodifiable(_logs);
-  void clearLogs() { _logs.clear(); _logsListenable.value = List.from(_logs); }
+
+  /// 启动时把持久化的日志（含 native 弹窗记录）载入内存显示
+  Future<void> loadPersistedLogs() async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_logSpKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final list = (jsonDecode(raw) as List).cast<String>();
+        _logs.addAll(list.where((x) => x.isNotEmpty));
+        if (_logs.length > 50) _logs.removeRange(0, _logs.length - 50);
+      } catch (_) {}
+    }
+    _logsListenable.value = List.from(_logs);
+  }
+
+  void clearLogs() {
+    _logs.clear();
+    _logsListenable.value = List.from(_logs);
+    SharedPreferences.getInstance().then((sp) => sp.setString(_logSpKey, '[]'));
+  }
+
   void recordLog(String msg) {
     final ts = DateTime.now().toString().substring(11, 19);
     final line = "[$ts] $msg";
     _logs.add(line);
     if (_logs.length > 50) _logs.removeAt(0);
     _logsListenable.value = List.from(_logs);
+    // 持久化（native 弹窗记录也写同一个 key，重启不清空）
+    SharedPreferences.getInstance().then((sp) async {
+      var raw = sp.getString(_logSpKey) ?? '[]';
+      List<String> list;
+      try {
+        list = (jsonDecode(raw) as List).cast<String>();
+      } catch (_) {
+        list = [];
+      }
+      list.add(line);
+      if (list.length > 50) list.removeAt(0);
+      await sp.setString(_logSpKey, jsonEncode(list));
+    });
   }
   static const _channel = MethodChannel('jizhang/auto_record');
   static const _kEnabled = 'auto_record_enabled';

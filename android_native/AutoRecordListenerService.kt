@@ -110,6 +110,10 @@ class AutoRecordListenerService : NotificationListenerService() {
             // 弹 heads-up 时 native 不知道 Flutter 是否会丢弃（如通知没金额）。
             val titleStr = "已加入待处理 $src"
             val body = if (title.isNotEmpty()) title else "自动记账已加入待处理"
+            val now = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.CHINA).format(java.util.Date())
+            val logLine = if (amount.isNotEmpty()) "[$now][弹窗] $titleStr ¥$amount | $body"
+                          else "[$now][弹窗] $titleStr | $body"
+            AutoRecordStore.appendLog(this, logLine)
             val n = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle(titleStr)
@@ -176,6 +180,19 @@ object AutoRecordStore {
         } catch (_: Exception) {
             emptyList()
         }
+    }
+
+    // 弹窗/处理日志：与 Flutter recordLog 同一个 SharedPreferences key（JSON 数组，最多 50 条）
+    fun appendLog(ctx: Context, msg: String) {
+        val sp = sp(ctx)
+        val cur = try {
+            JSONArray(sp.getString("auto_record_logs", "[]") ?: "[]")
+        } catch (_: Exception) {
+            JSONArray()
+        }
+        while (cur.length() >= 50) cur.remove(0)
+        cur.put(msg)
+        sp.edit().putString("auto_record_logs", cur.toString()).apply()
     }
 
     fun appendPending(ctx: Context, item: JSONObject) {

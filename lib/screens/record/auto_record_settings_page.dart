@@ -34,6 +34,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
 
   Future<void> _load() async {
     final svc = AutoRecordService.instance;
+    await svc.loadPersistedLogs(); // 加载持久化日志（含 native 弹窗记录）
     _enabled = await svc.enabled;
     _ex = await svc.excludes;
     _users = await svc.userList;
