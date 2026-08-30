@@ -432,9 +432,9 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       final d = _daily[index];
       dateLabel = d.date;
       barTotal = _type == 'expense' ? d.expense : d.income;
-      final items = <DailyTopItem>[];
-      d.top.forEach((_, v) => items.addAll(v));
-      items.sort((a, b) => b.amount.compareTo(a.amount));
+      // 只取当前选中类型（支出/收入）的 top 3；不足 3 笔按实际显示
+      final items = (d.top[_type] ?? <DailyTopItem>[]).toList()
+        ..sort((a, b) => b.amount.compareTo(a.amount));
       top = items.take(3).map((i) => _TopItem.fromDaily(i)).toList();
     }
     if (!mounted) return;

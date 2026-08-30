@@ -977,7 +977,8 @@ final w = await _api.getWallets();
       });
       return DailyStat(date: e.key, expense: exp, income: inc, top: top);
     }).toList();
-    list.sort((a, b) => b.date.compareTo(a.date));
+    // 升序：1号在前 → 柱状图左边 1 号、右边月末
+    list.sort((a, b) => a.date.compareTo(b.date));
     return list;
   }
 

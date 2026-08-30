@@ -96,8 +96,14 @@ List<Widget> buildGroupedFlows(
   required Widget Function(Flow) tileBuilder,
   bool showDateHeader = true,
 }) {
+  // 显式按时间由近到远排序（flow_time DESC，同时间按 id DESC），
+  // 保证首页当天流水顺序稳定（不依赖上游数组顺序）
+  final sorted = [...flows]..sort((a, b) {
+    final c = b.flowTime.compareTo(a.flowTime);
+    return c != 0 ? c : b.id.compareTo(a.id);
+  });
   final grouped = <String, List<Flow>>{};
-  for (final f in flows) {
+  for (final f in sorted) {
     final d = datePart(f.flowTime);
     (grouped[d] ??= []).add(f);
   }
