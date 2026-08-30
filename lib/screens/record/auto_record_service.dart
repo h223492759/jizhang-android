@@ -293,7 +293,7 @@ class AutoRecordService {
   // 解析通知文本 → 结构化记录
   ParsedNotification? _parse(Map<String, dynamic> raw) {
     final text = '${raw['title'] ?? ''} ${raw['text'] ?? ''}';
-    if (text.trim().isEmpty) return null;
+    if (text.trim().isEmpty) { recordLog('AI解析跳过:text为空'); return null; }
 
     // ---- ① 误识别过滤：强信号词（完成时态） ----
     // 含微信/支付宝转账：转账成功/已存入零钱/收到转账
@@ -321,10 +321,12 @@ class AutoRecordService {
     final hasStrong = strongKw.any((kw) => text.contains(kw));
     if (!hasStrong) {
       // 无强信号：直接丢弃（哪怕是支付 App——营销/聊天也会在支付 App 里出现）
+      recordLog('AI解析跳过:无强信号 text='${text.take(80)}'');
       return null;
     }
     // 虚拟积分类通知（支付宝积分/京豆/里程等）直接丢弃，不当作记账
     if (virtualKw.any((kw) => text.contains(kw))) {
+      recordLog('AI解析跳过:虚拟积分词匹配 text='${text.take(80)}'');
       return null;
     }
     if (marketingKw.any((kw) => text.contains(kw))) {
@@ -332,7 +334,7 @@ class AutoRecordService {
       // 否则视为营销截图误抓
       final clearSignal = ['支付成功', '付款成功', '成功付款', '收款成功', '到账', '入账', '扣款成功']
           .any((kw) => text.contains(kw));
-      if (!clearSignal) return null;
+      if (!clearSignal) { recordLog('AI解析跳过:营销词+信号不明 text=${text.take(80)}'); return null; }
     }
 
     // ---- ② 金额提取（优先级：实付/支付/付款金额 > 紧跟支付词的 ¥ > 首个 ¥） ----
