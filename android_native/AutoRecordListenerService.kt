@@ -185,17 +185,18 @@ object AutoRecordStore {
         }
     }
 
-    // 弹窗/处理日志：与 Flutter recordLog 同一个 SharedPreferences key（JSON 数组，最多 50 条）
+    // 弹窗/处理日志：直接写文件到 app 私有目录（Flutter 端通过 path_provider 读同一文件）
+    // 不通过 SharedPreferences，因为 native sp 文件 ≠ Flutter sp 文件（跨沙箱）
     fun appendLog(ctx: Context, msg: String) {
-        val sp = sp(ctx)
+        val file = java.io.File(ctx.filesDir, "native_logs.json")
         val cur = try {
-            JSONArray(sp.getString("auto_record_logs", "[]") ?: "[]")
+            JSONArray(if (file.exists()) file.readText() else "[]")
         } catch (_: Exception) {
             JSONArray()
         }
         while (cur.length() >= 50) cur.remove(0)
         cur.put(msg)
-        sp.edit().putString("auto_record_logs", cur.toString()).apply()
+        file.writeText(cur.toString())
     }
 
     fun appendPending(ctx: Context, item: JSONObject) {

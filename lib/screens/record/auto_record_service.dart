@@ -3,10 +3,12 @@ import 'package:jizhang_android/core/theme.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
 import 'package:jizhang_android/screens/record/auto_record_dialog.dart';
 
@@ -23,15 +25,25 @@ class AutoRecordService {
 
   /// 启动时把持久化的日志（含 native 弹窗记录）载入内存显示
   Future<void> loadPersistedLogs() async {
+    // 1) Flutter 端 SharedPreferences 日志
     final sp = await SharedPreferences.getInstance();
     final raw = sp.getString(_logSpKey);
     if (raw != null && raw.isNotEmpty) {
       try {
         final list = (jsonDecode(raw) as List).cast<String>();
         _logs.addAll(list.where((x) => x.isNotEmpty));
-        if (_logs.length > 50) _logs.removeRange(0, _logs.length - 50);
       } catch (_) {}
     }
+    // 2) native 端弹窗日志（写在 app 私有 files/native_logs.json，跨沙箱不共享 sp）
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/native_logs.json');
+      if (file.existsSync()) {
+        final list = (jsonDecode(file.readAsStringSync()) as List).cast<String>();
+        _logs.addAll(list.where((x) => x.isNotEmpty));
+      }
+    } catch (_) {}
+    if (_logs.length > 50) _logs.removeRange(0, _logs.length - 50);
     _logsListenable.value = List.from(_logs);
   }
 
@@ -39,6 +51,11 @@ class AutoRecordService {
     _logs.clear();
     _logsListenable.value = List.from(_logs);
     SharedPreferences.getInstance().then((sp) => sp.setString(_logSpKey, '[]'));
+    // 同时清 native 弹窗日志文件
+    getApplicationSupportDirectory().then((dir) {
+      final f = File('${dir.path}/native_logs.json');
+      if (f.existsSync()) f.writeAsStringSync('[]');
+    }).catchError((_) {});
   }
 
   // 监听 native 端弹窗日志推送（native 用 _channel.invokeMethod 调）
