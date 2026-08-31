@@ -206,6 +206,22 @@ class AutoRecordService {
     }
   }
 
+  // native id 去重：防同一条通知被 native 重复入队（合并支付的多笔不合并）
+  static const _kIdSeen = 'auto_record_id_seen';
+  Future<bool> _idDedupHit(String id) async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_kIdSeen);
+    if (raw == null) return false;
+    try { return ((jsonDecode(raw) as List).cast<String>()).contains(id); } catch (_) { return false; }
+  }
+  Future<void> _idDedupMark(String id) async {
+    final sp = await SharedPreferences.getInstance();
+    var list = (jsonDecode(sp.getString(_kIdSeen) ?? '[]') as List).cast<String>();
+    list.add(id);
+    if (list.length > 200) list.removeRange(0, list.length - 200);
+    await sp.setString(_kIdSeen, jsonEncode(list));
+  }
+
   Future<void> _dedupMark(String key) async {
     final sp = await SharedPreferences.getInstance();
     final map = (sp.getString(_kDedupSeen) ?? '');
@@ -276,38 +292,38 @@ class AutoRecordService {
     if (pending.isEmpty) return;
     _showing = true;
     try {
-      // 聚合通知合并：支付宝同一笔支付常常连续 2-3 条 heads-up
-      //（'服务通知' + '交易提醒/你有一笔 6.89 元的支出'），
-      // 按 pkg + 10 秒桶分组，取 text 最长的（通常含金额那条）——避免
-      // 0 元占位+有金额分别记两笔。
-      final merged = <String, Map<String, dynamic>>{};
+      // 逐条处理（不再按 10 秒桶合并）：
+      // - native 同 id 的同一条通知会被 _idDedupHit 跳过（防 native 重复入队），
+      //   这能解决 v1.4.58 之前的'0 元占位+有金额分别记两笔'问题
+      // - 不同 id（合并支付多笔）保留 → 多笔就记多笔（v1.5.2 行为）
       for (final raw in pending) {
-        final t = (raw['time'] as int?) ?? 0;
-        final pkg = (raw['pkg'] as String?) ?? '';
-        final bucket = t ~/ 10000; // 10 秒窗口
-        final key = '$pkg|$bucket';
-        final txt = (raw['text'] as String?) ?? '';
-        if (merged.containsKey(key)) {
-          if (txt.length > ((merged[key]!['text'] as String?) ?? '').length) {
-            merged[key] = Map<String, dynamic>.from(raw);
-          }
-        } else {
-          merged[key] = Map<String, dynamic>.from(raw);
+        final rid = raw['id']?.toString() ?? '';
+        if (rid.isEmpty) {
+          await removePending(rid);
+          continue;
         }
-      }
-      // 原始队列全部出队（合并后只处理 1 条）
-      for (final raw in pending) {
-        await removePending(raw['id']?.toString() ?? '');
-      }
-      // 处理合并后的
-      for (final raw in merged.values) {
+        if (await _idDedupHit(rid)) {
+          await removePending(rid);
+          continue;
+        }
         final parsed = _parse(raw);
-        if (parsed == null) continue;
-        if (await _excluded(parsed)) continue;
+        if (parsed == null) {
+          await removePending(rid);
+          continue;
+        }
+        if (await _excluded(parsed)) {
+          await removePending(rid);
+          continue;
+        }
         final dedupKey = '${parsed.merchant}|${parsed.amount.toStringAsFixed(2)}';
-        if (await _dedupHit(dedupKey)) continue;
+        if (await _dedupHit(dedupKey)) {
+          await removePending(rid);
+          continue;
+        }
         await _dedupMark(dedupKey);
+        await _idDedupMark(rid);
         await _saveParsedFlow(ref, parsed);
+        await removePending(rid);
       }
     } catch (_) {
     } finally {
