@@ -219,13 +219,20 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         'payment_method': '',
         'flow_time': ymd(_date),
       };
+      bool offlineQueued;
       if (_isEdit) {
-        await ref.read(localApiProvider).updateFlow(widget.initialFlow!.id, body);
+        // updateFlow：true 在线成功 / false 离线入队（本地已生效，连网后补传）
+        offlineQueued = !(await ref.read(localApiProvider).updateFlow(
+            widget.initialFlow!.id, body));
       } else {
-        await ref.read(localApiProvider).createFlow(body);
+        // createFlow：返回 id <= 0 表示离线入队（tmpId 为负数）
+        final id = await ref.read(localApiProvider).createFlow(body);
+        offlineQueued = id <= 0;
       }
       ref.read(dataVersionProvider.notifier).state++;
-      toast(_isEdit ? '已更新' : '已保存');
+      toast(offlineQueued
+          ? '已暂存本地，联网后自动同步'
+          : (_isEdit ? '已更新' : '已保存'));
       if (mounted) Navigator.pop(context);
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));

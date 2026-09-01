@@ -20,7 +20,16 @@ class ApiClient {
 
   ApiClient({required this.serverUrl, this.token, this.bookId}) {
     final base = '${serverUrl.replaceAll(RegExp(r'/$'), '')}/api';
-    _dio = Dio(BaseOptions(baseUrl: base, connectTimeout: const Duration(seconds: 15)));
+    _dio = Dio(BaseOptions(
+      baseUrl: base,
+      // 连接超时从 15s 降到 6s：飞行模式下 DNS 解析通常 5s 内出结果，
+      // 6s 不会出现"卡死 30s+ 才反馈"；超时分两类：
+      //   - 飞行模式/无网络 → connectionError（6s 内返回）
+      //   - 服务器慢 → 走 receiveTimeout（10s 单独控制）
+      connectTimeout: const Duration(seconds: 6),
+      sendTimeout: const Duration(seconds: 8),
+      receiveTimeout: const Duration(seconds: 12),
+    ));
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
         if (token != null && token!.isNotEmpty) {

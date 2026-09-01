@@ -24,14 +24,18 @@ class AutoRecordService {
   List<String> getLogs() => List.unmodifiable(_logs);
 
   /// 启动时把持久化的日志（含 native 弹窗记录）载入内存显示
+  /// - 进入时先清空 _logs（修复 issue：之前不清空就 addAll，
+  ///   导致多次进入 settings 页时把同一批 SP+native 日志叠加、UI 看似 50 条
+  ///   但里面有大量重复行）
+  /// - 合并后按 [HH:mm:ss] 时间戳统一排序（reverse=true 渲染让最新在最上面）
   Future<void> loadPersistedLogs() async {
     // 1) Flutter 端 SharedPreferences 日志
     final sp = await SharedPreferences.getInstance();
     final raw = sp.getString(_logSpKey);
+    final loaded = <String>[];
     if (raw != null && raw.isNotEmpty) {
       try {
-        final list = (jsonDecode(raw) as List).cast<String>();
-        _logs.addAll(list.where((x) => x.isNotEmpty));
+        loaded.addAll((jsonDecode(raw) as List).cast<String>().where((x) => x.isNotEmpty));
       } catch (_) {}
     }
     // 2) native 端弹窗日志（写在 app 私有 files/native_logs.json，跨沙箱不共享 sp）
@@ -39,11 +43,36 @@ class AutoRecordService {
       final dir = await getApplicationSupportDirectory();
       final file = File('${dir.path}/native_logs.json');
       if (file.existsSync()) {
-        final list = (jsonDecode(file.readAsStringSync()) as List).cast<String>();
-        _logs.addAll(list.where((x) => x.isNotEmpty));
+        loaded.addAll((jsonDecode(file.readAsStringSync()) as List).cast<String>().where((x) => x.isNotEmpty));
       }
     } catch (_) {}
-    if (_logs.length > 50) _logs.removeRange(0, _logs.length - 50);
+    // 去重（按行精确匹配，避免 sp/file 重复行）
+    final unique = <String>[];
+    final seen = <String>{};
+    for (final l in loaded) {
+      if (seen.add(l)) unique.add(l);
+    }
+    // 按 [HH:mm:ss] 时间戳升序排序；无法解析的行按原本顺序放在末尾
+    final tsRe = RegExp(r'^\[(\d{2}:\d{2}:\d{2})\]');
+    int _tsIdx(String line) {
+      final m = tsRe.firstMatch(line);
+      if (m == null) return -1;
+      // 转成可比较的整数 HHmmSS
+      final t = m.group(1)!.replaceAll(':', '');
+      return int.tryParse(t) ?? -1;
+    }
+    unique.sort((a, b) {
+      final ta = _tsIdx(a);
+      final tb = _tsIdx(b);
+      if (ta < 0 && tb < 0) return 0;
+      if (ta < 0) return 1; // 无时间戳的排后面
+      if (tb < 0) return -1;
+      return ta.compareTo(tb);
+    });
+    if (unique.length > 50) unique.removeRange(0, unique.length - 50);
+    _logs
+      ..clear()
+      ..addAll(unique);
     _logsListenable.value = List.from(_logs);
   }
 
@@ -396,12 +425,18 @@ class AutoRecordService {
       '扣款成功', '已扣款', '已消费', '消费', '扣款', '交易提醒',
       '入账', '到账', '还款成功', '已还款', '退款成功', '已退款',
     ];
-    // 虚拟积分/非现金类通知黑名单：即使含「到账/入账」也直接丢弃
-    // （支付宝积分到账、京豆、里程、信用分、金币、成长值等不是真实收支）
+    // 虚拟积分类通知黑名单（v1.5.3 收紧）：
+    // 单字'积分/豆'会误伤真实支出——招商银行信用卡「交易提醒 你有一笔 X.XX 元的支出，
+    // 点击领取 N 个支付宝积分」这类通知含'积分'字眼但其实是真实账目，
+    // 应该走金额路径记账而不是被一刀切掉。
+    // 双端保持一致：native 端 AutoRecordListenerService.kt virtualKw 必须同步改。
     const virtualKw = [
-      '积分', '金币', '京豆', '里程', '成长值', '信用分', '蚂蚁积分',
-      '积分到账', '积分入账', '返积分', '送积分', '领积分', '兑换积分',
-      '豆', '金币到账', '星星', '等级', '经验值', '会员积分',
+      '金币', '京豆', '里程', '成长值', '信用分', '蚂蚁积分',
+      '积分到账', '积分入账', '积分商城', '兑换积分',
+      '返积分', '送积分', '领积分', '已领积分', '积分兑换',
+      '金币到账', '获得金币', '领取金币', '兑换金币', '送金币',
+      '京豆到账', '送京豆', '领取京豆', '送里程', '返金币',
+      '星星', '等级', '经验值', '会员积分', '待领取积分',
     ];
     // 营销/聊天黑名单：命中这些词且没有强支付信号 → 丢弃（接龙/价目/优惠等）
     // 注意：不含「红包/领红包」——微信红包是真实收入（收到红包/领取红包），不能拦

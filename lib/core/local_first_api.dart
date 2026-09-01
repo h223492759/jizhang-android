@@ -412,7 +412,9 @@ final w = await _api.getWallets();
     } catch (_) {}
   }
 
-  Future<void> updateFlow(int id, Map<String, dynamic> body) async {
+  /// 修改流水：true=在线成功，false=离线入队（已写入本地镜像+出站队列，连网后补传）。
+  /// 抛出的异常是真正的非网络错误（如服务器 400、参数错等）。
+  Future<bool> updateFlow(int id, Map<String, dynamic> body) async {
     final db = LocalDb.instance;
     final existing = await db.flowById(id);
     try {
@@ -430,11 +432,19 @@ final w = await _api.getWallets();
         await db.upsertFlow(updated);
       }
       _syncAfterWrite();
+      return true;
     } catch (e) {
       if (_isNetworkErr(e) && existing != null) {
-        await db.markDirty(id, true);
+        // 离线：同样把修改后的值写回本地镜像（dirty=1），否则首页读本地还是旧值，
+        // 用户会以为"改了没反应"。出站队列会在联网后补传服务器。
+        final updated = <String, Object?>{...existing, ...body, 'id': id, 'dirty': 1};
+        if (!body.containsKey('flow_time')) {
+          updated['flow_time'] = existing['flow_time'];
+        }
+        updated['updated_at'] = _nowFull();
+        await db.upsertFlow(updated);
         await db.enqueue('update', 'flow', entityId: id, body: body);
-        return;
+        return false;
       }
       rethrow;
     }
