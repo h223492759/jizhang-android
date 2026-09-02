@@ -115,7 +115,9 @@ class AutoRecordListenerService : NotificationListenerService() {
             // 弹 heads-up 时 native 不知道 Flutter 是否会丢弃（如通知没金额）。
             val titleStr = "已加入待处理 $src"
             val body = if (title.isNotEmpty()) title else "自动记账已加入待处理"
-            val now = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.CHINA).format(java.util.Date())
+            // v1.5.4 加日期前缀：跨天不会因 HH:mm:ss 撞车而乱序；与 Flutter 端 recordLog
+            // 保持一致（双端统一，loadPersistedLogs 排序正则一并改）
+            val now = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.CHINA).format(java.util.Date())
             val logLine = if (amount.isNotEmpty()) "[$now][弹窗] $titleStr ¥$amount | $body"
                           else "[$now][弹窗] $titleStr | $body"
             // 直接写文件到 app 私有目录（Flutter 端通过 path_provider 读同一文件）

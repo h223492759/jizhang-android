@@ -24,6 +24,9 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
   List<String> _users = [];
   List<List<String>> _andGroups = [];
   List<String> _orKws = [];
+  // v1.5.4：系统跳过词（可编辑/恢复默认）
+  Map<String, List<String>> _systemKw = {};
+  List<List<String>> _systemRepayGroups = [];
   bool _loading = true;
 
   @override
@@ -40,6 +43,8 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
     _users = await svc.userList;
     _andGroups = await svc.andGroups;
     _orKws = await svc.orKeywords;
+    _systemKw = await svc.systemKeywords;
+    _systemRepayGroups = await svc.systemRepayGroups;
     if (mounted) setState(() => _loading = false);
   }
 
@@ -166,6 +171,190 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
     await AutoRecordService.instance.setOrKeywords(_orKws);
   }
 
+  // ============== v1.5.4 系统跳过词编辑 ==============
+
+  Widget _buildSystemKwCard(String groupKey, String desc) {
+    final list = _systemKw[groupKey] ?? const <String>[];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(groupKey, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const SizedBox(height: 2),
+            Text(desc,
+                style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+            const SizedBox(height: 8),
+            if (list.isEmpty)
+              Text('（已全部删除，将不会按此规则跳过）',
+                  style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context)))
+            else
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: list
+                    .map((kw) => InputChip(
+                          label: Text(kw, style: const TextStyle(fontSize: 12)),
+                          onDeleted: () => _removeSystemKw(groupKey, kw),
+                          deleteIcon: const Icon(Icons.close, size: 14),
+                          visualDensity: VisualDensity.compact,
+                        ))
+                    .toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _removeSystemKw(String groupKey, String kw) async {
+    final list = List<String>.from(_systemKw[groupKey] ?? const <String>[]);
+    list.remove(kw);
+    setState(() => _systemKw[groupKey] = list);
+    await AutoRecordService.instance.setSystemKeywords(_systemKw);
+  }
+
+  Future<void> _resetSystemKeywords() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('恢复系统默认跳过词'),
+        content: const Text('将清空你删除的关键词，恢复为内置默认值。确定继续吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('恢复')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await AutoRecordService.instance.resetSystemKeywords();
+    final fresh = await AutoRecordService.instance.systemKeywords;
+    final freshGroups = await AutoRecordService.instance.systemRepayGroups;
+    if (mounted) {
+      setState(() {
+        _systemKw = fresh;
+        _systemRepayGroups = freshGroups;
+      });
+      toast('已恢复系统默认跳过词');
+    }
+  }
+
+  /// 编辑「信用卡还款」AND 规则组（每组全部同时出现才屏蔽）
+  /// 0.65 漏记复测路径：用户可删掉含「花呗」的那组 → 真实支出通知不再被拦
+  Future<void> _editSystemRepayGroups() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: AppPalette.card(context),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (c, setSheet) {
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+                16, 16, 16, 16 + MediaQuery.of(ctx).viewInsets.bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('信用卡还款 AND 规则',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text('每组所有关键词同时出现才屏蔽。点 × 删除某组（如含「花呗」即可让"花呗+还款"通知记账）',
+                    style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                const SizedBox(height: 12),
+                if (_systemRepayGroups.isEmpty)
+                  Text('暂无规则（不会按此规则屏蔽）',
+                      style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context)))
+                else
+                  ...List.generate(_systemRepayGroups.length, (i) {
+                    final g = _systemRepayGroups[i];
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(g.join(' + ')),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () async {
+                          setSheet(() => _systemRepayGroups.removeAt(i));
+                          await AutoRecordService.instance
+                              .setSystemRepayGroups(_systemRepayGroups);
+                        },
+                      ),
+                    );
+                  }),
+                const SizedBox(height: 8),
+                Row(children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('添加组'),
+                    onPressed: () async {
+                      final ctrl = TextEditingController();
+                      final input = await showDialog<String>(
+                        context: ctx,
+                        builder: (c2) => AlertDialog(
+                              title: const Text('添加 AND 组'),
+                              content: TextField(
+                                controller: ctrl,
+                                autofocus: true,
+                                decoration: const InputDecoration(
+                                  hintText: '多个关键词用逗号或空格分隔，如：还款, 信用卡',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(c2), child: const Text('取消')),
+                                TextButton(
+                                    onPressed: () => Navigator.pop(c2, ctrl.text.trim()),
+                                    child: const Text('添加')),
+                              ],
+                            ),
+                      );
+                      if (input == null || input.isEmpty) return;
+                      final kws = input
+                          .split(RegExp(r'[,，\s]+'))
+                          .map((e) => e.trim())
+                          .where((e) => e.isNotEmpty)
+                          .toList();
+                      if (kws.length < 2) {
+                        toast('至少 2 个（AND 规则）');
+                        return;
+                      }
+                      setSheet(() => _systemRepayGroups.add(kws));
+                      await AutoRecordService.instance
+                          .setSystemRepayGroups(_systemRepayGroups);
+                    },
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () async {
+                      await AutoRecordService.instance.resetSystemKeywords();
+                      final fresh = await AutoRecordService.instance.systemRepayGroups;
+                      setSheet(() => _systemRepayGroups = fresh);
+                      if (mounted) setState(() {});
+                    },
+                    icon: const Icon(Icons.restore, size: 16),
+                    label: const Text('恢复默认'),
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('完成'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -272,6 +461,15 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                         _saveEx();
                       }),
                     ),
+                    if (_ex['repay'] == true)
+                      ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.tune, size: 16, color: Colors.grey),
+                        title: const Text('编辑/查看关键词',
+                            style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        trailing: const Icon(Icons.chevron_right, size: 16),
+                        onTap: _editSystemRepayGroups,
+                      ),
 
                     SwitchListTile(
                       title: const Text('转给指定用户'),
@@ -293,6 +491,27 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                     ),
                   ]),
                 ),
+                const SizedBox(height: 12),
+                // 系统跳过词（v1.5.4 暴露到设置页可编辑/恢复默认）：
+                // virtualKw/marketingKw 原硬编码，现支持点 × 删除某条 + 恢复默认
+                Row(children: [
+                  const Text('系统跳过词',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _resetSystemKeywords,
+                    icon: const Icon(Icons.restore, size: 16),
+                    label: const Text('恢复默认'),
+                  ),
+                ]),
+                Text('通知文本命中这些词会被识别为「非真实支付」直接跳过；点 × 删除某条',
+                    style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                const SizedBox(height: 4),
+                _buildSystemKwCard('虚拟积分',
+                    '支付宝积分/京豆/金币/里程/成长值等（命中即跳过）'),
+                const SizedBox(height: 8),
+                _buildSystemKwCard('营销聊天',
+                    '优惠/秒杀/团购/接龙等（命中且无明确支付信号则跳过）'),
                 const SizedBox(height: 12),
                 // 自定义「同时出现才屏蔽」：每组所有关键词同时出现才忽略
                 Row(children: [

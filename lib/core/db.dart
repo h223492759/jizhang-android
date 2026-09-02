@@ -247,17 +247,43 @@ class LocalDb {
     await d.delete('flows', where: 'book_id=?', whereArgs: [bookId]);
   }
 
-  /// 删除本地不在 allIds 里的流水（与服务器对账）
-  Future<void> deleteFlowsNotIn(int bookId, List<int> allIds) async {
+  /// 删除本地不在 allIds 里的流水（与服务器对账）。
+  /// [safeSinceSeconds] 保护窗口秒数：本地 created_at 在该窗口内的行不被删除，
+  /// 用于「首页新建/改日期」流水写入后 syncNow 对账时被误删导致「先消失再刷新才出现」。
+  /// 默认 30s；超过保护窗口的本地行若不在 allIds 仍按原逻辑删除（服务器真删了能跟上）。
+  Future<void> deleteFlowsNotIn(int bookId, List<int> allIds,
+      {int safeSinceSeconds = 30}) async {
     final d = await db;
+    // 计算保护截止时间（当前时间往前 safeSinceSeconds 秒），字符串便于 SQL 比较
+    final useSafe = safeSinceSeconds > 0;
+    String cutoff = '';
+    if (useSafe) {
+      cutoff = DateTime.now()
+          .subtract(Duration(seconds: safeSinceSeconds))
+          .toString()
+          .substring(0, 19);
+    }
     if (allIds.isEmpty) {
-      await d.delete('flows', where: 'book_id=?', whereArgs: [bookId]);
+      if (useSafe) {
+        await d.rawDelete(
+            'DELETE FROM flows WHERE book_id=? AND (created_at IS NULL OR created_at < ?)',
+            [bookId, cutoff]);
+      } else {
+        await d.delete('flows', where: 'book_id=?', whereArgs: [bookId]);
+      }
       return;
     }
     final marks = List.filled(allIds.length, '?').join(',');
-    await d.rawDelete(
-        'DELETE FROM flows WHERE book_id=? AND id NOT IN ($marks)',
-        [bookId, ...allIds]);
+    if (useSafe) {
+      await d.rawDelete(
+          'DELETE FROM flows WHERE book_id=? AND id NOT IN ($marks) '
+          'AND (created_at IS NULL OR created_at < ?)',
+          [bookId, ...allIds, cutoff]);
+    } else {
+      await d.rawDelete(
+          'DELETE FROM flows WHERE book_id=? AND id NOT IN ($marks)',
+          [bookId, ...allIds]);
+    }
   }
 
   Future<List<Map<String, Object?>>> queryFlows(

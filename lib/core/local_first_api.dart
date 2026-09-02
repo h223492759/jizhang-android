@@ -1484,6 +1484,11 @@ final w = await _api.getWallets();
         'payment_method': b['payment_method'] ?? '',
         'description': b['description'] ?? '',
         'flow_time': b['flow_time'] ?? '',
+        // 本地新建/修改时刻（用于 syncNow 对账时保护刚写入的乐观行，
+        // 避免「首页新建/改日期后流水先消失再刷新才出现」：
+        // deleteFlowsNotIn 增加 safeSince 参数，只删 created_at 早于 now-safeSince 的本地行）
+        'created_at': _nowFull(),
+        'updated_at': _nowFull(),
         'source': b['source'] ?? '',
         'attribution': b['attribution'] ?? '',
         'attribution_uid': b['attribution_uid'],

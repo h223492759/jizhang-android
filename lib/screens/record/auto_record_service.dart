@@ -52,8 +52,9 @@ class AutoRecordService {
     for (final l in loaded) {
       if (seen.add(l)) unique.add(l);
     }
-    // 按 [HH:mm:ss] 时间戳升序排序；无法解析的行按原本顺序放在末尾
-    final tsRe = RegExp(r'^\[(\d{2}:\d{2}:\d{2})\]');
+    // 按 [YYYY-MM-DD HH:mm:ss] 时间戳升序排序（v1.5.4 加日期，避免跨天乱序）；
+    // 无法解析的行按原本顺序放在末尾
+    final tsRe = RegExp(r'^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]');
     int _tsIdx(String line) {
       final m = tsRe.firstMatch(line);
       if (m == null) return -1;
@@ -98,7 +99,9 @@ class AutoRecordService {
   }
 
   void recordLog(String msg) {
-    final ts = DateTime.now().toString().substring(11, 19);
+    // v1.5.4 加日期前缀：跨天不会因 HH:mm:ss 撞车而乱序；与 native 端 SimpleDateFormat
+    // ("yyyy-MM-dd HH:mm:ss") 保持一致（双端统一，loadPersistedLogs 排序正则一并改）
+    final ts = DateTime.now().toString().substring(0, 19);
     final line = "[$ts] $msg";
     _logs.add(line);
     if (_logs.length > 50) _logs.removeAt(0);
@@ -117,7 +120,7 @@ class AutoRecordService {
       await sp.setString(_logSpKey, jsonEncode(list));
     });
   }
-  static const _channel = MethodChannel('jizhang/auto_record');
+  static const _kChannel = 'jizhang/auto_record';
   static const _kEnabled = 'auto_record_enabled';
   static const _kExcludeRepay = 'auto_exclude_repay';
   static const _kExcludeSelfTransfer = 'auto_exclude_self_transfer';
@@ -128,6 +131,8 @@ class AutoRecordService {
   static const _kOrKeywords = 'auto_exclude_or_keywords';
   static const _kIgnoreMerchants = 'auto_ignore_merchants';
   static const _kDedupSeen = 'auto_dedup_seen';
+  static const _kSystemKw = 'auto_system_keywords'; // v1.5.4 系统跳过词（分组可编辑）
+  static const _kSystemRepayGroups = 'auto_system_repay_groups'; // v1.5.4 信用卡还款 AND 规则
 
   static AutoRecordService? _instance;
   static AutoRecordService get instance =>
@@ -138,6 +143,9 @@ class AutoRecordService {
   // 避免 6 秒定时轮轮把同一批通知堆出多个弹窗（用户截图里"点了很多次忽略
   // 后弹窗后面都变浅/变深"就是这个原因）。
   bool _showing = false;
+  // v1.5.4：缓存系统跳过词（每次 _processQueue 开头预取，供 _parse 同步使用）
+  Map<String, List<String>>? _cachedSystemKw;
+  List<List<String>>? _cachedRepayGroups;
 
   AutoRecordService._();
 
@@ -214,6 +222,96 @@ class AutoRecordService {
   Future<void> setIgnoreMerchants(List<String> list) async {
     final sp = await SharedPreferences.getInstance();
     await sp.setStringList(_kIgnoreMerchants, list);
+  }
+
+  // ============== v1.5.4 系统跳过词（分组可编辑：设置页能删/恢复默认） ==============
+  // 虚拟积分类通知黑名单（v1.5.3 收紧后的精确词组；用户可在设置页删除某条）
+  static const _defaultVirtualKw = [
+    '金币', '京豆', '里程', '成长值', '信用分', '蚂蚁积分',
+    '积分到账', '积分入账', '积分商城', '兑换积分',
+    '返积分', '送积分', '领积分', '已领积分', '积分兑换',
+    '金币到账', '获得金币', '领取金币', '兑换金币', '送金币',
+    '京豆到账', '送京豆', '领取京豆', '送里程', '返金币',
+    '星星', '等级', '经验值', '会员积分', '待领取积分',
+  ];
+  // 营销/聊天黑名单（v1.5.3；用户可编辑）
+  static const _defaultMarketingKw = [
+    '优惠', '秒杀', '限时', '活动', '领券', '抵扣', '接龙', '价目',
+    '团购', '热卖', '返利', '折扣', '会员日', '特惠', '立减', '满减',
+    '优惠券', '代金券', '促销', '特价', '砍价', '拼团', '商品推荐',
+  ];
+  // 信用卡还款 AND 规则（v1.5.4 改成"两组 AND 规则"可编辑）
+  // 默认：含"还款"+"信用卡" → 屏蔽；含"还款"+"花呗" → 屏蔽
+  // 0.65 漏记复测：删掉"花呗"那条 AND 规则后，"花呗+还款"通知不再被拦
+  static const _defaultRepayGroups = [
+    ['还款', '信用卡'],
+    ['还款', '花呗'],
+  ];
+
+  /// 返回系统跳过词分组（供设置页编辑/展示）
+  Future<Map<String, List<String>>> get systemKeywords async {
+    final sp = await SharedPreferences.getInstance();
+    var raw = sp.getString(_kSystemKw);
+    Map<String, dynamic> parsed;
+    if (raw == null || raw.isEmpty) {
+      // 首次：写入默认值（v1.5.4 默认值就是收紧后的词表）
+      parsed = {
+        '虚拟积分': List<String>.from(_defaultVirtualKw),
+        '营销聊天': List<String>.from(_defaultMarketingKw),
+      };
+      await sp.setString(_kSystemKw, jsonEncode(parsed));
+    } else {
+      try {
+        parsed = (jsonDecode(raw) as Map<String, dynamic>);
+      } catch (_) {
+        parsed = {};
+      }
+    }
+    // 兼容旧数据：确保三个默认分组都存在
+    final out = <String, List<String>>{};
+    for (final k in ['虚拟积分', '营销聊天']) {
+      final v = parsed[k];
+      out[k] = v is List ? v.cast<String>().toList() : [];
+    }
+    return out;
+  }
+
+  Future<void> setSystemKeywords(Map<String, List<String>> v) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(_kSystemKw, jsonEncode(v));
+  }
+
+  /// 信用卡还款 AND 规则组（每组 = 全部同时出现才屏蔽）
+  Future<List<List<String>>> get systemRepayGroups async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_kSystemRepayGroups);
+    if (raw == null || raw.isEmpty) {
+      // 首次：写入默认值
+      final groups = _defaultRepayGroups.map((g) => List<String>.from(g)).toList();
+      await sp.setString(_kSystemRepayGroups, jsonEncode(groups));
+      return groups;
+    }
+    try {
+      return (jsonDecode(raw) as List).map((g) => (g as List).cast<String>()).toList();
+    } catch (_) {
+      return _defaultRepayGroups.map((g) => List<String>.from(g)).toList();
+    }
+  }
+
+  Future<void> setSystemRepayGroups(List<List<String>> groups) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(_kSystemRepayGroups, jsonEncode(groups));
+  }
+
+  /// 一键恢复所有系统跳过词为默认值（虚拟积分 / 营销聊天 / 信用卡还款 AND 组）
+  Future<void> resetSystemKeywords() async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(_kSystemKw, jsonEncode({
+      '虚拟积分': List<String>.from(_defaultVirtualKw),
+      '营销聊天': List<String>.from(_defaultMarketingKw),
+    }));
+    await sp.setString(_kSystemRepayGroups,
+        jsonEncode(_defaultRepayGroups.map((g) => List<String>.from(g)).toList()));
   }
 
   // ---------------- 去重指纹（持久化） ----------------
@@ -317,6 +415,9 @@ class AutoRecordService {
     if (!(await enabled)) return;
     final s = ref.read(sessionProvider);
     if (!s.hasToken || !s.hasBook) return;
+    // v1.5.4：预取系统跳过词缓存（_parse 同步使用，避免每次都读 SP）
+    _cachedSystemKw = await systemKeywords;
+    _cachedRepayGroups = await systemRepayGroups;
     final pending = await fetchPending();
     if (pending.isEmpty) return;
     _showing = true;
@@ -412,6 +513,8 @@ class AutoRecordService {
   }
 
   // 解析通知文本 → 结构化记录
+  // v1.5.4：virtualKw/marketingKw 改为从 SP 读取（设置页可编辑/恢复默认）；
+  // hardcoded 常量保留 _defaultVirtualKw/_defaultMarketingKw 仅作首启动默认值
   ParsedNotification? _parse(Map<String, dynamic> raw) {
     final text = '${raw['title'] ?? ''} ${raw['text'] ?? ''}';
     if (text.trim().isEmpty) { recordLog('AI解析跳过:text为空'); return null; }
@@ -425,43 +528,28 @@ class AutoRecordService {
       '扣款成功', '已扣款', '已消费', '消费', '扣款', '交易提醒',
       '入账', '到账', '还款成功', '已还款', '退款成功', '已退款',
     ];
-    // 虚拟积分类通知黑名单（v1.5.3 收紧）：
-    // 单字'积分/豆'会误伤真实支出——招商银行信用卡「交易提醒 你有一笔 X.XX 元的支出，
-    // 点击领取 N 个支付宝积分」这类通知含'积分'字眼但其实是真实账目，
-    // 应该走金额路径记账而不是被一刀切掉。
-    // 双端保持一致：native 端 AutoRecordListenerService.kt virtualKw 必须同步改。
-    const virtualKw = [
-      '金币', '京豆', '里程', '成长值', '信用分', '蚂蚁积分',
-      '积分到账', '积分入账', '积分商城', '兑换积分',
-      '返积分', '送积分', '领积分', '已领积分', '积分兑换',
-      '金币到账', '获得金币', '领取金币', '兑换金币', '送金币',
-      '京豆到账', '送京豆', '领取京豆', '送里程', '返金币',
-      '星星', '等级', '经验值', '会员积分', '待领取积分',
-    ];
-    // 营销/聊天黑名单：命中这些词且没有强支付信号 → 丢弃（接龙/价目/优惠等）
-    // 注意：不含「红包/领红包」——微信红包是真实收入（收到红包/领取红包），不能拦
-    const marketingKw = [
-      '优惠', '秒杀', '限时', '活动', '领券', '抵扣', '接龙', '价目',
-      '团购', '热卖', '返利', '折扣', '会员日', '特惠', '立减', '满减',
-      '优惠券', '代金券', '促销', '特价', '砍价', '拼团', '商品推荐',
-    ];
+    // virtualKw/marketingKw 从 SP 异步读取（v1.5.4：设置页可编辑/恢复默认），
+    // 这里同步读取需要预加载——放在 _processQueue 调用 _parse 前预取并缓存
+    final virtualKw = _cachedSystemKw?['虚拟积分'] ?? const <String>[];
+    final marketingKw = _cachedSystemKw?['营销聊天'] ?? const <String>[];
     final hasStrong = strongKw.any((kw) => text.contains(kw));
     if (!hasStrong) {
-      // 无强信号：直接丢弃（哪怕是支付 App——营销/聊天也会在支付 App 里出现）
       recordLog("AI解析跳过:无强信号 text=${text.substring(0, text.length < 80 ? text.length : 80)}");
       return null;
     }
-    // 虚拟积分类通知（支付宝积分/京豆/里程等）直接丢弃，不当作记账
-    if (virtualKw.any((kw) => text.contains(kw))) {
+    // 虚拟积分类通知直接丢弃，不当作记账（v1.5.4 从 SP 取）
+    if (virtualKw.isNotEmpty && virtualKw.any((kw) => text.contains(kw))) {
       recordLog("AI解析跳过:虚拟积分词匹配 text=${text.substring(0, text.length < 80 ? text.length : 80)}");
       return null;
     }
-    if (marketingKw.any((kw) => text.contains(kw))) {
+    if (marketingKw.isNotEmpty && marketingKw.any((kw) => text.contains(kw))) {
       // 有强信号但混了营销词：只有当强信号词非常明确（成功/到账/扣款）才继续，
       // 否则视为营销截图误抓
-      final clearSignal = ['支付成功', '付款成功', '成功付款', '收款成功', '到账', '入账', '扣款成功']
-          .any((kw) => text.contains(kw));
-      if (!clearSignal) { recordLog('AI解析跳过:营销词+信号不明 text=${text.substring(0, text.length < 80 ? text.length : 80)}'); return null; }
+      const clearSignal = ['支付成功', '付款成功', '成功付款', '收款成功', '到账', '入账', '扣款成功'];
+      if (!clearSignal.any((kw) => text.contains(kw))) {
+        recordLog('AI解析跳过:营销词+信号不明 text=${text.substring(0, text.length < 80 ? text.length : 80)}');
+        return null;
+      }
     }
 
     // ---- ② 金额提取（优先级：实付/支付/付款金额 > 紧跟支付词的 ¥ > 首个 ¥） ----
@@ -578,16 +666,16 @@ class AutoRecordService {
       recordLog('跳过记账:${p.merchant} | ${skipReason}');
       return true;
     }
-    // 信用卡还款：同时含「还款」+「信用卡」或「还款」+「花呗」才忽略（AND）
+    // 信用卡还款：每组 AND 规则全部命中 → 屏蔽（v1.5.4：缓存的 systemRepayGroups 可编辑）
     if (ex['repay'] == true) {
-      final hasRepay = p.text.contains('还款');
-      final hasCard = p.text.contains('信用卡');
-      final hasHuabei = p.text.contains('花呗');
-      if (hasRepay && (hasCard || hasHuabei)) {
-        skipReason = '信用卡还款规则';
-        recordLog('跳过记账:${p.merchant} | ${skipReason}');
-        return true;
-    }
+      final groups = _cachedRepayGroups ?? (await systemRepayGroups);
+      for (final group in groups) {
+        if (group.isNotEmpty && group.every((k) => p.text.contains(k))) {
+          skipReason = '信用卡还款规则:${group.join("+")}';
+          recordLog('跳过记账:${p.merchant} | ${skipReason}');
+          return true;
+        }
+      }
     }
     // 自定义「同时出现才屏蔽」：每组全部关键词同时出现 → 忽略
     for (final group in andGroups) {

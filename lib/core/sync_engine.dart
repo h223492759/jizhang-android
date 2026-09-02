@@ -431,8 +431,11 @@ class SyncEngine extends ChangeNotifier {
       rows.add(_flowToRow(bookId, m));
     }
     if (rows.isNotEmpty) await db.upsertFlows(rows);
-    // 对账删除：all_ids 之外的本地行删掉（outbox 中的行在服务器仍存在，不受影响）
-    await db.deleteFlowsNotIn(bookId, allIds);
+    // 对账删除：all_ids 之外的本地行删掉（outbox 中的行在服务器仍存在，不受影响）。
+    // safeSinceSeconds=30：保护本地刚写入 30s 内的乐观行（首页新建/改日期后立即同步会被误删，
+    // 导致「先消失再刷新才出现」；30s 保护窗口确保用户能在首页看到新建行，
+    // 超过 30s 仍未出现在 server allIds 的仍按原逻辑删除——服务器真删了能跟上）。
+    await db.deleteFlowsNotIn(bookId, allIds, safeSinceSeconds: 30);
     // 游标推进用服务器时间（避免手机时钟偏差）
     final serverTime = (d['server_time'] as String?) ??
         DateTime.now().toIso8601String();
