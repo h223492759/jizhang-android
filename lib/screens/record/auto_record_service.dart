@@ -121,6 +121,10 @@ class AutoRecordService {
     });
   }
   static const _kChannel = 'jizhang/auto_record';
+  // v1.5.4 修复：与 native 端通信的 MethodChannel 实例（native MainActivity.kt
+  // 以同名 "jizhang/auto_record" 注册 handler；重构时误删字段只剩常量导致 CI
+  // analyze 报 Undefined name '_channel'）。初始化必须先于 _initMethodHandler() 使用。
+  static const MethodChannel _channel = MethodChannel(_kChannel);
   static const _kEnabled = 'auto_record_enabled';
   static const _kExcludeRepay = 'auto_exclude_repay';
   static const _kExcludeSelfTransfer = 'auto_exclude_self_transfer';
