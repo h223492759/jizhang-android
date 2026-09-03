@@ -43,11 +43,14 @@ class AutoRecordAccessibilityService : AccessibilityService() {
     // 与通知监听同一份强信号词（页面命中「支付成功/收款成功…」才算完成页）。
     // 注：页面文本通常没有「交易提醒」这类通知标题词，主要靠 支付成功/付款成功/
     // 收款成功/转账成功/交易成功/扣款 等完成态词命中。
+    // v2.0.1：删除裸词「收款/转账/转入/扣款/消费」——这些词在支付宝/微信日常页面
+    // （转账按钮、收款码、付款记录）常驻，每次打开就触发记账，已误记 N 笔 0 元/小数。
+    // 改为只保留【完成态】复合词；「到账」保留（招行碰一碰结果页常用）。
     private val strongKw = listOf(
         "支付成功", "付款成功", "成功付款", "支付成功通知", "已支付", "已付款",
-        "收款成功", "已收款", "收款通知", "收款到账", "收款",
-        "转账成功", "转账", "已存入", "收到转账", "转入",
-        "扣款成功", "已扣款", "已消费", "消费", "扣款", "交易提醒",
+        "收款成功", "已收款", "收款通知", "收款到账",
+        "转账成功", "已存入", "收到转账",
+        "扣款成功", "已扣款", "已消费", "交易提醒",
         "入账", "到账", "还款成功", "已还款", "退款成功", "已退款",
         // 页面高频完成态词（通知文本少见但结果页必有）
         "交易成功", "支付完成", "付款完成", "交易完成", "缴费成功"
@@ -60,8 +63,13 @@ class AutoRecordAccessibilityService : AccessibilityService() {
         "拼团", "砍价", "抽奖", "活动", "会员", "邀请", "推荐", "红包"
     )
 
-    // 页面前 3 个节点若含这些词 → 疑似历史账单/明细/流水列表页，不记
-    private val listPageTopKw = listOf("账单", "明细", "交易记录", "收支", "流水", "历史", "全部")
+    // v2.0.1：覆盖支付宝/微信日常入口页 + 原列表页（修「打开就记」主因之一）
+    private val listPageTopKw = listOf(
+        "我的", "朋友", "通讯录", "消息", "聊天", "首页", "扫一扫",
+        "付款码", "收钱码", "卡包", "余额", "好友", "服务",
+        // 原列表页
+        "账单", "明细", "交易记录", "收支", "流水", "历史", "全部"
+    )
 
     // 命中冷却：同「包|金额」30s 内只入队一次（防同一结果页/同额行反复触发误抓；
     // 连续两笔不同金额的真支付不受影响——按金额区分而不是按包名一刀切）
@@ -112,7 +120,22 @@ class AutoRecordAccessibilityService : AccessibilityService() {
             return
         }
         val kw = hits.minByOrNull { it.second }!!.first
-        val amt = extractAmount(all)
+        val kwIdx = hits.minByOrNull { it.second }!!.second
+        // v2.0.1：金额必须出现在「强信号词 ±30 字」窗口内——避开页面里无关的余额/费率/
+        // 积分数字（之前把账户余额 0.14 / 0.50 当成支付金额误识）。
+        val winStart = (kwIdx - 30).coerceAtLeast(0)
+        val winEnd = (kwIdx + kw.length + 30).coerceAtMost(all.length)
+        val window = all.substring(winStart, winEnd)
+        val amt = extractAmount(window)
+        // v2.0.1：窗口内既无金额也无「0 元 / 0.00 / 免支付」明确字样 → 跳过不入账
+        // （修「打开支付宝就记 0 元占位」问题；保留 0 元保底以防页面无金额的成功页漏记）
+        if (amt.isEmpty()) {
+            val zeroHint = Regex("(?:^|\\D)0(?:\\.0+)?\\s*(?:元|人民币)|免支付").containsMatchIn(window)
+            if (!zeroHint) {
+                logFile("[无障碍] 窗口内无金额且非明确免支付，跳过 kw=$kw pkg=$pkg win=\"$window\"")
+                return
+            }
+        }
         // 同「包|金额」冷却（页面重发/同额列表行防抖；无金额占位也用空串区分）
         val sigKey = "$pkg|$amt"
         val nowMs = System.currentTimeMillis()
@@ -138,7 +161,7 @@ class AutoRecordAccessibilityService : AccessibilityService() {
                 lastEnqueueAt[sigKey] = System.currentTimeMillis()
                 logFile("[无障碍] 已入队 id=${id.takeLast(18)} amt=${amt.ifEmpty { "0元占位" }}")
                 postHeadsUp(pkg, kw, amt)
-                launchMain(id)
+                // v2.0.1：不调 launchMain 抢前台——用户要求「弹 heads-up 即可，跳转 App 太烦」
             } else {
                 logFile("[无障碍] 队列去重跳过：同包同额已有条目（通知通道优先） kw=$kw")
             }
@@ -237,16 +260,8 @@ class AutoRecordAccessibilityService : AccessibilityService() {
         nm.createNotificationChannel(ch)
     }
 
-    private fun launchMain(id: String) {
-        try {
-            val i = Intent(this, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                putExtra("auto_record", id)
-            }
-            startActivity(i)
-        } catch (_: Exception) {
-        }
-    }
+    // v2.0.1：删除 launchMain——自动记账后不再抢前台（用户要求：heads-up 弹窗即可）
+    // private fun launchMain(id: String) { ... }
 
     /** 用户可见日志：与通知通道同文件（native_logs.json），[无障碍] 前缀区分来源 */
     private fun logFile(msg: String) {
