@@ -64,9 +64,10 @@ class AutoRecordListenerService : NotificationListenerService() {
         val hasStrong = strongKw.any { all.contains(it) }
         if (!hasStrong) return  // 没强信号词一律不入队（如营销「邀请店主领用收钱码可得20元」）
         if (virtualKw.any { all.contains(it) }) return  // 虚拟积分直接丢弃
-        // 抓一个金额作为通知摘要（取第一个 ¥/￥/元）
+        // 抓一个金额作为通知摘要（取第一个 ¥/￥/元/人民币；与 Flutter _parse 同步，v1.5.5 补人民币格式）
         val amtMatch = Regex("[¥￥]\\s*([0-9]+(?:\\.[0-9]{1,2})?)").find(all)
-            ?: Regex("([0-9]+(?:\\.[0-9]{1,2})?)\\s*元").find(all)
+            ?: Regex("([0-9]+(?:\\.[0-9]{1,2})?)\\s*(?:元|人民币)").find(all)
+            ?: Regex("(?:人民币|RMB)\\s*([0-9]+(?:\\.[0-9]{1,2})?)").find(all)
         val amt = amtMatch?.groupValues?.getOrNull(1) ?: ""
         Log.d("AutoRecord", "hasStrong=$hasStrong amt=$amt")
         val id = "${System.currentTimeMillis()}_${pkg}"

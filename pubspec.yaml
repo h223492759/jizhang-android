@@ -1,7 +1,7 @@
 name: jizhang_android
 description: 记账本 - 安卓客户端（复刻鲨鱼记账交互，对接 jizhang 后端）
 publish_to: 'none'
-version: 1.5.4+1
+version: 1.5.5+1
 
 environment:
   sdk: '>=3.4.0 <4.0.0'

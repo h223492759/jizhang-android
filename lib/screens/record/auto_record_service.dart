@@ -27,7 +27,8 @@ class AutoRecordService {
   /// - 进入时先清空 _logs（修复 issue：之前不清空就 addAll，
   ///   导致多次进入 settings 页时把同一批 SP+native 日志叠加、UI 看似 50 条
   ///   但里面有大量重复行）
-  /// - 合并后按 [HH:mm:ss] 时间戳统一排序（reverse=true 渲染让最新在最上面）
+  /// - 合并去重后按 [yyyy-MM-dd HH:mm:ss] 时间戳统一【降序】存储（最新 index0），
+  ///   UI 顺序渲染即最新在上、复制按钮输出同序（v1.5.5 起不再依赖 reverse 技巧）
   Future<void> loadPersistedLogs() async {
     // 1) Flutter 端 SharedPreferences 日志
     final sp = await SharedPreferences.getInstance();
@@ -52,25 +53,12 @@ class AutoRecordService {
     for (final l in loaded) {
       if (seen.add(l)) unique.add(l);
     }
-    // 按 [YYYY-MM-DD HH:mm:ss] 时间戳升序排序（v1.5.4 加日期，避免跨天乱序）；
-    // 无法解析的行按原本顺序放在末尾
-    final tsRe = RegExp(r'^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]');
-    int _tsIdx(String line) {
-      final m = tsRe.firstMatch(line);
-      if (m == null) return -1;
-      // 转成可比较的整数 HHmmSS
-      final t = m.group(1)!.replaceAll(':', '');
-      return int.tryParse(t) ?? -1;
-    }
-    unique.sort((a, b) {
-      final ta = _tsIdx(a);
-      final tb = _tsIdx(b);
-      if (ta < 0 && tb < 0) return 0;
-      if (ta < 0) return 1; // 无时间戳的排后面
-      if (tb < 0) return -1;
-      return ta.compareTo(tb);
-    });
-    if (unique.length > 50) unique.removeRange(0, unique.length - 50);
+    // 按 [YYYY-MM-DD HH:mm:ss] 时间戳【降序】排序：最新在最前（UI 顺序渲染即最新在上）。
+    // ⚠️ v1.5.5 修复：旧实现 group(1).replaceAll(':','') 后仍是 "2026-09-02 153705"
+    // （残留 '-' 与空格）→ int.tryParse 全部 null → 全落到 -1 → sort 完全失效，
+    // 日志永远按「SP 组 + native 组」两块拼接显示（用户看到的"按类型分组"乱序）。
+    unique.sort(_logCmpDesc);
+    if (unique.length > 50) unique.removeRange(50, unique.length);
     _logs
       ..clear()
       ..addAll(unique);
@@ -98,13 +86,31 @@ class AutoRecordService {
     });
   }
 
+  // v1.5.5：日志行时间 key 与降序比较器（最新在前）。双端日志前缀统一为
+  // "[yyyy-MM-dd HH:mm:ss]"；直接字符串比较（ISO 字典序==时间序），修复旧实现
+  // replaceAll(':') 残留 '-'/空格 → int.tryParse 全 null → sort 失效的分组乱序。
+  static String? _logTs(String line) =>
+      RegExp(r'^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]').firstMatch(line)?.group(1);
+
+  static int _logCmpDesc(String a, String b) {
+    final ka = _logTs(a);
+    final kb = _logTs(b);
+    if (ka == null && kb == null) return 0;
+    if (ka == null) return 1; // 无时间戳排最后
+    if (kb == null) return -1;
+    return kb.compareTo(ka);
+  }
+
   void recordLog(String msg) {
     // v1.5.4 加日期前缀：跨天不会因 HH:mm:ss 撞车而乱序；与 native 端 SimpleDateFormat
     // ("yyyy-MM-dd HH:mm:ss") 保持一致（双端统一，loadPersistedLogs 排序正则一并改）
     final ts = DateTime.now().toString().substring(0, 19);
     final line = "[$ts] $msg";
+    // v1.5.5：运行期追加也保持降序时间线（add 后整体重排，≤50 条开销可忽略），
+    // 否则 UI 显示的日志会混入未排序的实时行
     _logs.add(line);
-    if (_logs.length > 50) _logs.removeAt(0);
+    _logs.sort(_logCmpDesc);
+    if (_logs.length > 50) _logs.removeRange(50, _logs.length);
     _logsListenable.value = List.from(_logs);
     // 持久化（native 弹窗记录也写同一个 key，重启不清空）
     SharedPreferences.getInstance().then((sp) async {
@@ -325,9 +331,15 @@ class AutoRecordService {
     if (map.isEmpty) return false;
     try {
       final seen = jsonDecode(map) as Map<String, dynamic>;
-      final hit = seen[key] != null;
-      // 清理超过 1 天的指纹，防止无限膨胀
       final now = DateTime.now().millisecondsSinceEpoch;
+      // v1.5.5：命中窗口从"1 天内存在即吞"收紧为"3 分钟内同 key 才算重复"。
+      // dedup 本意是拦同一笔通知被 native 多包名/重复推送的瞬间重复；旧逻辑下
+      // 一天内同额同商户（如两笔早餐 12.00）或同「平台名|0.00」的第二笔起会被
+      // 静默吞掉 → 正是"有弹窗没记账/莫名少记"的元凶之一。
+      final hit = seen[key] != null &&
+          now - (seen[key] as num).toInt() <
+              const Duration(minutes: 3).inMilliseconds;
+      // 清理超过 1 天的指纹，防止无限膨胀
       seen.removeWhere((k, v) => now - (v as num).toInt() >
           const Duration(days: 1).inMilliseconds);
       await sp.setString(_kDedupSeen, jsonEncode(seen));
@@ -437,6 +449,8 @@ class AutoRecordService {
           continue;
         }
         if (await _idDedupHit(rid)) {
+          // v1.5.5：去重也留痕，避免"弹窗了却没记账"无从排查
+          recordLog('去重跳过:同一条通知已被处理过');
           await removePending(rid);
           continue;
         }
@@ -449,12 +463,20 @@ class AutoRecordService {
           await removePending(rid);
           continue;
         }
+        // v1.5.5：0 元占位（通知没解析到金额）【不参与】同额去重——
+        // 不同时间的两笔无金额消费若都解析成「平台名|0.00」，第二笔起会被
+        // 静默吞掉（无日志、无流水），正是"碰一碰/服务通知有弹窗但没记账"的
+        // 主要嫌疑路径。仍保留同通知 id 去重防 native 重复入队。
         final dedupKey = '${parsed.merchant}|${parsed.amount.toStringAsFixed(2)}';
-        if (await _dedupHit(dedupKey)) {
-          await removePending(rid);
-          continue;
+        if (parsed.amount != 0) {
+          if (await _dedupHit(dedupKey)) {
+            // v1.5.5：同额去重命中也要留痕
+            recordLog('去重跳过:同额已记账 ${dedupKey}');
+            await removePending(rid);
+            continue;
+          }
+          await _dedupMark(dedupKey);
         }
-        await _dedupMark(dedupKey);
         await _idDedupMark(rid);
         await _saveParsedFlow(ref, parsed);
         await removePending(rid);
@@ -559,7 +581,9 @@ class AutoRecordService {
     // ---- ② 金额提取（优先级：实付/支付/付款金额 > 紧跟支付词的 ¥ > 首个 ¥） ----
     double? amount;
     final amtRe = RegExp(r'[¥￥]\s*([0-9]+(?:\.[0-9]{1,2})?)');
-    final amtYuanRe = RegExp(r'([0-9]+(?:\.[0-9]{1,2})?)\s*元');
+    // v1.5.5：补充「29.30 人民币」「人民币29.30」等无 ¥、无"元"的银行/碰一碰文案
+    final amtYuanRe = RegExp(r'([0-9]+(?:\.[0-9]{1,2})?)\s*(?:元|人民币)');
+    final amtRmbPreRe = RegExp(r'(?:人民币|RMB)\s*([0-9]+(?:\.[0-9]{1,2})?)');
     final paidRe = RegExp(
         r'(?:实付|实际支付|支付金额|付款金额|实付金额|支付成功[^¥￥]{0,8})(?:[¥￥]\s*)?([0-9]+(?:\.[0-9]{1,2})?)');
     // 1) 实付/支付金额 上下文
@@ -577,9 +601,11 @@ class AutoRecordService {
         if (v != null && v > 0) amount = v;
       }
     }
-    // 3) 兜底：首个 ¥ 或 xx元
+    // 3) 兜底：首个 ¥ 或 xx元 / xx人民币 / 人民币xx
     if (amount == null) {
-      final m = amtRe.firstMatch(text) ?? amtYuanRe.firstMatch(text);
+      final m = amtRe.firstMatch(text) ??
+          amtYuanRe.firstMatch(text) ??
+          amtRmbPreRe.firstMatch(text);
       if (m != null) {
         final v = double.tryParse(m.group(1) ?? '');
         if (v != null && v > 0) amount = v;

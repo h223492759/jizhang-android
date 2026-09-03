@@ -46,6 +46,9 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
     _systemKw = await svc.systemKeywords;
     _systemRepayGroups = await svc.systemRepayGroups;
     if (mounted) setState(() => _loading = false);
+    // v1.5.5：进设置页也触发一次处理——native 弹窗时若 App 不在前台/进程被杀，
+    // pending 会滞留到下次进 App；这里兜底处理并让日志区立刻能看到"已记账/去重跳过"
+    AutoRecordService.instance.processNow(ref, context);
   }
 
   Future<void> _saveEx() async {
@@ -368,7 +371,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                 Card(
                   child: ExpansionTile(
                     leading: const Icon(Icons.list_alt, size: 18),
-                    title: const Text("自动记账日志（最近 50 条）"),
+                    title: const Text("自动记账日志（最新 50 条，最新在上）"),
                     subtitle: ValueListenableBuilder(
                       valueListenable: AutoRecordService.instance.logsListenable,
                       builder: (c, v, _) => Text("已记录 ${v.length} 条"),
@@ -405,9 +408,11 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                           valueListenable: AutoRecordService.instance.logsListenable,
                           builder: (c, v, _) {
                             if (v.isEmpty) return const Center(child: Text("暂无日志", style: TextStyle(color: Colors.grey)));
+                            // v1.5.5：_logs 已统一按 [yyyy-MM-dd HH:mm:ss] 时间降序
+                            //（最新在前，已记账/弹窗/跳过全部混排），顺序渲染即可；
+                            // 复制按钮同样输出该顺序 → 与屏幕一致：最新在最上面
                             return ListView(
-                              reverse: true,
-                              children: v.reversed.map((s) => Padding(
+                              children: v.map((s) => Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                                 child: Text(s, style: const TextStyle(fontSize: 11, fontFamily: "monospace")),
                               )).toList(),
