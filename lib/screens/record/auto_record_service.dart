@@ -378,6 +378,68 @@ class AutoRecordService {
     await sp.setString(_kDedupSeen, jsonEncode(seen));
   }
 
+  // ---------------- v1.5.6：0 元占位配对 ----------------
+  // 同一次支付（碰一碰/扫码/快捷支付）常触发两条通知：有金额的「交易提醒/支付凭证」+
+  // 无金额的「服务通知/付款成功」（金额画在卡片图里，通知文本没有）。
+  // 若 5 秒内（用户观察弹窗间隔基本 3 秒内，留余量）同支付方式已有金额>0 的记录，
+  // 无金额那条就不入账（否则一次支付记两笔：0 元占位 + 真实金额 → 账本出现 -0 脏行）。
+  // 找不到配对才走 B 方案：0 元照记待录入（保底防漏，v1.5.5 已让 0 元不参与同额去重）。
+  static const int _zeroPairWindowMs = 5000;
+  // 最近成功记账的有金额记录（payName/notifTime/amount/ts），供跨批配对判断
+  final List<Map<String, dynamic>> _recentlyRecorded = [];
+
+  /// 轻量判断文本中是否含金额表述（与 _parse 金额提取正则族一致，无日志副作用）
+  bool _textHasAmount(String text) {
+    if (RegExp(r'[¥￥]\s*[0-9]+(?:\.[0-9]{1,2})?').hasMatch(text)) return true;
+    if (RegExp(r'[0-9]+(?:\.[0-9]{1,2})?\s*(?:元|人民币)').hasMatch(text)) return true;
+    if (RegExp(r'(?:人民币|RMB)\s*[0-9]+(?:\.[0-9]{1,2})?').hasMatch(text)) return true;
+    return false;
+  }
+
+  /// v1.5.6：0 元占位是否应被「同批未处理 or 最近已记账」的有金额通知配对吞掉
+  Future<bool> _zeroPaired(Map<String, dynamic> raw,
+      List<Map<String, dynamic>> pending, Set<String> handledRids) async {
+    final rid = raw['id']?.toString() ?? '';
+    final payName = _pkgName(raw['pkg']?.toString() ?? '');
+    final t = (raw['time'] as num?)?.toInt() ?? 0;
+    // 1) 同批 pending 中未处理的其他通知：同支付方式、含金额文字、通知时间差 ≤5s
+    for (final o in pending) {
+      final oid = o['id']?.toString() ?? '';
+      if (oid == rid || handledRids.contains(oid)) continue;
+      if (_pkgName(o['pkg']?.toString() ?? '') != payName) continue;
+      final ot = (o['time'] as num?)?.toInt() ?? 0;
+      if (t != 0 && ot != 0 && (ot - t).abs() > _zeroPairWindowMs) continue;
+      final otext = '${o['title'] ?? ''} ${o['text'] ?? ''}';
+      if (_textHasAmount(otext)) return true;
+    }
+    // 2) 最近刚记账的有金额通知（上一轮已处理、已从 pending 移除的跨批场景）
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final r in _recentlyRecorded) {
+      if (r['payName'] != payName) continue;
+      if (now - (r['ts'] as int) > 60 * 1000) continue; // 只认 1 分钟内，防误配老通知
+      final nt = r['notifTime'] as int;
+      if (nt != 0 && t != 0 && (nt - t).abs() <= _zeroPairWindowMs &&
+          (r['amount'] as num).toDouble() > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// v1.5.6：登记一笔刚记账的有金额记录（供后续 0 元占位配对）
+  void _recordRecently(Map<String, dynamic> raw, ParsedNotification p) {
+    if (p.amount <= 0) return; // 只认有金额的
+    _recentlyRecorded.add({
+      'payName': _pkgName(p.pkg),
+      'notifTime': (raw['time'] as num?)?.toInt() ?? 0,
+      'amount': p.amount,
+      'ts': DateTime.now().millisecondsSinceEpoch,
+    });
+    if (_recentlyRecorded.length > 20) {
+      _recentlyRecorded.removeRange(0, _recentlyRecorded.length - 20);
+    }
+  }
+
   // ---------------- 原生队列 ----------------
   Future<List<Map<String, dynamic>>> fetchPending() async {
     try {
@@ -442,6 +504,7 @@ class AutoRecordService {
       // - native 同 id 的同一条通知会被 _idDedupHit 跳过（防 native 重复入队），
       //   这能解决 v1.4.58 之前的'0 元占位+有金额分别记两笔'问题
       // - 不同 id（合并支付多笔）保留 → 多笔就记多笔（v1.5.2 行为）
+      final handledRids = <String>{};
       for (final raw in pending) {
         final rid = raw['id']?.toString() ?? '';
         if (rid.isEmpty) {
@@ -451,15 +514,29 @@ class AutoRecordService {
         if (await _idDedupHit(rid)) {
           // v1.5.5：去重也留痕，避免"弹窗了却没记账"无从排查
           recordLog('去重跳过:同一条通知已被处理过');
+          handledRids.add(rid);
           await removePending(rid);
           continue;
         }
         final parsed = _parse(raw);
         if (parsed == null) {
+          handledRids.add(rid);
           await removePending(rid);
           continue;
         }
         if (await _excluded(parsed)) {
+          handledRids.add(rid);
+          await removePending(rid);
+          continue;
+        }
+        // v1.5.6：0 元占位配对吞掉——同支付方式 5 秒内出现「有金额通知」
+        // （如支付宝：交易提醒 ¥16.92 + 服务通知(无金额) 同时到达），说明是同一次
+        // 支付的两条通知，只记有金额那条，避免账本出现 -0 脏行。
+        // 找不到配对才继续走 B 方案：0 元照记「待录入」保底（防漏）。
+        if (parsed.amount == 0 && await _zeroPaired(raw, pending, handledRids)) {
+          recordLog('配对吞掉:0元占位同支付方式5s内有金额通知（不记重复占位）');
+          await _idDedupMark(rid); // 吞掉的也打 id 指纹，防 native 重复入队再来
+          handledRids.add(rid);
           await removePending(rid);
           continue;
         }
@@ -472,6 +549,7 @@ class AutoRecordService {
           if (await _dedupHit(dedupKey)) {
             // v1.5.5：同额去重命中也要留痕
             recordLog('去重跳过:同额已记账 ${dedupKey}');
+            handledRids.add(rid);
             await removePending(rid);
             continue;
           }
@@ -479,6 +557,8 @@ class AutoRecordService {
         }
         await _idDedupMark(rid);
         await _saveParsedFlow(ref, parsed);
+        _recordRecently(raw, parsed); // v1.5.6：供后续 0 元占位配对
+        handledRids.add(rid);
         await removePending(rid);
       }
     } catch (_) {
@@ -776,9 +856,14 @@ class AutoRecordService {
       case 'com.eg.android.AlipayGphone':
         return '支付宝';
       case 'com.tencent.mm':
+      case 'com.tencent.wepay':
         return '微信支付';
       case 'com.unionpay':
         return '云闪付';
+      case 'com.cmbchina.cc':
+      case 'com.cmbchina.biz':
+      case 'com.cmbchina.mobilebank':
+        return '招行信用卡';
       default:
         return '';
     }
