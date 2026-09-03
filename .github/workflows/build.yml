@@ -37,11 +37,12 @@ jobs:
           cp -r assets/icons/mipmap-xxxhdpi/. android/app/src/main/res/mipmap-xxxhdpi/
       - name: Apply auto-record native code
         run: |
-          # 自动记账：通知监听 + 队列，复制进生成的 android 工程（包名 com.example.u_gen_tmp）
+          # 自动记账：通知监听 + 无障碍兜底 + 队列，复制进生成的 android 工程（包名 com.example.u_gen_tmp）
           KDIR=android/app/src/main/kotlin/com/example/u_gen_tmp
           mkdir -p "$KDIR"
           cp -f android_native/MainActivity.kt "$KDIR/MainActivity.kt"
           cp -f android_native/AutoRecordListenerService.kt "$KDIR/AutoRecordListenerService.kt"
+          cp -f android_native/AutoRecordAccessibilityService.kt "$KDIR/AutoRecordAccessibilityService.kt"
       - name: Patch Android project
         run: python3 scripts/patch_android.py
       - run: flutter pub get

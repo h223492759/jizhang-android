@@ -426,13 +426,53 @@ class AutoRecordService {
     return false;
   }
 
+  /// v2.0.0：双通道（通知监听 + 无障碍兜底）同笔去重。
+  /// 支付成功页弹窗与系统通知几乎同时出现时两通道都会命中入队；规则：
+  /// 同支付方式 + 金额>0 + 通知时间差 ≤60s + 条目来自【不同通道】（pending 未处理
+  /// 或刚记账的都算）→ 后处理的那条丢弃。通知通道文本更结构化，优先保留通知条目；
+  /// 无障碍条目先到时也会在通知条目处理时被对称丢弃，最终同笔只记一条。
+  /// 0 元占位不走这里（由 _zeroPaired 的 5s 配对窗口负责）。
+  Future<bool> _crossChannelDup(Map<String, dynamic> raw, ParsedNotification p,
+      List<Map<String, dynamic>> pending, Set<String> handledRids) async {
+    final mySrc = raw['src']?.toString() == 'a11y' ? 'a11y' : 'notif';
+    final payName = _pkgName(p.pkg);
+    final t = (raw['time'] as num?)?.toInt() ?? 0;
+    // 1) 同批 pending 中未处理的另一通道条目
+    for (final o in pending) {
+      final oid = o['id']?.toString() ?? '';
+      if (oid.isEmpty || oid == p.id || handledRids.contains(oid)) continue;
+      final oSrc = o['src']?.toString() == 'a11y' ? 'a11y' : 'notif';
+      if (oSrc == mySrc) continue;
+      if (_pkgName(o['pkg']?.toString() ?? '') != payName) continue;
+      final ot = (o['time'] as num?)?.toInt() ?? 0;
+      if (t != 0 && ot != 0 && (ot - t).abs() > 60000) continue;
+      final otext = '${o['title'] ?? ''} ${o['text'] ?? ''}';
+      if (_textHasAmount(otext)) return true;
+    }
+    // 2) 最近刚记账的另一通道记录（跨批：上一轮已处理完并从 pending 移除）
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final r in _recentlyRecorded) {
+      if (r['src'] == mySrc) continue;
+      if (r['payName'] != payName) continue;
+      if (now - (r['ts'] as int) > 60 * 1000) continue; // 只认 1 分钟内，防误配老记录
+      final nt = r['notifTime'] as int;
+      if (nt != 0 && t != 0 && (nt - t).abs() <= 60000 &&
+          (r['amount'] as num).toDouble() > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// v1.5.6：登记一笔刚记账的有金额记录（供后续 0 元占位配对）
+  /// v2.0.0：顺带记录来源通道 src（notif=通知监听 / a11y=无障碍兜底），供双通道去重
   void _recordRecently(Map<String, dynamic> raw, ParsedNotification p) {
     if (p.amount <= 0) return; // 只认有金额的
     _recentlyRecorded.add({
       'payName': _pkgName(p.pkg),
       'notifTime': (raw['time'] as num?)?.toInt() ?? 0,
       'amount': p.amount,
+      'src': raw['src']?.toString() == 'a11y' ? 'a11y' : 'notif',
       'ts': DateTime.now().millisecondsSinceEpoch,
     });
     if (_recentlyRecorded.length > 20) {
@@ -536,6 +576,16 @@ class AutoRecordService {
         if (parsed.amount == 0 && await _zeroPaired(raw, pending, handledRids)) {
           recordLog('配对吞掉:0元占位同支付方式5s内有金额通知（不记重复占位）');
           await _idDedupMark(rid); // 吞掉的也打 id 指纹，防 native 重复入队再来
+          handledRids.add(rid);
+          await removePending(rid);
+          continue;
+        }
+        // v2.0.0：双通道去重——同一笔支付被「无障碍兜底 + 通知监听」都抓到时只记一条
+        // （成功页 + 系统通知几乎同时出现；同支付方式 + 金额>0 + 时间差≤60s + 通道不同）
+        if (parsed.amount > 0 && await _crossChannelDup(raw, parsed, pending, handledRids)) {
+          final from = raw['src']?.toString() == 'a11y' ? '无障碍页面' : '通知';
+          recordLog('去重跳过:双通道同款同额60s内(本笔来自$from，另一通道已处理/在途)');
+          await _idDedupMark(rid);
           handledRids.add(rid);
           await removePending(rid);
           continue;
@@ -854,6 +904,10 @@ class AutoRecordService {
   String _pkgName(String pkg) {
     switch (pkg) {
       case 'com.eg.android.AlipayGphone':
+      case 'com.aliyun.snotif':
+      case 'com.alipay.consumer':
+      case 'com.alipay.android.uiapay':
+      case 'com.alipay.mobile':
         return '支付宝';
       case 'com.tencent.mm':
       case 'com.tencent.wepay':
@@ -863,6 +917,7 @@ class AutoRecordService {
       case 'com.cmbchina.cc':
       case 'com.cmbchina.biz':
       case 'com.cmbchina.mobilebank':
+      case 'com.cmbwallet':
         return '招行信用卡';
       default:
         return '';

@@ -31,6 +31,24 @@ class MainActivity : FlutterActivity() {
                     }
                     result.success(true)
                 }
+                "openA11ySettings" -> {
+                    try {
+                        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    } catch (_: Exception) {
+                    }
+                    result.success(true)
+                }
+                "a11yEnabled" -> {
+                    // 无障碍兜底通道是否已在系统设置中开启（读系统开关，无需权限）
+                    val enabled = Settings.Secure.getString(
+                        contentResolver,
+                        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+                    ) ?: ""
+                    val on = enabled.split(':').any {
+                        it.contains("AutoRecordAccessibilityService")
+                    }
+                    result.success(on)
+                }
                 "enabled" -> {
                     result.success(true)
                 }

@@ -13,8 +13,11 @@ class AutoRecordSettingsPage extends ConsumerStatefulWidget {
       _AutoRecordSettingsPageState();
 }
 
-class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage> {
+class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
+    with WidgetsBindingObserver {
   bool _enabled = false;
+  // v2.0.0：无障碍兜底通道是否已在系统无障碍中开启
+  bool _a11yOn = false;
   Map<String, bool> _ex = {
     'repay': false,
     'selfTransfer': false,
@@ -32,7 +35,42 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// 从系统无障碍设置页返回时刷新兜底通道状态
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _readA11yState().then((v) {
+        if (mounted && v != _a11yOn) setState(() => _a11yOn = v);
+      });
+    }
+  }
+
+  Future<bool> _readA11yState() async {
+    try {
+      return await MethodChannel('jizhang/auto_record')
+              .invokeMethod('a11yEnabled') ==
+          true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _openA11ySettings() async {
+    try {
+      await MethodChannel('jizhang/auto_record').invokeMethod('openA11ySettings');
+    } catch (_) {
+      toast('请在系统设置 → 无障碍 → 已安装的服务 中开启「记账本·自动记账」');
+    }
   }
 
   Future<void> _load() async {
@@ -45,6 +83,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
     _orKws = await svc.orKeywords;
     _systemKw = await svc.systemKeywords;
     _systemRepayGroups = await svc.systemRepayGroups;
+    _a11yOn = await _readA11yState();
     if (mounted) setState(() => _loading = false);
     // v1.5.5：进设置页也触发一次处理——native 弹窗时若 App 不在前台/进程被杀，
     // pending 会滞留到下次进 App；这里兜底处理并让日志区立刻能看到"已记账/去重跳过"
@@ -448,6 +487,22 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                     subtitle: const Text('系统设置 → 通知使用权 → 允许记账本，才能监听支付通知'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: _openNotifAccess,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // v2.0.0：无障碍兜底通道（实验）——补「支付只在 App 内弹窗、无系统通知」的漏单
+                Card(
+                  child: ListTile(
+                    leading: Icon(Icons.accessibility_new, color: AppColors.primaryDark),
+                    title: const Text('无障碍兜底通道（实验）'),
+                    subtitle: Text(
+                        _a11yOn
+                            ? '已开启：识别支付成功页兜底记账（仅窗口变化，低耗电，无 OCR）'
+                            : '兜底无通知的支付成功页（如招行碰一碰）。点此去系统「无障碍」开启；误抓可随时关闭'),
+                    trailing: _a11yOn
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : const Icon(Icons.chevron_right),
+                    onTap: _openA11ySettings,
                   ),
                 ),
                 const SizedBox(height: 12),

@@ -74,6 +74,9 @@ class AutoRecordListenerService : NotificationListenerService() {
         val item = JSONObject()
             .put("id", id)
             .put("pkg", pkg)
+            // v2.0.0：amt 归一化金额字段（供无障碍兜底通道做「同包同额 60s」队列级去重，
+            // 通知条目优先于无障碍条目；无金额时为 ""）
+            .put("amt", amt)
             .put("title", title)
             .put("text", all)
             .put("time", sbn.postTime)
@@ -216,6 +219,44 @@ object AutoRecordStore {
         while (cur.length() >= 50) cur.remove(0)
         cur.put(item)
         sp.edit().putString(KEY, cur.toString()).apply()
+    }
+
+    /**
+     * v2.0.0：无障碍兜底通道专用入队——60s 内同包同额已有条目则丢弃（通知通道优先）。
+     * 同一笔支付「成功页 + 系统通知」几乎同时出现时，两通道都会命中；通知文本更结构化、
+     * 商户/金额解析更可靠，因此只保留通知条目（或先到的任一条），无障碍条目让路。
+     */
+    @Synchronized
+    fun appendA11yPending(ctx: Context, item: JSONObject): Boolean {
+        val sp = sp(ctx)
+        val cur = try {
+            JSONArray(sp.getString(KEY, "[]") ?: "[]")
+        } catch (_: Exception) {
+            JSONArray()
+        }
+        val pkg = item.optString("pkg")
+        val amt = item.optString("amt")
+        val t = item.optLong("time")
+        for (i in 0 until cur.length()) {
+            val o = cur.optJSONObject(i) ?: continue
+            if (o.optString("pkg") != pkg) continue
+            val ot = o.optLong("time")
+            if (t != 0L && ot != 0L && kotlin.math.abs(ot - t) > 60_000L) continue
+            if (sameAmount(amt, o.optString("amt"))) return false
+        }
+        while (cur.length() >= 50) cur.remove(0)
+        cur.put(item)
+        sp.edit().putString(KEY, cur.toString()).apply()
+        return true
+    }
+
+    /** 金额比较：空串 vs 空串 = 相等；否则解析为 double 差 <0.005 视为相等 */
+    private fun sameAmount(a: String, b: String): Boolean {
+        if (a.isEmpty() && b.isEmpty()) return true
+        val da = a.toDoubleOrNull()
+        val db = b.toDoubleOrNull()
+        if (da == null || db == null) return false
+        return kotlin.math.abs(da - db) < 0.005
     }
 
     fun removePending(ctx: Context, id: String) {

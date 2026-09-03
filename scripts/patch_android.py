@@ -144,6 +144,69 @@ def patch_network_security_config():
     print("network_security_config.xml created")
 
 
+# 无障碍兜底通道（v2.0.0）：packageNames 必须与 AutoRecordStore.ALLOWED_PACKAGES
+# + AutoRecordAccessibilityService 保持一致（改了 Kotlin 白名单要同步这里）
+A11Y_PACKAGES = (
+    "com.eg.android.AlipayGphone,com.aliyun.snotif,com.alipay.consumer,"
+    "com.alipay.android.uiapay,com.alipay.mobile,com.tencent.mm,com.tencent.wepay,"
+    "com.unionpay,com.cmbchina.cc,com.cmbchina.biz,com.cmbchina.mobilebank,com.cmbwallet"
+)
+
+
+def patch_accessibility():
+    """无障碍兜底通道：注册服务 + accessibility 配置 + 描述文案（description 缺失会闪退）"""
+    # 1) accessibility 配置 xml（低耗电：只订 typeWindowStateChanged + 支付 App 白名单）
+    xml_dir = "android/app/src/main/res/xml"
+    os.makedirs(xml_dir, exist_ok=True)
+    p = os.path.join(xml_dir, "accessibility_config.xml")
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"\n'
+        '    android:accessibilityEventTypes="typeWindowStateChanged"\n'
+        '    android:accessibilityFeedbackType="feedbackGeneric"\n'
+        '    android:accessibilityFlags="flagDefault"\n'
+        '    android:canRetrieveWindowContent="true"\n'
+        '    android:description="@string/accessibility_service_description"\n'
+        '    android:notificationTimeout="100"\n'
+        f'    android:packageNames="{A11Y_PACKAGES}" />\n'
+    )
+    with open(p, "w", encoding="utf-8") as f:
+        f.write(xml)
+    # 2) 服务描述文案（Android 要求 description 资源，否则开启服务时崩溃）
+    val_dir = "android/app/src/main/res/values"
+    os.makedirs(val_dir, exist_ok=True)
+    sp = os.path.join(val_dir, "strings.xml")
+    strings = '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_label">自动记账·无障碍兜底</string>
+    <string name="accessibility_service_description">仅用于自动记账补漏：只监听白名单支付应用（微信/支付宝/云闪付/招行）在窗口切换瞬间的页面文字，识别「支付成功/收款成功」等完成页并写入待记账队列。不上传、不保存任何聊天与通讯内容；仅窗口变化低频触发，低耗电，不做屏幕截图识别。</string>
+</resources>
+'''
+    with open(sp, "w", encoding="utf-8") as f:
+        f.write(strings)
+    # 3) Manifest 注册服务
+    mp = "android/app/src/main/AndroidManifest.xml"
+    with open(mp, encoding="utf-8") as f:
+        ms = f.read()
+    if "AutoRecordAccessibilityService" not in ms:
+        block = '''    <service
+        android:name=".AutoRecordAccessibilityService"
+        android:label="@string/accessibility_service_label"
+        android:exported="false"
+        android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+        <intent-filter>
+            <action android:name="android.accessibilityservice.AccessibilityService" />
+        </intent-filter>
+        <meta-data
+            android:name="android.accessibilityservice"
+            android:resource="@xml/accessibility_config" />
+    </service>'''
+        ms = ms.replace("</application>", block + "\n    </application>", 1)
+        with open(mp, "w", encoding="utf-8") as f:
+            f.write(ms)
+    print("accessibility service patched (+AutoRecordAccessibilityService +config xml)")
+
+
 def patch_build_info(version_name, build, tag):
     """生成 build_info.dart，供 APP 展示版本号与构建时间。"""
     os.makedirs("lib/core", exist_ok=True)
@@ -166,5 +229,6 @@ if __name__ == "__main__":
     version_name, build, tag = patch_pubspec()
     patch_build_gradle()
     patch_manifest()
+    patch_accessibility()
     patch_network_security_config()
     patch_build_info(version_name, build, tag)
