@@ -87,7 +87,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     try {
       final bookId = ref.read(sessionProvider).bookId;
       if (bookId != null) {
-        await SyncEngine.instance.syncNow(bookId).catchError((_) {});
+        try {
+          await SyncEngine.instance.syncNow(bookId);
+        } catch (_) {}
       }
     } catch (_) {}
     await _load();

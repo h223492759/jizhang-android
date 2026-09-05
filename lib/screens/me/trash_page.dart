@@ -5,6 +5,7 @@ import 'package:jizhang_android/core/storage.dart';
 import 'package:jizhang_android/core/sync_engine.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
+import 'package:jizhang_android/state/session.dart';
 
 /// 回收站：已删除的流水快照（谁删的 + 删除时间）。
 /// 数据在服务端（flows_trash），按账本隔离 → 共享账本全员可见/可恢复；
@@ -69,7 +70,9 @@ class _TrashPageState extends ConsumerState<TrashPage> {
       // 同步一次：让恢复的流水重新出现在本端列表
       final bookId = await Storage.getBookId();
       if (bookId != null) {
-        await SyncEngine.instance.syncNow(bookId).catchError((_) {});
+        try {
+          await SyncEngine.instance.syncNow(bookId);
+        } catch (_) {}
       }
       ref.read(dataVersionProvider.notifier).state++;
       toast('已恢复');

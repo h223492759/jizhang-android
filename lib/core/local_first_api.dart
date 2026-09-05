@@ -466,6 +466,15 @@ final w = await _api.getWallets();
     }
   }
 
+  // ==================== 回收站（服务端快照，共享账本全员可见） ====================
+
+  Future<List<Map<String, dynamic>>> fetchTrashFlows({int limit = 200}) =>
+      _api.fetchTrashFlows(limit: limit);
+
+  Future<void> restoreTrashFlow(int id) => _api.restoreTrashFlow(id);
+
+  Future<void> purgeTrashFlow(int id) => _api.purgeTrashFlow(id);
+
   // ================= 通用离线写（在线直连 / 断网入队 + 操作日志） =================
 
   Future<void> _offlineWrite({
