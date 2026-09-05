@@ -71,8 +71,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  // 首页下拉：先强制同步（推送本地改动 + 拉取 server 最新），再重读本地
+  // 首页下拉：已在「最新月份」→ 先强制同步（推送本地改动 + 拉取 server 最新），再重读本地；
+  // 在历史月份（如 8 月）顶部下拉 → 跳回最新月份，不触发同步
   Future<void> _onPullRefresh() async {
+    final now = DateTime.now();
+    final isCurrentMonth =
+        _month.year == now.year && _month.month == now.month;
+    if (!isCurrentMonth) {
+      if (!mounted) return;
+      setState(() => _month = DateTime(now.year, now.month));
+      await _load();
+      if (mounted) toast('已回到 ${now.month} 月');
+      return;
+    }
     try {
       final bookId = ref.read(sessionProvider).bookId;
       if (bookId != null) {
@@ -80,6 +91,17 @@ class _HomePageState extends ConsumerState<HomePage> {
       }
     } catch (_) {}
     await _load();
+  }
+
+  // 触底继续上拉 → 翻到上一个月（9月→8月→7月…）。防抖：加载/切换中忽略。
+  bool _changingMonth = false;
+  Future<void> _goPrevMonth() async {
+    if (_changingMonth || _loading || !mounted) return;
+    _changingMonth = true;
+    final prev = DateTime(_month.year, _month.month - 1);
+    setState(() => _month = prev);
+    await _load();
+    _changingMonth = false;
   }
 
   Future<void> _pickMonth() async {
@@ -409,18 +431,30 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Scaffold(
       backgroundColor: AppPalette.background(context),
       extendBody: false,
-      body: RefreshIndicator(
-        onRefresh: _onPullRefresh,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(child: _headerRegion()),
-            SliverToBoxAdapter(child: _quickModules()),
-            _loading
-                ? const SliverToBoxAdapter(
-                    child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())))
-                : _flowList(overrides, user),
-          ],
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (n) {
+          // 列表滚到底后继续上拉（overscroll 向下）→ 翻到上一个月
+          if (n is OverscrollNotification &&
+              n.overscroll > 0 &&
+              !_changingMonth &&
+              !_loading) {
+            _goPrevMonth();
+          }
+          return false;
+        },
+        child: RefreshIndicator(
+          onRefresh: _onPullRefresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: _headerRegion()),
+              SliverToBoxAdapter(child: _quickModules()),
+              _loading
+                  ? const SliverToBoxAdapter(
+                      child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())))
+                  : _flowList(overrides, user),
+            ],
+          ),
         ),
       ),
     );

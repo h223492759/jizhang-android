@@ -1,9 +1,9 @@
 name: jizhang_android
 description: 记账本 - 安卓客户端（复刻鲨鱼记账交互，对接 jizhang 后端）
 publish_to: 'none'
-# v2.0.1：清理强信号裸词（修「打开支付宝就记一笔 0 元」多记 bug）+ 去 launchMain 不抢前台
+# v2.1.0：①流水回收站（删除留档/恢复/彻底删除，共享账本全员可见）②自动记账静默开关（默认不跳 App 首页）③首页列表触底翻上月/顶部下拉回最新月
 # 回滚 v1.5.6=tag v260903-0843 仍有效
-version: 2.0.1+1
+version: 2.1.0+1
 
 environment:
   sdk: '>=3.4.0 <4.0.0'

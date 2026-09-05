@@ -10,6 +10,7 @@ import 'package:jizhang_android/screens/me/owner_color_settings_page.dart';
 import 'package:jizhang_android/screens/record/auto_record_settings_page.dart';
 import 'package:jizhang_android/screens/server/server_list_page.dart';
 import 'package:jizhang_android/screens/me/op_logs_page.dart';
+import 'package:jizhang_android/screens/me/trash_page.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
 import 'package:jizhang_android/core/sync_engine.dart';
 import 'package:jizhang_android/core/storage.dart';
@@ -91,6 +92,7 @@ class MePage extends ConsumerWidget {
           // 当前账本：点击切换
           _tile(Icons.book, '当前账本', () => _switchBook(context, ref, s), subtitle: book?.name ?? '未选择'),
           _tile(Icons.auto_awesome, '自动记账', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoRecordSettingsPage()))),
+          _tile(Icons.restore_from_trash, '回收站', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrashPage())), subtitle: '误删的流水可恢复（共享账本全员可见）'),
           // 同步状态：点击手动同步
           AnimatedBuilder(
             animation: SyncEngine.instance,

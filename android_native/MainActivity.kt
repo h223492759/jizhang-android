@@ -49,6 +49,15 @@ class MainActivity : FlutterActivity() {
                     }
                     result.success(on)
                 }
+                "getSilent" -> {
+                    // 静默模式：自动记账只弹 heads-up、不拉起 App（默认开启）
+                    result.success(AutoRecordStore.isSilent(this))
+                }
+                "setSilent" -> {
+                    val v = (call.arguments as? Map<*, *>)?.get("v") as? Boolean ?: false
+                    AutoRecordStore.setSilent(this, v)
+                    result.success(true)
+                }
                 "enabled" -> {
                     result.success(true)
                 }

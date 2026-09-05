@@ -186,6 +186,25 @@ class ApiClient {
     await _req(() => _dio.delete('/flows/$id'));
   }
 
+  // ==================== 回收站（删除的流水快照；共享账本全员可见/可恢复） ====================
+
+  Future<List<Map<String, dynamic>>> fetchTrashFlows({int limit = 200}) async {
+    final d = await _req(() => _dio.get('/flows/trash', queryParameters: {'limit': limit}));
+    return ((d as Map<String, dynamic>)['list'] as List? ?? [])
+        .map((e) => (e as Map).cast<String, dynamic>())
+        .toList();
+  }
+
+  /// 恢复：插回 flows（服务端增量同步会重新推送到所有成员）
+  Future<void> restoreTrashFlow(int id) async {
+    await _req(() => _dio.post('/flows/trash/$id/restore'));
+  }
+
+  /// 彻底删除（不可再恢复）
+  Future<void> purgeTrashFlow(int id) async {
+    await _req(() => _dio.delete('/flows/trash/$id'));
+  }
+
   /// 增量同步：返回 {all_ids, changed[], server_time}；不传 since = 全量
   Future<Map<String, dynamic>> fetchFlowsSync({String? since}) async {
     final q = <String, dynamic>{};

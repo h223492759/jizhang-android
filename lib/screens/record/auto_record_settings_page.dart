@@ -18,6 +18,8 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
   bool _enabled = false;
   // v2.0.0：无障碍兜底通道是否已在系统无障碍中开启
   bool _a11yOn = false;
+  // v2.1.0：静默模式——自动记账只弹 heads-up，不自动拉起 App 首页（native prefs silent）
+  bool _silent = true;
   Map<String, bool> _ex = {
     'repay': false,
     'selfTransfer': false,
@@ -65,6 +67,24 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
     }
   }
 
+  // v2.1.0：静默模式读取（native SharedPreferences，默认开启）
+  Future<bool> _readSilent() async {
+    try {
+      return await MethodChannel('jizhang/auto_record').invokeMethod('getSilent') ==
+          true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> _setSilent(bool v) async {
+    setState(() => _silent = v);
+    try {
+      await MethodChannel('jizhang/auto_record')
+          .invokeMethod('setSilent', {'v': v});
+    } catch (_) {}
+  }
+
   Future<void> _openA11ySettings() async {
     try {
       await MethodChannel('jizhang/auto_record').invokeMethod('openA11ySettings');
@@ -84,6 +104,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
     _systemKw = await svc.systemKeywords;
     _systemRepayGroups = await svc.systemRepayGroups;
     _a11yOn = await _readA11yState();
+    _silent = await _readSilent();
     if (mounted) setState(() => _loading = false);
     // v1.5.5：进设置页也触发一次处理——native 弹窗时若 App 不在前台/进程被杀，
     // pending 会滞留到下次进 App；这里兜底处理并让日志区立刻能看到"已记账/去重跳过"
@@ -503,6 +524,17 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                         ? const Icon(Icons.check_circle, color: Colors.green)
                         : const Icon(Icons.chevron_right),
                     onTap: _openA11ySettings,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // v2.1.0：静默模式——识别并自动记账后只弹通知，不跳转 App 首页
+                Card(
+                  child: SwitchListTile(
+                    title: const Text('静默记账（不自动打开 App）',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('识别并记账后只弹系统通知，不再自动跳到 App 首页；点通知仍可进入查看'),
+                    value: _silent,
+                    onChanged: _setSilent,
                   ),
                 ),
                 const SizedBox(height: 12),

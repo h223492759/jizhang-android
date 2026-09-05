@@ -84,7 +84,8 @@ class AutoRecordListenerService : NotificationListenerService() {
         Log.d("AutoRecord", "enqueued id=$id pkg=$pkg amt=$amt")
         // 在系统通知栏弹一条 heads-up
         postHeadsUp(pkg, title, amt)
-        // 拉起主界面（若已在后台则回到前台）
+        // 静默模式下不拉起主界面（只保留 heads-up 弹窗 + 点击通知才进 App）
+        if (AutoRecordStore.isSilent(this)) return
         val i = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             putExtra("auto_record", id)
@@ -183,6 +184,15 @@ object AutoRecordStore {
         "com.cmbwallet",               // 招行信用卡独立 app（最常见包名）
     )
     private const val KEY = "auto_record_queue"
+    private const val KEY_SILENT = "silent"
+
+    // 静默模式：开启后自动记账只弹 heads-up 通知，不拉起 App 主界面（v2.1.0 默认 true）
+    fun isSilent(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_SILENT, true)
+
+    fun setSilent(ctx: Context, v: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_SILENT, v).apply()
+    }
 
     fun readPending(ctx: Context): List<String> {
         val sp = sp(ctx)
