@@ -1,6 +1,7 @@
 # 记账本 (jizhang-android)
 
 安卓端记账 App，对接 [jizhang](https://github.com/h223492759/jizhang) 后端 REST API。
+本人不会代码，全部由我提需求发现bug，workbuddy提交代码并发布。
 
 ## 功能
 - 多服务器配置（内网 / 外网地址）、登录、账本切换
