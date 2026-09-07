@@ -8,6 +8,7 @@ import 'package:jizhang_android/core/build_info.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/me/owner_color_settings_page.dart';
 import 'package:jizhang_android/screens/record/auto_record_settings_page.dart';
+import 'package:jizhang_android/screens/utility/utility_page.dart';
 import 'package:jizhang_android/screens/server/server_list_page.dart';
 import 'package:jizhang_android/screens/me/op_logs_page.dart';
 import 'package:jizhang_android/screens/me/trash_page.dart';
