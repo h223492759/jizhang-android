@@ -386,6 +386,9 @@ final w = await _api.getWallets();
     try {
       final id = await _api.createFlow({...body, 'uuid': uuid});
       await db.upsertFlow(_rowFromBody(bookId, id, body));
+      await _safeOpLog(bookId,
+          op: 'createFlow', entity: 'flow', entityId: id, uuid: uuid,
+          summary: '新增流水 ${_flowSummary(body, id: id)}', status: 'ok');
       _syncAfterWrite(); // 写成功 → 触发一次同步（常用名/小表刷新；指纹可跳过）
       return id;
     } catch (e) {
@@ -394,6 +397,9 @@ final w = await _api.getWallets();
         await db.upsertFlow(
             _rowFromBody(bookId, tmpId, body, uuid: uuid, dirty: true));
         await db.enqueue('create', 'flow', uuid: uuid, body: body);
+        await _safeOpLog(bookId,
+            op: 'createFlow', entity: 'flow', uuid: uuid,
+            summary: '新增流水 ${_flowSummary(body)}', status: 'queued');
         return tmpId;
       }
       rethrow;
@@ -415,6 +421,7 @@ final w = await _api.getWallets();
   /// 修改流水：true=在线成功，false=离线入队（已写入本地镜像+出站队列，连网后补传）。
   /// 抛出的异常是真正的非网络错误（如服务器 400、参数错等）。
   Future<bool> updateFlow(int id, Map<String, dynamic> body) async {
+    final bookId = await _curBook();
     final db = LocalDb.instance;
     final existing = await db.flowById(id);
     try {
@@ -431,6 +438,9 @@ final w = await _api.getWallets();
         updated['updated_at'] = _nowFull();
         await db.upsertFlow(updated);
       }
+      await _safeOpLog(bookId,
+          op: 'updateFlow', entity: 'flow', entityId: id,
+          summary: '修改流水 ${_flowSummary(body, id: id)}', status: 'ok');
       _syncAfterWrite();
       return true;
     } catch (e) {
@@ -444,6 +454,9 @@ final w = await _api.getWallets();
         updated['updated_at'] = _nowFull();
         await db.upsertFlow(updated);
         await db.enqueue('update', 'flow', entityId: id, body: body);
+        await _safeOpLog(bookId,
+            op: 'updateFlow', entity: 'flow', entityId: id,
+            summary: '修改流水 ${_flowSummary(body, id: id)}', status: 'queued');
         return false;
       }
       rethrow;
@@ -451,19 +464,58 @@ final w = await _api.getWallets();
   }
 
   Future<void> deleteFlow(int id) async {
+    final bookId = await _curBook();
     final db = LocalDb.instance;
     try {
       await _api.deleteFlow(id);
       await db.deleteFlowById(id);
+      await _safeOpLog(bookId,
+          op: 'deleteFlow', entity: 'flow', entityId: id,
+          summary: '删除流水#$id', status: 'ok');
       _syncAfterWrite();
     } catch (e) {
       if (_isNetworkErr(e)) {
         await db.deleteFlowById(id);
         await db.enqueue('delete', 'flow', entityId: id);
+        await _safeOpLog(bookId,
+            op: 'deleteFlow', entity: 'flow', entityId: id,
+            summary: '删除流水#$id', status: 'queued');
         return;
       }
       rethrow;
     }
+  }
+
+  /// 流水操作的日志摘要：名称（空则分类）＋金额；信息不足时回落 #id
+  String _flowSummary(Map<String, dynamic> body, {int? id}) {
+    final parts = <String>[];
+    final desc = ((body['description'] as String?) ?? '').trim();
+    final cat = ((body['category'] as String?) ?? '').trim();
+    final nm = desc.isNotEmpty ? desc : cat;
+    if (nm.isNotEmpty) parts.add(nm);
+    final amt = body['amount'];
+    if (amt != null && amt.toString().isNotEmpty) parts.add('¥$amt');
+    if (parts.isEmpty) return id != null ? '流水#$id' : '流水';
+    return parts.join(' ');
+  }
+
+  /// 记本地操作日志（审计失败不影响主流程）
+  Future<void> _safeOpLog(int bookId,
+      {required String op,
+      String entity = '',
+      int? entityId,
+      String? uuid,
+      String summary = '',
+      String status = 'ok'}) async {
+    try {
+      await LocalDb.instance.addOpLog(bookId,
+          op: op,
+          entity: entity,
+          entityId: entityId,
+          uuid: uuid,
+          summary: summary,
+          status: status);
+    } catch (_) {}
   }
 
   // ==================== 回收站（服务端快照，共享账本全员可见） ====================
@@ -471,9 +523,35 @@ final w = await _api.getWallets();
   Future<List<Map<String, dynamic>>> fetchTrashFlows({int limit = 200}) =>
       _api.fetchTrashFlows(limit: limit);
 
-  Future<void> restoreTrashFlow(int id) => _api.restoreTrashFlow(id);
+  Future<void> restoreTrashFlow(int id) async {
+    final bookId = await _curBook();
+    try {
+      await _api.restoreTrashFlow(id);
+      await _safeOpLog(bookId,
+          op: 'restoreFlow', entity: 'flow', entityId: id,
+          summary: '从回收站恢复流水#$id', status: 'ok');
+    } catch (e) {
+      await _safeOpLog(bookId,
+          op: 'restoreFlow', entity: 'flow', entityId: id,
+          summary: '从回收站恢复流水#$id', status: 'failed');
+      rethrow;
+    }
+  }
 
-  Future<void> purgeTrashFlow(int id) => _api.purgeTrashFlow(id);
+  Future<void> purgeTrashFlow(int id) async {
+    final bookId = await _curBook();
+    try {
+      await _api.purgeTrashFlow(id);
+      await _safeOpLog(bookId,
+          op: 'purgeFlow', entity: 'flow', entityId: id,
+          summary: '彻底删除流水#$id', status: 'ok');
+    } catch (e) {
+      await _safeOpLog(bookId,
+          op: 'purgeFlow', entity: 'flow', entityId: id,
+          summary: '彻底删除流水#$id', status: 'failed');
+      rethrow;
+    }
+  }
 
   // ================= 通用离线写（在线直连 / 断网入队 + 操作日志） =================
 
