@@ -92,6 +92,7 @@ class MePage extends ConsumerWidget {
           // 当前账本：点击切换
           _tile(Icons.book, '当前账本', () => _switchBook(context, ref, s), subtitle: book?.name ?? '未选择'),
           _tile(Icons.auto_awesome, '自动记账', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoRecordSettingsPage()))),
+          _tile(Icons.water_drop, '水电气用量', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UtilityPage())), subtitle: '水/电/燃气/物业每月用量与档位高亮'),
           _tile(Icons.restore_from_trash, '回收站', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrashPage())), subtitle: '误删的流水可恢复（共享账本全员可见）'),
           // 同步状态：点击手动同步
           AnimatedBuilder(

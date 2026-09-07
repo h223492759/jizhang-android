@@ -574,6 +574,72 @@ class ApiClient {
     }));
     return (d as Map).cast<String, dynamic>();
   }
+
+  // ================= 水电气物业用量（utility，纯在线） =================
+  /// 规则列表（含 tiers/season 解析）
+  Future<List<dynamic>> getUtilityRules() async {
+    final d = await _req(() => _dio.get('/utility/rules'));
+    return ((d as Map)['list'] as List<dynamic>?) ?? [];
+  }
+
+  /// 某类型某年的账单列表（含关联流水）
+  Future<List<dynamic>> getUtilityRecords(
+      {required String type, required int year}) async {
+    final d = await _req(() => _dio.get('/utility/records',
+        queryParameters: {'type': type, 'year': year}));
+    return ((d as Map)['list'] as List<dynamic>?) ?? [];
+  }
+
+  /// 月度均摊视图（12 个月，含 usage/amount/tier/hasBill/note）
+  Future<Map<String, dynamic>> getUtilityMonths(
+      {required String type, required int year}) async {
+    final d =
+        await _req(() => _dio.get('/utility/months',
+            queryParameters: {'type': type, 'year': year}));
+    return (d as Map).cast<String, dynamic>();
+  }
+
+  /// 校正账单：补优惠金额 / 改用量（至少传一项）
+  Future<void> saveUtilityRecord(int id,
+      {double? discount, double? usage}) async {
+    final body = <String, dynamic>{};
+    if (discount != null) body['discount'] = discount;
+    if (usage != null) body['usage'] = usage;
+    await _req(() => _dio.put('/utility/records/$id', data: body));
+  }
+
+  /// 手动添加账单
+  Future<int> createUtilityRecord(Map<String, dynamic> body) async {
+    final d = await _req(() => _dio.post('/utility/records', data: body));
+    return ((d as Map)['id'] as num?)?.toInt() ?? 0;
+  }
+
+  /// 删除账单
+  Future<void> deleteUtilityRecord(int id) async {
+    await _req(() => _dio.delete('/utility/records/$id'));
+  }
+
+  /// 扫描历史流水回填账单，返回该类型处理笔数
+  Future<int> scanUtilityFlows(String type) async {
+    final d = await _req(() => _dio.post('/utility/scan', data: {'type': type}));
+    return ((((d as Map)['counts'] as Map?) ?? {})[type] as num?)?.toInt() ?? 0;
+  }
+
+  /// 新建规则
+  Future<int> createUtilityRule(Map<String, dynamic> body) async {
+    final d = await _req(() => _dio.post('/utility/rules', data: body));
+    return ((d as Map)['id'] as num?)?.toInt() ?? 0;
+  }
+
+  /// 更新规则
+  Future<void> updateUtilityRule(int id, Map<String, dynamic> body) async {
+    await _req(() => _dio.put('/utility/rules/$id', data: body));
+  }
+
+  /// 删除规则（不自动删除关联账单）
+  Future<void> deleteUtilityRule(int id) async {
+    await _req(() => _dio.delete('/utility/rules/$id'));
+  }
 }
 
 class LoginResult {

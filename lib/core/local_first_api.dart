@@ -1554,6 +1554,30 @@ final w = await _api.getWallets();
   Future<Meta> getMeta() => _api.getMeta();
   Future<List<Map<String, dynamic>>> getOpLogs({int limit = 50}) =>
       _api.getOpLogs(limit: limit);
+
+  // ================= 水电气物业用量（utility，纯在线透传） =================
+  Future<List<dynamic>> getUtilityRules() => _api.getUtilityRules();
+  Future<List<dynamic>> getUtilityRecords(
+          {required String type, required int year}) =>
+      _api.getUtilityRecords(type: type, year: year);
+  Future<Map<String, dynamic>> getUtilityMonths(
+          {required String type, required int year}) =>
+      _api.getUtilityMonths(type: type, year: year);
+  Future<void> saveUtilityRecord(int id,
+          {double? discount, double? usage}) =>
+      _api.saveUtilityRecord(id, discount: discount, usage: usage);
+  Future<int> createUtilityRecord(Map<String, dynamic> body) =>
+      _api.createUtilityRecord(body);
+  Future<void> deleteUtilityRecord(int id) =>
+      _api.deleteUtilityRecord(id);
+  Future<int> scanUtilityFlows(String type) =>
+      _api.scanUtilityFlows(type);
+  Future<int> createUtilityRule(Map<String, dynamic> body) =>
+      _api.createUtilityRule(body);
+  Future<void> updateUtilityRule(int id, Map<String, dynamic> body) =>
+      _api.updateUtilityRule(id, body);
+  Future<void> deleteUtilityRule(int id) => _api.deleteUtilityRule(id);
+
   Future<int> ping() => _api.ping();
   Future<LoginResult> login(String username, String password) =>
       _api.login(username, password);
