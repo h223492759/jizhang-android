@@ -82,6 +82,8 @@ class AutoRecordAccessibilityService : AccessibilityService() {
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = e.packageName?.toString() ?: return
         if (!AutoRecordStore.ALLOWED_PACKAGES.contains(pkg)) return
+        // v2.2.0：支付方式开关——未勾选来源的页面事件直接忽略（与通知通道同一启用集合）
+        if (!AutoRecordStore.isPayMethodEnabled(this, pkg)) return
         // 防抖：窗口变化可能连发（弹窗出现/布局稳定），只处理最后一发
         val now = System.currentTimeMillis()
         debounce?.let { mainHandler.removeCallbacks(it) }
@@ -217,6 +219,9 @@ class AutoRecordAccessibilityService : AccessibilityService() {
         "com.unionpay" -> "云闪付"
         "com.cmbchina.cc", "com.cmbchina.biz", "com.cmbchina.mobilebank",
         "com.cmbwallet" -> "招行信用卡"
+        "com.ss.android.ugc.aweme", "com.ss.android.ugc.aweme.lite" -> "抖音支付"
+        "com.jingdong.app.mall" -> "京东支付"
+        "com.sankuai.meituan" -> "美团支付"
         else -> pkg
     }
 

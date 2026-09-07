@@ -137,34 +137,52 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
     return Scaffold(
       backgroundColor: AppPalette.background(context),
       extendBody: false,
+      // v2.2.0：顶部两行固定（月/年+支出/收入切换、具体月/年选择器），列表上拉不划走；
+      // 只滚动下方内容区。跳转子页（分类详情/归属流水）同为固定顶部结构。
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                children: [
-                  _modeAndTypeBar(color),
-                  const SizedBox(height: 8),
-                  _periodSelector(),
-                  Divider(height: 1, thickness: 1, color: AppPalette.divider(context)),
-                  const SizedBox(height: 10),
-                  _totalRow(color),
-                  const SizedBox(height: 12),
-                  Container(
-                    height: 220,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
-                    child: _barChart(color),
-                  ),
-                  const SizedBox(height: 16),
-                  _ownerProportion(color),
-                  const SizedBox(height: 16),
-                  const Text('分类排行', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  const SizedBox(height: 8),
-                  ..._catRows(color),
-                ],
-              ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // PIN 1: 月/年 + 支出/收入 切换
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+              child: _modeAndTypeBar(color),
+            ),
+            // PIN 2: 具体月/年选择器
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: _periodSelector(),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              child: Divider(height: 1, thickness: 1, color: AppPalette.divider(context)),
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      children: [
+                        _totalRow(color),
+                        const SizedBox(height: 12),
+                        Container(
+                          height: 220,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppPalette.card(context), borderRadius: BorderRadius.circular(12)),
+                          child: _barChart(color),
+                        ),
+                        const SizedBox(height: 16),
+                        _ownerProportion(color),
+                        const SizedBox(height: 16),
+                        const Text('分类排行', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const SizedBox(height: 8),
+                        ..._catRows(color),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

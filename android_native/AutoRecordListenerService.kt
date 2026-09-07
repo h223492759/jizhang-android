@@ -32,6 +32,11 @@ class AutoRecordListenerService : NotificationListenerService() {
             Log.d("AutoRecord", "skip pkg not in whitelist: $pkg")
             return
         }
+        // v2.2.0：支付方式开关——未勾选来源的通知直接忽略（设置页可勾选微信/支付宝/云闪付/招行/抖音/京东/美团）
+        if (!AutoRecordStore.isPayMethodEnabled(this, pkg)) {
+            Log.d("AutoRecord", "skip pkg pay-method disabled: $pkg")
+            return
+        }
         val n: Notification = sbn.notification
         val extras = n.extras ?: return
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
@@ -112,7 +117,11 @@ class AutoRecordListenerService : NotificationListenerService() {
                 "com.eg.android.AlipayGphone" -> "支付宝"
                 "com.tencent.mm", "com.tencent.wepay" -> "微信支付"
                 "com.unionpay" -> "云闪付"
-                "com.cmbchina.cc", "com.cmbchina.biz", "com.cmbchina.mobilebank" -> "招行信用卡"
+                "com.cmbchina.cc", "com.cmbchina.biz", "com.cmbchina.mobilebank",
+                "com.cmbwallet" -> "招行信用卡"
+                "com.ss.android.ugc.aweme", "com.ss.android.ugc.aweme.lite" -> "抖音支付"
+                "com.jingdong.app.mall" -> "京东支付"
+                "com.sankuai.meituan" -> "美团支付"
                 else -> pkg
             }
             // 文案：'已加入待处理'（不是'已记账'，避免误导）。
@@ -165,26 +174,47 @@ class AutoRecordListenerService : NotificationListenerService() {
 
 /** 待处理队列存储（SharedPreferences，JSON 数组） */
 object AutoRecordStore {
-    val ALLOWED_PACKAGES = setOf(
-        // 支付宝多包名（不同版本/子应用）
-        "com.eg.android.AlipayGphone", // 支付宝 主 app
-        "com.aliyun.snotif",           // 支付宝 阿里云推送通道（聚合通知走这条）
-        "com.alipay.consumer",         // 支付宝 消费者版
-        "com.alipay.android.uiapay",   // 支付宝 内嵌支付 SDK
-        "com.alipay.mobile",           // 支付宝 老包名
-        // 微信
-        "com.tencent.mm",              // 微信 主 app
-        "com.tencent.wepay",           // 微信支付组件
-        // 其他
-        "com.unionpay",                // 云闪付
-        // 招商银行多包名
-        "com.cmbchina.cc",             // 掌上生活
-        "com.cmbchina.biz",            // 企业银行
-        "com.cmbchina.mobilebank",     // 手机银行
-        "com.cmbwallet",               // 招行信用卡独立 app（最常见包名）
+    // v2.2.0：支持的支付方式（id -> 包名）。改这里必须同步：
+    // ① AutoRecordAccessibilityService.kt / AutoRecordListenerService.kt 的 pkgLabel/when(pkg)
+    // ② Flutter auto_record_service.dart kPayMethods（同 id/label/包名）
+    // ③ scripts/patch_android.py A11Y_PACKAGES（无障碍 packageNames 白名单）
+    val PAY_METHODS: Map<String, List<String>> = linkedMapOf(
+        "wechat" to listOf(
+            "com.tencent.mm",              // 微信 主 app
+            "com.tencent.wepay"            // 微信支付组件
+        ),
+        "alipay" to listOf(
+            "com.eg.android.AlipayGphone", // 支付宝 主 app
+            "com.aliyun.snotif",           // 支付宝 阿里云推送通道（聚合通知走这条）
+            "com.alipay.consumer",         // 支付宝 消费者版
+            "com.alipay.android.uiapay",   // 支付宝 内嵌支付 SDK
+            "com.alipay.mobile"            // 支付宝 老包名
+        ),
+        "unionpay" to listOf(
+            "com.unionpay"                 // 云闪付
+        ),
+        "cmb" to listOf(
+            "com.cmbchina.cc",             // 掌上生活
+            "com.cmbchina.biz",            // 企业银行
+            "com.cmbchina.mobilebank",     // 手机银行
+            "com.cmbwallet"                // 招行信用卡独立 app（最常见包名）
+        ),
+        "douyin" to listOf(
+            "com.ss.android.ugc.aweme",        // 抖音
+            "com.ss.android.ugc.aweme.lite"    // 抖音极速版
+        ),
+        "jd" to listOf(
+            "com.jingdong.app.mall"            // 京东
+        ),
+        "meituan" to listOf(
+            "com.sankuai.meituan"              // 美团
+        )
     )
+    val ALLOWED_PACKAGES: Set<String> = PAY_METHODS.values.flatten().toSet()
+
     private const val KEY = "auto_record_queue"
     private const val KEY_SILENT = "silent"
+    private const val KEY_PAY_METHODS = "pay_methods_enabled"
 
     // 静默模式：开启后自动记账只弹 heads-up 通知，不拉起 App 主界面（v2.1.0 默认 true）
     fun isSilent(ctx: Context): Boolean =
@@ -192,6 +222,37 @@ object AutoRecordStore {
 
     fun setSilent(ctx: Context, v: Boolean) {
         sp(ctx).edit().putBoolean(KEY_SILENT, v).apply()
+    }
+
+    // ---- v2.2.0 支付方式启用集合（默认全开；null/异常 → 全开兼容老用户；显式空数组=全关） ----
+    fun enabledMethodIds(ctx: Context): Set<String> {
+        val raw = sp(ctx).getString(KEY_PAY_METHODS, null) ?: return PAY_METHODS.keys
+        return try {
+            val a = JSONArray(if (raw.isEmpty()) "[]" else raw)
+            (0 until a.length())
+                .map { a.getString(it) }
+                .filter { PAY_METHODS.containsKey(it) }
+                .toSet()
+        } catch (_: Exception) {
+            PAY_METHODS.keys
+        }
+    }
+
+    fun setPayMethods(ctx: Context, ids: List<String>) {
+        val a = JSONArray()
+        ids.forEach { if (PAY_METHODS.containsKey(it)) a.put(it) }
+        sp(ctx).edit().putString(KEY_PAY_METHODS, a.toString()).apply()
+    }
+
+    /** 包名是否属于「已启用」的支付方式（未知包直接放行，由 ALLOWED_PACKAGES 决定） */
+    fun isPayMethodEnabled(ctx: Context, pkg: String): Boolean {
+        val mid = methodIdOf(pkg) ?: return true
+        return enabledMethodIds(ctx).contains(mid)
+    }
+
+    fun methodIdOf(pkg: String): String? {
+        for ((id, pkgs) in PAY_METHODS) if (pkg in pkgs) return id
+        return null
     }
 
     fun readPending(ctx: Context): List<String> {

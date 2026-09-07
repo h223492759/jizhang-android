@@ -20,6 +20,8 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
   bool _a11yOn = false;
   // v2.1.0：静默模式——自动记账只弹 heads-up，不自动拉起 App 首页（native prefs silent）
   bool _silent = true;
+  // v2.2.0：支付方式开关（微信/支付宝/云闪付/招行/抖音/京东/美团）
+  Map<String, bool> _payOn = {};
   Map<String, bool> _ex = {
     'repay': false,
     'selfTransfer': false,
@@ -105,6 +107,9 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
     _systemRepayGroups = await svc.systemRepayGroups;
     _a11yOn = await _readA11yState();
     _silent = await _readSilent();
+    // v2.2.0：读取启用的支付方式（默认全开）
+    final pmIds = await svc.payMethods;
+    _payOn = {for (final m in kPayMethods) m.id: pmIds.contains(m.id)};
     if (mounted) setState(() => _loading = false);
     // v1.5.5：进设置页也触发一次处理——native 弹窗时若 App 不在前台/进程被杀，
     // pending 会滞留到下次进 App；这里兜底处理并让日志区立刻能看到"已记账/去重跳过"
@@ -113,6 +118,16 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
 
   Future<void> _saveEx() async {
     await AutoRecordService.instance.setExcludes(_ex);
+  }
+
+  // v2.2.0：勾选/取消某支付方式 → 同步 native（后台通知监听/无障碍按同一集合过滤）
+  Future<void> _togglePay(String id, bool v) async {
+    setState(() => _payOn[id] = v);
+    final ids = kPayMethods
+        .where((m) => _payOn[m.id] ?? true)
+        .map((m) => m.id)
+        .toList();
+    await AutoRecordService.instance.setPayMethods(ids);
   }
 
   Future<void> _openNotifAccess() async {
@@ -527,7 +542,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                   ),
                 ),
                 const SizedBox(height: 8),
-                // v2.1.0：静默模式——识别并自动记账后只弹通知，不跳转 App 首页
+                // v2.2.0：静默模式——识别并自动记账后只弹通知，不跳转 App 首页
                 Card(
                   child: SwitchListTile(
                     title: const Text('静默记账（不自动打开 App）',
@@ -535,6 +550,26 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                     subtitle: const Text('识别并记账后只弹系统通知，不再自动跳到 App 首页；点通知仍可进入查看'),
                     value: _silent,
                     onChanged: _setSilent,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // v2.2.0：支持的支付方式（未勾选的不识别、不弹窗、不记账）
+                const Text('支持的支付方式',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text('只识别勾选来源的支付通知（未勾选的通知直接忽略，可减少误记与打扰）',
+                    style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                const SizedBox(height: 8),
+                Card(
+                  child: Column(
+                    children: kPayMethods.map((m) => SwitchListTile(
+                      dense: true,
+                      title: Text(m.label, style: const TextStyle(fontSize: 14)),
+                      subtitle: Text(m.hint,
+                          style: TextStyle(fontSize: 11, color: AppPalette.textSecondary(context))),
+                      value: _payOn[m.id] ?? true,
+                      onChanged: (v) => _togglePay(m.id, v),
+                    )).toList(),
                   ),
                 ),
                 const SizedBox(height: 12),

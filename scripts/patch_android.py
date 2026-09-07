@@ -144,12 +144,15 @@ def patch_network_security_config():
     print("network_security_config.xml created")
 
 
-# 无障碍兜底通道（v2.0.0）：packageNames 必须与 AutoRecordStore.ALLOWED_PACKAGES
-# + AutoRecordAccessibilityService 保持一致（改了 Kotlin 白名单要同步这里）
+# 无障碍兜底通道（v2.0.0）：packageNames 必须与 AutoRecordStore.PAY_METHODS（v2.2.0）
+# + AutoRecordAccessibilityService 保持一致（改了 Kotlin 白名单要同步这里；
+# v2.2.0 起白名单 = 全部支付方式包名：微信/支付宝/云闪付/招行/抖音/京东/美团）
 A11Y_PACKAGES = (
     "com.eg.android.AlipayGphone,com.aliyun.snotif,com.alipay.consumer,"
     "com.alipay.android.uiapay,com.alipay.mobile,com.tencent.mm,com.tencent.wepay,"
-    "com.unionpay,com.cmbchina.cc,com.cmbchina.biz,com.cmbchina.mobilebank,com.cmbwallet"
+    "com.unionpay,com.cmbchina.cc,com.cmbchina.biz,com.cmbchina.mobilebank,com.cmbwallet,"
+    "com.ss.android.ugc.aweme,com.ss.android.ugc.aweme.lite,"
+    "com.jingdong.app.mall,com.sankuai.meituan"
 )
 
 
@@ -179,7 +182,7 @@ def patch_accessibility():
     strings = '''<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_service_label">自动记账·无障碍兜底</string>
-    <string name="accessibility_service_description">仅用于自动记账补漏：只监听白名单支付应用（微信/支付宝/云闪付/招行）在窗口切换瞬间的页面文字，识别「支付成功/收款成功」等完成页并写入待记账队列。不上传、不保存任何聊天与通讯内容；仅窗口变化低频触发，低耗电，不做屏幕截图识别。</string>
+    <string name="accessibility_service_description">仅用于自动记账补漏：只监听白名单支付应用（微信/支付宝/云闪付/招行/抖音/京东/美团，可在 App 设置里勾选）在窗口切换瞬间的页面文字，识别「支付成功/收款成功」等完成页并写入待记账队列。不上传、不保存任何聊天与通讯内容；仅窗口变化低频触发，低耗电，不做屏幕截图识别。</string>
 </resources>
 '''
     with open(sp, "w", encoding="utf-8") as f:

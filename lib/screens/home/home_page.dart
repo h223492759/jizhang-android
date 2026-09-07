@@ -71,17 +71,22 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  // 首页下拉：已在「最新月份」→ 先强制同步（推送本地改动 + 拉取 server 最新），再重读本地；
-  // 在历史月份（如 8 月）顶部下拉 → 跳回最新月份，不触发同步
+  // 首页下拉：
+  // - 在「历史月份」顶部下拉 → 只前进一个月（回较新的相邻月，7月→8月→9月…），
+  //   不直接跳最新月（防止翻好几层后误跳、丢失浏览位置）
+  // - 在「最新月份」顶部下拉 → 正常同步刷新（推送本地改动 + 拉取 server 最新）
   Future<void> _onPullRefresh() async {
     final now = DateTime.now();
     final isCurrentMonth =
         _month.year == now.year && _month.month == now.month;
-    if (!isCurrentMonth) {
+    final isFutureMonth =
+        _month.year > now.year || (_month.year == now.year && _month.month > now.month);
+    if (!isCurrentMonth && !isFutureMonth) {
+      final next = DateTime(_month.year, _month.month + 1);
       if (!mounted) return;
-      setState(() => _month = DateTime(now.year, now.month));
+      setState(() => _month = next);
       await _load();
-      if (mounted) toast('已回到 ${now.month} 月');
+      if (mounted) toast('已切到 ${next.month} 月');
       return;
     }
     try {
@@ -104,6 +109,38 @@ class _HomePageState extends ConsumerState<HomePage> {
     setState(() => _month = prev);
     await _load();
     _changingMonth = false;
+  }
+
+  // ============ v2.2.0 触底翻月防呆 ============
+  // 背景：列表滚到底后若手势一直没停（快速滑到底顺势再上拉），会立刻翻月——
+  // 每月 1 号的流水还没看清就被带到上月。规则：只有「拉到底停顿后、从底部重新
+  // 开始的新一次上拉」才翻月；同一段持续滑动顺带拉到底不翻月。下拉回新月份走
+  // RefreshIndicator（本身要拉到阈值松手才会触发，天然带停顿），无需额外防呆。
+  /// 本次滚动手势起点是否已在列表底部（触底翻月只认「停顿后再拉一次」的新手势）
+  bool _flipArmedAtBottom = false;
+  /// 上次翻月时间（ms），防一次拖动/连续两次上拉连跳两个月
+  int _lastFlipMs = 0;
+  static const _flipGapMs = 1500;
+
+  bool _handleScroll(ScrollNotification n) {
+    if (n is ScrollStartNotification) {
+      // 记录新一次手势起点是否在底部；内容不足一屏（maxScrollExtent==0）时视作在底部，
+      // 否则翻月手势永远无法触发（如整月只有几笔流水的情况）
+      final m = n.metrics;
+      final atBottom = m.maxScrollExtent <= 0 ||
+          m.pixels >= m.maxScrollExtent - 1;
+      _flipArmedAtBottom = atBottom;
+    } else if (n is OverscrollNotification && n.overscroll > 0) {
+      // 触底继续上拉 → 翻上月（仅当停顿后从底部重新拉才允许）
+      if (_changingMonth || _loading) return false;
+      if (!_flipArmedAtBottom) return false;
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (nowMs - _lastFlipMs < _flipGapMs) return false;
+      _lastFlipMs = nowMs;
+      _flipArmedAtBottom = false; // 防同一次手势内连续触发
+      _goPrevMonth();
+    }
+    return false;
   }
 
   Future<void> _pickMonth() async {
@@ -433,31 +470,32 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Scaffold(
       backgroundColor: AppPalette.background(context),
       extendBody: false,
-      body: NotificationListener<ScrollNotification>(
-        onNotification: (n) {
-          // 列表滚到底后继续上拉（overscroll 向下）→ 翻到上一个月
-          if (n is OverscrollNotification &&
-              n.overscroll > 0 &&
-              !_changingMonth &&
-              !_loading) {
-            _goPrevMonth();
-          }
-          return false;
-        },
-        child: RefreshIndicator(
-          onRefresh: _onPullRefresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(child: _headerRegion()),
-              SliverToBoxAdapter(child: _quickModules()),
-              _loading
-                  ? const SliverToBoxAdapter(
-                      child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())))
-                  : _flowList(overrides, user),
-            ],
+      // v2.2.0：顶部分区固定——颜色区（日期/收支）+ 5 个功能按钮不随列表滚动，
+      // 只有下方流水列表可滚动（结构 = 固定 Column + Expanded 滚动区）
+      body: Column(
+        children: [
+          _headerRegion(),
+          _quickModules(),
+          Expanded(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _handleScroll,
+              child: RefreshIndicator(
+                onRefresh: _onPullRefresh,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    _loading
+                        ? const SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        : _flowList(overrides, user),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

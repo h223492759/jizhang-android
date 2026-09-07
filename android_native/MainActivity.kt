@@ -58,6 +58,20 @@ class MainActivity : FlutterActivity() {
                     AutoRecordStore.setSilent(this, v)
                     result.success(true)
                 }
+                "getPayMethods" -> {
+                    // v2.2.0：当前启用的支付方式 id 列表（native 端为唯一事实源）
+                    result.success(AutoRecordStore.enabledMethodIds(this).toList())
+                }
+                "setPayMethods" -> {
+                    // v2.2.0：设置启用支付方式（Flutter 设置页勾选后同步；后台服务按此过滤）
+                    val ids = (call.arguments as? Map<*, *>)?.get("ids")
+                    val list = when (ids) {
+                        is List<*> -> ids.mapNotNull { it?.toString() }
+                        else -> emptyList()
+                    }
+                    AutoRecordStore.setPayMethods(this, list)
+                    result.success(true)
+                }
                 "enabled" -> {
                     result.success(true)
                 }

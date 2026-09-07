@@ -143,6 +143,7 @@ class AutoRecordService {
   static const _kDedupSeen = 'auto_dedup_seen';
   static const _kSystemKw = 'auto_system_keywords'; // v1.5.4 系统跳过词（分组可编辑）
   static const _kSystemRepayGroups = 'auto_system_repay_groups'; // v1.5.4 信用卡还款 AND 规则
+  static const _kPayMethods = 'auto_pay_methods'; // v2.2.0 启用支付方式（native 侧同步过滤）
 
   static AutoRecordService? _instance;
   static AutoRecordService get instance =>
@@ -166,6 +167,29 @@ class AutoRecordService {
   Future<void> setEnabled(bool v) async {
     final sp = await SharedPreferences.getInstance();
     await sp.setBool(_kEnabled, v);
+  }
+
+  // ---------------- v2.2.0 支付方式（可勾选启用） ----------------
+  // 与 native AutoRecordStore.PAY_METHODS / scripts/patch_android.py A11Y_PACKAGES
+  // 保持一致（改任何一端必须三端同步：Kotlin 通知监听 + Kotlin 无障碍 + Flutter）。
+  Future<List<String>> get payMethods async {
+    final sp = await SharedPreferences.getInstance();
+    final list = sp.getStringList(_kPayMethods);
+    if (list == null) {
+      // 从未设置过 → 默认全开（兼容老用户）
+      return kPayMethods.map((m) => m.id).toList();
+    }
+    // 过滤掉已下线的方法 id；显式空列表 = 全部关闭（保留用户选择）
+    return list.where((id) => kPayMethods.any((m) => m.id == id)).toList();
+  }
+
+  Future<void> setPayMethods(List<String> ids) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setStringList(_kPayMethods, ids);
+    // 同步给 native：通知监听/无障碍在后台直接按启用集合过滤，Flutter 进程被杀也生效
+    try {
+      await _channel.invokeMethod('setPayMethods', {'ids': ids});
+    } catch (_) {}
   }
 
   Future<Map<String, bool>> get excludes async {
@@ -538,6 +562,8 @@ class AutoRecordService {
     _cachedRepayGroups = await systemRepayGroups;
     final pending = await fetchPending();
     if (pending.isEmpty) return;
+    // v2.2.0：当前启用的支付方式（native 后台已按同一集合过滤，这里双保险）
+    final enabledSet = (await payMethods).toSet();
     _showing = true;
     try {
       // 逐条处理（不再按 10 秒桶合并）：
@@ -554,6 +580,16 @@ class AutoRecordService {
         if (await _idDedupHit(rid)) {
           // v1.5.5：去重也留痕，避免"弹窗了却没记账"无从排查
           recordLog('去重跳过:同一条通知已被处理过');
+          handledRids.add(rid);
+          await removePending(rid);
+          continue;
+        }
+        // v2.2.0：支付方式开关——未收录/未启用的来源直接丢弃（native 已过滤）
+        final pkgRaw = raw['pkg']?.toString() ?? '';
+        final mid = payMethodIdOf(pkgRaw);
+        if (mid == null || !enabledSet.contains(mid)) {
+          final label = _pkgName(pkgRaw);
+          recordLog('支付方式跳过:${label.isEmpty ? '未知来源' : label} 未启用');
           handledRids.add(rid);
           await removePending(rid);
           continue;
@@ -919,10 +955,59 @@ class AutoRecordService {
       case 'com.cmbchina.mobilebank':
       case 'com.cmbwallet':
         return '招行信用卡';
+      case 'com.ss.android.ugc.aweme':
+      case 'com.ss.android.ugc.aweme.lite':
+        return '抖音支付';
+      case 'com.jingdong.app.mall':
+        return '京东支付';
+      case 'com.sankuai.meituan':
+        return '美团支付';
       default:
         return '';
     }
   }
+}
+
+/// 支持的支付方式（v2.2.0 起可在自动记账设置页勾选启用）
+/// 与 native AutoRecordStore.PAY_METHODS / scripts/patch_android.py A11Y_PACKAGES 三端同步
+class PayMethodInfo {
+  final String id;
+  final String label;
+  final String hint;
+  final List<String> pkgs;
+  const PayMethodInfo(this.id, this.label, this.hint, this.pkgs);
+}
+
+const List<PayMethodInfo> kPayMethods = [
+  PayMethodInfo('wechat', '微信支付', '微信 App 内支付/转账/收款通知', ['com.tencent.mm', 'com.tencent.wepay']),
+  PayMethodInfo('alipay', '支付宝', '支付宝 App 内支付/收款/转账通知', [
+    'com.eg.android.AlipayGphone',
+    'com.aliyun.snotif',
+    'com.alipay.consumer',
+    'com.alipay.android.uiapay',
+    'com.alipay.mobile',
+  ]),
+  PayMethodInfo('unionpay', '云闪付（银行卡）', '云闪付 App 绑卡支付/消费提醒', ['com.unionpay']),
+  PayMethodInfo('cmb', '招商银行（信用卡）', '招商银行 App / 掌上生活 消费提醒', [
+    'com.cmbchina.cc',
+    'com.cmbchina.biz',
+    'com.cmbchina.mobilebank',
+    'com.cmbwallet',
+  ]),
+  PayMethodInfo('douyin', '抖音支付', '抖音 / 抖音极速版 App 内支付', [
+    'com.ss.android.ugc.aweme',
+    'com.ss.android.ugc.aweme.lite',
+  ]),
+  PayMethodInfo('jd', '京东支付', '京东 App 下单/支付/退款通知', ['com.jingdong.app.mall']),
+  PayMethodInfo('meituan', '美团支付', '美团 App 下单/支付/退款通知', ['com.sankuai.meituan']),
+];
+
+/// 包名 → 所属支付方式 id（未收录返回 null）
+String? payMethodIdOf(String pkg) {
+  for (final m in kPayMethods) {
+    if (m.pkgs.contains(pkg)) return m.id;
+  }
+  return null;
 }
 
 /// 解析后的通知记录
