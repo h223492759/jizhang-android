@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jizhang_android/core/local_first_api.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
-import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/screens/utility/utility_common.dart';
 import 'package:jizhang_android/screens/utility/utility_rules_page.dart';
 
@@ -368,8 +368,12 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
     return _records
         .where((r) {
           final m = r as Map;
-          return (m['bill_start'] as String?)?.compareTo(ym) <= 0 &&
-              (m['bill_end'] as String?)?.compareTo(ym) >= 0;
+          final bs = m['bill_start'] as String?;
+          final be = m['bill_end'] as String?;
+          return bs != null &&
+              be != null &&
+              bs.compareTo(ym) <= 0 &&
+              be.compareTo(ym) >= 0;
         })
         .cast<Map>()
         .toList();
