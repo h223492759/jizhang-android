@@ -1006,14 +1006,16 @@ final w = await _api.getWallets();
 
   Future<Map<String, dynamic>> getSavingsItemHistory(int id) async {
     final bookId = await _curBook();
-    return _cachedGet('apic:shist:$bookId:$id',
-        () => _api.getSavingsItemHistory(id)) as Map<String, dynamic>;
+    final data = await _cachedGet('apic:shist:$bookId:$id',
+        () => _api.getSavingsItemHistory(id));
+    return data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> getWalletTxns(int id) async {
     final bookId = await _curBook();
-    return _cachedGet('apic:wtxn:$bookId:$id',
-        () => _api.getWalletTxns(id)) as Map<String, dynamic>;
+    final data = await _cachedGet('apic:wtxn:$bookId:$id',
+        () => _api.getWalletTxns(id));
+    return data as Map<String, dynamic>;
   }
 
   // ================ 派生统计（账单/图表）本地聚合（离线可用） ================
@@ -1558,8 +1560,9 @@ final w = await _api.getWallets();
   Future<List<AiModel>> getAiModels() => _api.getAiModels();
   Future<Map<String, dynamic>> getSavingsMonthItems(String ym) async {
     final bookId = await _curBook();
-    return _cachedGet('apic:smonth:$bookId:$ym',
-        () => _api.getSavingsMonthItems(ym)) as Map<String, dynamic>;
+    final data = await _cachedGet('apic:smonth:$bookId:$ym',
+        () => _api.getSavingsMonthItems(ym));
+    return data as Map<String, dynamic>;
   }
   Future<Meta> getMeta() => _api.getMeta();
   Future<List<Map<String, dynamic>>> getOpLogs({int limit = 50}) =>
@@ -1595,28 +1598,32 @@ final w = await _api.getWallets();
   // ================= 水电气物业用量（utility，读走缓存回退） =================
   Future<List<dynamic>> getUtilityRules() async {
     final bookId = await _curBook();
-    return _cachedGet('apic:urules:$bookId', () => _api.getUtilityRules())
-        as List<dynamic>;
+    final data = await _cachedGet(
+        'apic:urules:$bookId', () => _api.getUtilityRules());
+    return data as List<dynamic>;
   }
 
   Future<List<dynamic>> getUtilityRecords(
-          {required String type, required int year}) async {
+      {required String type, required int year}) async {
     final bookId = await _curBook();
-    return _cachedGet('apic:urecs:$bookId:$type:$year',
-        () => _api.getUtilityRecords(type: type, year: year)) as List<dynamic>;
+    final data = await _cachedGet('apic:urecs:$bookId:$type:$year',
+        () => _api.getUtilityRecords(type: type, year: year));
+    return data as List<dynamic>;
   }
 
   Future<Map<String, dynamic>> getUtilityMonths(
-          {required String type, required int year}) async {
+      {required String type, required int year}) async {
     final bookId = await _curBook();
-    return _cachedGet('apic:umon:$bookId:$type:$year',
-        () => _api.getUtilityMonths(type: type, year: year)) as Map<String, dynamic>;
+    final data = await _cachedGet('apic:umon:$bookId:$type:$year',
+        () => _api.getUtilityMonths(type: type, year: year));
+    return data as Map<String, dynamic>;
   }
 
   Future<List<dynamic>> getUtilityYears({required String type}) async {
     final bookId = await _curBook();
-    return _cachedGet('apic:uyears:$bookId:$type',
-        () => _api.getUtilityYears(type: type)) as List<dynamic>;
+    final data = await _cachedGet('apic:uyears:$bookId:$type',
+        () => _api.getUtilityYears(type: type));
+    return data as List<dynamic>;
   }
   Future<void> saveUtilityRecord(int id,
           {double? discount, double? usage}) =>
