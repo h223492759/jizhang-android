@@ -1,17 +1,11 @@
 package com.example.u_gen_tmp
 
 import android.accessibilityservice.AccessibilityService
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import androidx.core.app.NotificationCompat
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -162,7 +156,8 @@ class AutoRecordAccessibilityService : AccessibilityService() {
             if (appended) {
                 lastEnqueueAt[sigKey] = System.currentTimeMillis()
                 logFile("[无障碍] 已入队 id=${id.takeLast(18)} amt=${amt.ifEmpty { "0元占位" }}")
-                postHeadsUp(pkg, kw, amt)
+                // v260908：不再逐条弹「已加入待处理」heads-up（弹窗太多）；只在 Flutter
+                // 真正记账成功后统一弹一次「已记账」（AutoRecordStore.postRecordedHeadsUp）。
                 // v2.0.1：不调 launchMain 抢前台——用户要求「弹 heads-up 即可，跳转 App 太烦」
             } else {
                 logFile("[无障碍] 队列去重跳过：同包同额已有条目（通知通道优先） kw=$kw")
@@ -210,63 +205,11 @@ class AutoRecordAccessibilityService : AccessibilityService() {
         }
     }
 
-    // ---------- 与通知监听一致的用户可见反馈（弹 heads-up + 拉起主界面） ----------
-
-    private fun pkgLabel(pkg: String): String = when (pkg) {
-        "com.eg.android.AlipayGphone", "com.aliyun.snotif",
-        "com.alipay.consumer", "com.alipay.android.uiapay", "com.alipay.mobile" -> "支付宝"
-        "com.tencent.mm", "com.tencent.wepay" -> "微信支付"
-        "com.unionpay" -> "云闪付"
-        "com.cmbchina.cc", "com.cmbchina.biz", "com.cmbchina.mobilebank",
-        "com.cmbwallet" -> "招行信用卡"
-        "com.ss.android.ugc.aweme", "com.ss.android.ugc.aweme.lite" -> "抖音支付"
-        "com.jingdong.app.mall" -> "京东支付"
-        "com.sankuai.meituan" -> "美团支付"
-        else -> pkg
-    }
-
-    private fun postHeadsUp(pkg: String, kw: String, amount: String) {
-        try {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            ensureChannel(nm)
-            val pi = PendingIntent.getActivity(
-                this, 1,
-                Intent(this, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val src = pkgLabel(pkg)
-            val titleStr = "已加入待处理 $src"
-            val body = if (amount.isNotEmpty()) "识别到支付页面 ¥$amount" else "识别到支付页面（无金额，已记待录入）"
-            val n = NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentTitle(titleStr)
-                .setContentText("$body · $kw")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_EVENT)
-                .setAutoCancel(true)
-                .setContentIntent(pi)
-                .build()
-            nm.notify(NOTIFY_ID, n)
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun ensureChannel(nm: NotificationManager) {
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return
-        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-        val ch = NotificationChannel(
-            CHANNEL_ID, "自动记账", NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "自动从支付通知/支付页面记账"
-            enableVibration(true)
-        }
-        nm.createNotificationChannel(ch)
-    }
-
-    // v2.0.1：删除 launchMain——自动记账后不再抢前台（用户要求：heads-up 弹窗即可）
-    // private fun launchMain(id: String) { ... }
+    // ---------- 用户可见反馈（v260908 收口） ----------
+    // 不再在每次页面检测成功时逐条弹「已加入待处理」heads-up（弹窗太多）；入队只写日志，
+    // 记账成功与否由 App 端决定，成功后统一弹一次「已记账」提醒
+    // （Flutter 记账成功 → MethodChannel notifyRecorded → AutoRecordStore.postRecordedHeadsUp）。
+    // 删除：pkgLabel / postHeadsUp / ensureChannel / launchMain（v2.0.1 已删抢前台）
 
     /** 用户可见日志：与通知通道同文件（native_logs.json），[无障碍] 前缀区分来源 */
     private fun logFile(msg: String) {

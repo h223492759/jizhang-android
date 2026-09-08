@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:jizhang_android/core/models.dart';
@@ -117,6 +118,8 @@ class MePage extends ConsumerWidget {
           ),
           _tile(Icons.history, '操作日志', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OpLogsPage())), subtitle: '本地/服务器操作记录'),
           _tile(Icons.swap_horiz, '切换服务器', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage()))),
+          _tile(Icons.code, '开源地址（GitHub）', () => _copyRepo(context),
+              subtitle: 'github.com/h223492759/jizhang-android'),
           const SizedBox(height: 12),
           // 版本信息 + 设置信息合并展示
           _versionCard(context, ref, s),
@@ -174,6 +177,13 @@ class MePage extends ConsumerWidget {
       await ref.read(sessionProvider.notifier).selectBook(picked);
       toast('已切换到当前账本');
     }
+  }
+
+  // 开源地址：复制到剪贴板（避免额外引入 url_launcher 依赖）
+  Future<void> _copyRepo(BuildContext context) async {
+    const url = 'https://github.com/h223492759/jizhang-android';
+    await Clipboard.setData(const ClipboardData(text: url));
+    if (context.mounted) toast('已复制开源地址：$url');
   }
 
   // 版本信息 + 服务器 + 账号 + AI（设置页信息合并到此）

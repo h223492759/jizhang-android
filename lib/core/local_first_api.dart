@@ -1563,6 +1563,8 @@ final w = await _api.getWallets();
   Future<Map<String, dynamic>> getUtilityMonths(
           {required String type, required int year}) =>
       _api.getUtilityMonths(type: type, year: year);
+  Future<List<dynamic>> getUtilityYears({required String type}) =>
+      _api.getUtilityYears(type: type);
   Future<void> saveUtilityRecord(int id,
           {double? discount, double? usage}) =>
       _api.saveUtilityRecord(id, discount: discount, usage: usage);

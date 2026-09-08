@@ -17,11 +17,10 @@ import org.json.JSONObject
 
 /**
  * 自动记账：监听支付类 App 的通知，必须命中强信号词（支付成功/到账/收款等）
- * 才写入待处理队列 + 弹 heads-up。营销/虚拟积分类通知直接丢弃，
- * 避免"检测到但没记账"的误导。
+ * 才写入待处理队列。营销/虚拟积分类通知直接丢弃，避免"检测到但没记账"的误导。
  *
- * 命中后：① 入队 ② 弹 heads-up（点开直接进入主界面）
- * 让用户即使在后台也能感知到"自动记账正在处理这笔"。
+ * 命中后：① 入队（仅日志）② 记账成功与否由 App 端决定——Flutter 解析落库成功后
+ * 经 MethodChannel notifyRecorded 统一弹一次「已记账」（v260908：不再逐条弹 heads-up）。
  */
 class AutoRecordListenerService : NotificationListenerService() {
 
@@ -87,81 +86,38 @@ class AutoRecordListenerService : NotificationListenerService() {
             .put("time", sbn.postTime)
         AutoRecordStore.appendPending(this, item)
         Log.d("AutoRecord", "enqueued id=$id pkg=$pkg amt=$amt")
-        // 在系统通知栏弹一条 heads-up
-        postHeadsUp(pkg, title, amt)
-        // 静默模式下不拉起主界面（只保留 heads-up 弹窗 + 点击通知才进 App）
-        if (AutoRecordStore.isSilent(this)) return
-        val i = Intent(this, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            putExtra("auto_record", id)
-        }
-        try {
-            startActivity(i)
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun postHeadsUp(pkg: String, title: String, amount: String) {
-        try {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            ensureChannel(nm)
-            // 点击通知 → 打开主界面
-            val pi = PendingIntent.getActivity(
-                this, 0,
-                Intent(this, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val src = when (pkg) {
-                "com.eg.android.AlipayGphone" -> "支付宝"
-                "com.tencent.mm", "com.tencent.wepay" -> "微信支付"
-                "com.unionpay" -> "云闪付"
-                "com.cmbchina.cc", "com.cmbchina.biz", "com.cmbchina.mobilebank",
-                "com.cmbwallet" -> "招行信用卡"
-                "com.ss.android.ugc.aweme", "com.ss.android.ugc.aweme.lite" -> "抖音支付"
-                "com.jingdong.app.mall" -> "京东支付"
-                "com.sankuai.meituan" -> "美团支付"
-                else -> pkg
+        // v260908：不再逐条弹「已加入待处理」heads-up（弹窗太多）；只写一行入队日志，
+        // 记账成功与否由 App 端决定，成功后统一弹一次「已记账」提醒（AutoRecordStore.postRecordedHeadsUp）。
+        val now = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.CHINA).format(java.util.Date())
+        val srcLabel = pkgLabel(pkg)
+        val logLine = if (amt.isNotEmpty()) "[$now] 已入队待处理 $srcLabel ¥$amt | ${title}"
+                      else "[$now] 已入队待处理 $srcLabel | ${title}"
+        AutoRecordStore.appendLog(this, logLine)
+        // v2.2.0 静默开关语义保留：默认开启=记账后不自动打开 App（点通知可进查看）；
+        // 用户关闭静默=入队后拉起 App 首页让 Flutter 即时处理（v260908 起不再弹 heads-up）
+        if (!AutoRecordStore.isSilent(this)) {
+            val i = Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                putExtra("auto_record", id)
             }
-            // 文案：'已加入待处理'（不是'已记账'，避免误导）。
-            // 真正是否记账成功要等 Flutter _parse + _recordFlow 完成，
-            // 弹 heads-up 时 native 不知道 Flutter 是否会丢弃（如通知没金额）。
-            val titleStr = "已加入待处理 $src"
-            val body = if (title.isNotEmpty()) title else "自动记账已加入待处理"
-            // v1.5.4 加日期前缀：跨天不会因 HH:mm:ss 撞车而乱序；与 Flutter 端 recordLog
-            // 保持一致（双端统一，loadPersistedLogs 排序正则一并改）
-            val now = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.CHINA).format(java.util.Date())
-            val logLine = if (amount.isNotEmpty()) "[$now][弹窗] $titleStr ¥$amount | $body"
-                          else "[$now][弹窗] $titleStr | $body"
-            // 直接写文件到 app 私有目录（Flutter 端通过 path_provider 读同一文件）
-            AutoRecordStore.appendLog(this, logLine)
-            val n = NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentTitle(titleStr)
-                .setContentText(body)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_EVENT)
-                .setAutoCancel(true)
-                .setContentIntent(pi)
-                .build()
-            nm.notify(NOTIFY_ID, n)
-        } catch (_: Exception) {
+            try {
+                startActivity(i)
+            } catch (_: Exception) {
+            }
         }
     }
 
-    private fun ensureChannel(nm: NotificationManager) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val existing = nm.getNotificationChannel(CHANNEL_ID)
-        if (existing != null) return
-        val ch = NotificationChannel(
-            CHANNEL_ID, "自动记账",
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "已记账：自动从支付类通知记账，点击查看详情"
-            enableVibration(true)
-        }
-        nm.createNotificationChannel(ch)
+    private fun pkgLabel(pkg: String): String = when (pkg) {
+        "com.eg.android.AlipayGphone", "com.aliyun.snotif",
+        "com.alipay.consumer", "com.alipay.android.uiapay", "com.alipay.mobile" -> "支付宝"
+        "com.tencent.mm", "com.tencent.wepay" -> "微信支付"
+        "com.unionpay" -> "云闪付"
+        "com.cmbchina.cc", "com.cmbchina.biz", "com.cmbchina.mobilebank",
+        "com.cmbwallet" -> "招行信用卡"
+        "com.ss.android.ugc.aweme", "com.ss.android.ugc.aweme.lite" -> "抖音支付"
+        "com.jingdong.app.mall" -> "京东支付"
+        "com.sankuai.meituan" -> "美团支付"
+        else -> pkg
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {}
@@ -344,6 +300,48 @@ object AutoRecordStore {
             if (o.optString("id") != id) out.put(o)
         }
         sp.edit().putString(KEY, out.toString()).apply()
+    }
+
+    // ---- v260908：记账成功统一提醒（Flutter 记账成功后经 MethodChannel notifyRecorded 调用）----
+    // 替代原「每条通知入队都弹『已加入待处理』」的多个 heads-up：只在真正记账成功弹一次。
+    fun postRecordedHeadsUp(ctx: Context, body: String) {
+        try {
+            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            ensureRecordChannel(nm)
+            val pi = PendingIntent.getActivity(
+                ctx, 0,
+                Intent(ctx, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val n = NotificationCompat.Builder(ctx, "auto_record")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("已记账")
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_EVENT)
+                .setAutoCancel(true)
+                .setContentIntent(pi)
+                .build()
+            nm.notify(1001, n)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun ensureRecordChannel(nm: NotificationManager) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val existing = nm.getNotificationChannel("auto_record")
+        if (existing != null) return
+        val ch = NotificationChannel(
+            "auto_record", "自动记账",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "已记账：自动从支付通知/页面记账，点击查看详情"
+            enableVibration(true)
+        }
+        nm.createNotificationChannel(ch)
     }
 
     private fun sp(ctx: Context): SharedPreferences =

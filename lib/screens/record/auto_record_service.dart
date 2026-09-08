@@ -411,6 +411,8 @@ class AutoRecordService {
   static const int _zeroPairWindowMs = 5000;
   // 最近成功记账的有金额记录（payName/notifTime/amount/ts），供跨批配对判断
   final List<Map<String, dynamic>> _recentlyRecorded = [];
+  // v260908：最近成功记账的 0 元占位记录（多渠道全无金额时只按最早渠道记一条）
+  final List<Map<String, dynamic>> _recentlyZeroed = [];
 
   /// 轻量判断文本中是否含金额表述（与 _parse 金额提取正则族一致，无日志副作用）
   bool _textHasAmount(String text) {
@@ -421,29 +423,67 @@ class AutoRecordService {
   }
 
   /// v1.5.6：0 元占位是否应被「同批未处理 or 最近已记账」的有金额通知配对吞掉
+  /// v260908：窗口从「同支付方式」放宽到【任意支付方式】——同一笔消费常被多个渠道
+  /// 先后弹通知（如微信支付 ¥300 后 3 秒支付宝弹 0 元服务通知），只记有金额那条。
+  /// 全渠道都无金额时：更早渠道的 0 元占位已记账 → 本条吞掉（按最早渠道只记一条）。
   Future<bool> _zeroPaired(Map<String, dynamic> raw,
       List<Map<String, dynamic>> pending, Set<String> handledRids) async {
     final rid = raw['id']?.toString() ?? '';
-    final payName = _pkgName(raw['pkg']?.toString() ?? '');
     final t = (raw['time'] as num?)?.toInt() ?? 0;
-    // 1) 同批 pending 中未处理的其他通知：同支付方式、含金额文字、通知时间差 ≤5s
+    // 1) 同批 pending 中未处理的其他通知：任意支付方式、含金额文字、通知时间差 ≤5s
     for (final o in pending) {
       final oid = o['id']?.toString() ?? '';
       if (oid == rid || handledRids.contains(oid)) continue;
-      if (_pkgName(o['pkg']?.toString() ?? '') != payName) continue;
       final ot = (o['time'] as num?)?.toInt() ?? 0;
       if (t != 0 && ot != 0 && (ot - t).abs() > _zeroPairWindowMs) continue;
       final otext = '${o['title'] ?? ''} ${o['text'] ?? ''}';
       if (_textHasAmount(otext)) return true;
     }
-    // 2) 最近刚记账的有金额通知（上一轮已处理、已从 pending 移除的跨批场景）
+    // 2) 最近刚记账的有金额通知（上一轮已处理、已从 pending 移除的跨批场景；任意支付方式）
     final now = DateTime.now().millisecondsSinceEpoch;
     for (final r in _recentlyRecorded) {
-      if (r['payName'] != payName) continue;
       if (now - (r['ts'] as int) > 60 * 1000) continue; // 只认 1 分钟内，防误配老通知
       final nt = r['notifTime'] as int;
       if (nt != 0 && t != 0 && (nt - t).abs() <= _zeroPairWindowMs &&
           (r['amount'] as num).toDouble() > 0) {
+        return true;
+      }
+    }
+    // 3) 最近刚记账的 0 元占位（更早渠道已记 → 全 0 元只按最早渠道记一条）
+    for (final r in _recentlyZeroed) {
+      if (now - (r['ts'] as int) > 60 * 1000) continue;
+      final nt = r['notifTime'] as int;
+      if (nt != 0 && t != 0 && (nt - t).abs() <= _zeroPairWindowMs) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// v260908：跨支付方式同额去重——5 秒内【任意渠道】已记/在途同金额（>0）只记一条
+  /// （同一笔消费可能多个渠道都带金额通知：金额相同=同一笔；金额不同=不同笔，各记）
+  Future<bool> _sameAmtDup5s(Map<String, dynamic> raw, ParsedNotification p,
+      List<Map<String, dynamic>> pending, Set<String> handledRids) async {
+    if (p.amount <= 0) return false;
+    final rid = p.id;
+    final t = (raw['time'] as num?)?.toInt() ?? 0;
+    // 1) 同批 pending 中未处理的其他条目（任意支付方式）同额
+    for (final o in pending) {
+      final oid = o['id']?.toString() ?? '';
+      if (oid.isEmpty || oid == rid || handledRids.contains(oid)) continue;
+      final ot = (o['time'] as num?)?.toInt() ?? 0;
+      if (t != 0 && ot != 0 && (ot - t).abs() > _zeroPairWindowMs) continue;
+      final otext = '${o['title'] ?? ''} ${o['text'] ?? ''}';
+      final oAmt = _firstAmount(otext);
+      if (oAmt != null && (oAmt - p.amount).abs() < 0.005) return true;
+    }
+    // 2) 最近刚记账的同额条目（跨批；任意渠道 5s 窗）
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final r in _recentlyRecorded) {
+      if (now - (r['ts'] as int) > 60 * 1000) continue;
+      if (((r['amount'] as num).toDouble() - p.amount).abs() >= 0.005) continue;
+      final nt = r['notifTime'] as int;
+      if (nt != 0 && t != 0 && (nt - t).abs() <= _zeroPairWindowMs) {
         return true;
       }
     }
@@ -490,18 +530,35 @@ class AutoRecordService {
 
   /// v1.5.6：登记一笔刚记账的有金额记录（供后续 0 元占位配对）
   /// v2.0.0：顺带记录来源通道 src（notif=通知监听 / a11y=无障碍兜底），供双通道去重
+  /// v260908：0 元占位记账也登记（多渠道全 0 元时按最早渠道只记一条）
   void _recordRecently(Map<String, dynamic> raw, ParsedNotification p) {
-    if (p.amount <= 0) return; // 只认有金额的
-    _recentlyRecorded.add({
+    final rec = {
       'payName': _pkgName(p.pkg),
       'notifTime': (raw['time'] as num?)?.toInt() ?? 0,
       'amount': p.amount,
       'src': raw['src']?.toString() == 'a11y' ? 'a11y' : 'notif',
       'ts': DateTime.now().millisecondsSinceEpoch,
-    });
+    };
+    if (p.amount <= 0) {
+      _recentlyZeroed.add(rec);
+      if (_recentlyZeroed.length > 20) {
+        _recentlyZeroed.removeRange(0, _recentlyZeroed.length - 20);
+      }
+      return;
+    }
+    _recentlyRecorded.add(rec);
     if (_recentlyRecorded.length > 20) {
       _recentlyRecorded.removeRange(0, _recentlyRecorded.length - 20);
     }
+  }
+
+  /// 文本中第一个金额（double？），跨渠道同额判断用
+  double? _firstAmount(String text) {
+    final m = RegExp(r'[¥￥]\s*([0-9]+(?:\.[0-9]{1,2})?)').firstMatch(text) ??
+        RegExp(r'([0-9]+(?:\.[0-9]{1,2})?)\s*(?:元|人民币)').firstMatch(text) ??
+        RegExp(r'(?:人民币|RMB)\s*([0-9]+(?:\.[0-9]{1,2})?)').firstMatch(text);
+    if (m == null) return null;
+    return double.tryParse(m.group(1) ?? '');
   }
 
   // ---------------- 原生队列 ----------------
@@ -605,12 +662,11 @@ class AutoRecordService {
           await removePending(rid);
           continue;
         }
-        // v1.5.6：0 元占位配对吞掉——同支付方式 5 秒内出现「有金额通知」
-        // （如支付宝：交易提醒 ¥16.92 + 服务通知(无金额) 同时到达），说明是同一次
-        // 支付的两条通知，只记有金额那条，避免账本出现 -0 脏行。
-        // 找不到配对才继续走 B 方案：0 元照记「待录入」保底（防漏）。
+        // v1.5.6 + v260908：0 元占位配对吞掉——5 秒内【任意支付方式】出现「有金额通知」
+        // （如 微信支付 ¥300 → 3 秒后支付宝弹 0 元「服务通知」，属同一笔支付的多渠道通知），
+        // 只记有金额那条，避免账本出现 -0 脏行。找不到配对才走 B 方案：0 元照记「待录入」保底（防漏）。
         if (parsed.amount == 0 && await _zeroPaired(raw, pending, handledRids)) {
-          recordLog('配对吞掉:0元占位同支付方式5s内有金额通知（不记重复占位）');
+          recordLog('配对吞掉:0元占位5s内其他支付方式有金额通知（不记重复占位）');
           await _idDedupMark(rid); // 吞掉的也打 id 指纹，防 native 重复入队再来
           handledRids.add(rid);
           await removePending(rid);
@@ -621,6 +677,17 @@ class AutoRecordService {
         if (parsed.amount > 0 && await _crossChannelDup(raw, parsed, pending, handledRids)) {
           final from = raw['src']?.toString() == 'a11y' ? '无障碍页面' : '通知';
           recordLog('去重跳过:双通道同款同额60s内(本笔来自$from，另一通道已处理/在途)');
+          await _idDedupMark(rid);
+          handledRids.add(rid);
+          await removePending(rid);
+          continue;
+        }
+        // v260908：跨支付方式同额去重——5 秒内任意渠道同金额（>0）只记一条；
+        // 金额不同 = 不同笔消费，各记（用户规则：同额只记一条、异额记多条）
+        if (parsed.amount > 0 &&
+            await _sameAmtDup5s(raw, parsed, pending, handledRids)) {
+          recordLog(
+              '合并跳过:5s内其他支付方式同额¥${parsed.amount.toStringAsFixed(2)}已记/在途（同笔只记一条）');
           await _idDedupMark(rid);
           handledRids.add(rid);
           await removePending(rid);
@@ -678,12 +745,26 @@ class AutoRecordService {
       await ref.read(localApiProvider).createFlow(body);
       ref.read(dataVersionProvider.notifier).state++;
       recordLog("已记账：${p.merchant} ¥${p.amount.toStringAsFixed(2)} ");
-      toast('已记账：${p.merchant} ¥${p.amount.toStringAsFixed(2)}');
+      // v260908：记账成功才弹一次 heads-up 提醒（此前每条通知入队都弹「已加入待处理」，弹窗太多）
+      await _notifyRecorded(p);
     } catch (e) {
       // 真正的非网络错（如参数错）才提示失败
       recordLog('记账失败：${e.toString().replaceFirst("ApiException: ", "")}');
       toast('记账失败：${e.toString().replaceFirst("ApiException: ", "")}');
     }
+  }
+
+  /// v260908：记账成功后通知一次系统 heads-up「已记账」+ 内容
+  /// （native 收到后弹通知栏提醒；App 在前台不再另弹 toast，避免重复打扰）
+  Future<void> _notifyRecorded(ParsedNotification p) async {
+    try {
+      final pay = _pkgName(p.pkg);
+      final hhmm = _hhmm(p.time);
+      final body = p.amount == 0
+          ? '$pay $hhmm ${p.merchant}待录入（无金额，请补录）'
+          : '$pay $hhmm ${p.merchant} ¥${p.amount.toStringAsFixed(2)}';
+      await _channel.invokeMethod('notifyRecorded', {'body': body});
+    } catch (_) {}
   }
 
   /// 商户 → 忽略名单（流水详情页「不再记」调用）

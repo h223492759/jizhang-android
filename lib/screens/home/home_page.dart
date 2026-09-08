@@ -420,6 +420,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _editCategory(Flow f) async {
     final name = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true, // v260908：分类多时最后一行可滚动到底
       backgroundColor: AppPalette.card(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -612,9 +613,13 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
             const Text('选择分类', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+              constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.62),
               child: GridView.builder(
                 shrinkWrap: true,
+                // v260908：显式允许滚动 + 底部留白，分类多时最下面一行能拉到
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 12),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
                   childAspectRatio: 1.05,

@@ -599,6 +599,13 @@ class ApiClient {
     return (d as Map).cast<String, dynamic>();
   }
 
+  /// 年度汇总视图（历年：year/usage/amount/tier/hasBill）
+  Future<List<dynamic>> getUtilityYears({required String type}) async {
+    final d = await _req(() => _dio.get('/utility/years',
+        queryParameters: {'type': type}));
+    return (((d as Map)['list'] as List<dynamic>?) ?? []);
+  }
+
   /// 校正账单：补优惠金额 / 改用量（至少传一项）
   Future<void> saveUtilityRecord(int id,
       {double? discount, double? usage}) async {

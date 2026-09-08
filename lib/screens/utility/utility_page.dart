@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
@@ -7,9 +8,10 @@ import 'package:jizhang_android/screens/utility/utility_common.dart';
 import 'package:jizhang_android/screens/utility/utility_rules_page.dart';
 
 /// 水电气物业每月用量
-/// - 顶部固定两行：类型 seg + 年份切换（含扫描历史），下方列表滚动（同 v2.2.0 固定头约定）
+/// - 顶部固定两行：类型 seg + 视图 seg（按月/按年，复用账单页交互）+ 年份切换，下方滚动（v2.2.0 固定头约定）
+/// - 趋势图（金额柱状，第2档橙/第3档红着色）
 /// - 高亮：第2档橙黄（浅底+左条+badge），第3档及以上红色强警示
-/// - 详情弹层：补优惠金额 / 改用量（保存后服务端重算档位与状态）、删除账单
+/// - 详情弹层：录入实际账单金额 / 改用量（保存后服务端重算档位与状态）、删除账单
 /// - 数据纯在线（服务端 utility_records，无本地镜像）
 class UtilityPage extends ConsumerStatefulWidget {
   const UtilityPage({super.key});
@@ -23,9 +25,11 @@ int _tier(dynamic v) => (v as num?)?.toInt() ?? 1;
 class _UtilityPageState extends ConsumerState<UtilityPage> {
   String _type = 'electric';
   int _year = DateTime.now().year;
+  bool _yearMode = false; // v260908：false=按月（某年12个月） true=按年（历年汇总）
   List<dynamic> _rules = [];
   List<dynamic> _records = [];
   List<dynamic> _months = [];
+  List<dynamic> _years = [];
   bool _loading = true;
 
   @override
@@ -42,14 +46,25 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
       final api = ref.read(localApiProvider);
       final r1 = await api.getUtilityRules();
       final r2 = await api.getUtilityRecords(type: _type, year: _year);
-      final r3 = await api.getUtilityMonths(type: _type, year: _year);
-      if (!mounted) return;
-      setState(() {
-        _rules = r1;
-        _records = r2;
-        _months = ((r3['months'] as List<dynamic>?) ?? []);
-        _loading = false;
-      });
+      if (_yearMode) {
+        final rY = await api.getUtilityYears(type: _type);
+        if (!mounted) return;
+        setState(() {
+          _rules = r1;
+          _records = r2;
+          _years = rY;
+          _loading = false;
+        });
+      } else {
+        final r3 = await api.getUtilityMonths(type: _type, year: _year);
+        if (!mounted) return;
+        setState(() {
+          _rules = r1;
+          _records = r2;
+          _months = ((r3['months'] as List<dynamic>?) ?? []);
+          _loading = false;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -106,6 +121,12 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
             icon: const Icon(Icons.add_circle_outline),
             onPressed: _openAddDialog,
           ),
+          if (_hasRule)
+            IconButton(
+              tooltip: '扫描历史',
+              icon: const Icon(Icons.sync),
+              onPressed: _scan,
+            ),
           IconButton(
             tooltip: '规则设置',
             icon: const Icon(Icons.tune),
@@ -122,38 +143,38 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
               child: _segRow(),
             ),
-            // PIN 2: 年份切换 + 扫描历史
+            // PIN 2: 月/年视图 seg（复用账单页交互）+ 年份切换（月模式）
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(children: [
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: () {
-                    setState(() => _year -= 1);
-                    _refresh();
-                  },
-                ),
-                Text('$_year 年',
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.bold)),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: _year < DateTime.now().year + 3
-                      ? () {
-                          setState(() => _year += 1);
-                          _refresh();
-                        }
-                      : null,
-                ),
+                _seg(['按月', '按年'], _yearMode ? 1 : 0, (i) {
+                  setState(() => _yearMode = i == 1);
+                  _refresh();
+                }),
                 const Spacer(),
-                if (_hasRule)
-                  TextButton.icon(
-                    onPressed: _scan,
-                    icon: const Icon(Icons.sync, size: 16),
-                    label: const Text('扫描历史'),
+                if (!_yearMode) ...[
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: () {
+                      setState(() => _year -= 1);
+                      _refresh();
+                    },
                   ),
+                  Text('$_year 年',
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: _year < DateTime.now().year + 3
+                        ? () {
+                            setState(() => _year += 1);
+                            _refresh();
+                          }
+                        : null,
+                  ),
+                ],
               ]),
             ),
             Padding(
@@ -243,22 +264,303 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
+    // 按年视图：历年汇总行 + 跨年趋势
+    if (_yearMode) {
+      final hasData = _years.any((y) => (y as Map)['hasBill'] == true);
+      if (_years.isEmpty) {
+        return const Center(
+            child: Text('暂无数据', style: TextStyle(color: AppColors.textSecondary)));
+      }
+      return ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          if (hasData) _trendCard(context, yearMode: true),
+          ..._years.map((y) => _yearRow(context, y as Map)),
+        ],
+      );
+    }
+    // 按月视图：趋势图 + 12 个月行
     if (_months.isEmpty) {
       return const Center(
           child: Text('暂无数据', style: TextStyle(color: AppColors.textSecondary)));
     }
-    return ListView.builder(
+    final hasData =
+        _months.any((m) => (m as Map)['hasBill'] == true);
+    return ListView(
       padding: const EdgeInsets.all(12),
-      itemCount: _months.length,
-      itemBuilder: (_, i) {
-        final m = _months[i] as Map;
-        final month = (m['month'] as num?)?.toInt() ?? i + 1;
-        final hasBill = (m['hasBill'] as bool?) ?? false;
-        final tier = _tier(m['tier']);
-        final note = (m['note'] as String?) ?? '';
-        return _monthRow(
-            context, month, hasBill, tier, note, _num(m['usage']), _num(m['amount']));
-      },
+      children: [
+        if (hasData) _trendCard(context, yearMode: false),
+        ..._months.map((m) {
+          final mm = m as Map;
+          final month = (mm['month'] as num?)?.toInt() ?? 1;
+          final hasBill = (mm['hasBill'] as bool?) ?? false;
+          final tier = _tier(mm['tier']);
+          final note = (mm['note'] as String?) ?? '';
+          return _monthRow(context, month, hasBill, tier, note, _num(mm['usage']),
+              _num(mm['amount']));
+        }),
+      ],
+    );
+  }
+
+  // 月/年切换 seg（与账单页一致）
+  Widget _seg(List<String> labels, int sel, void Function(int) onTap) {
+    return Container(
+      decoration: BoxDecoration(
+          color: AppPalette.background(context),
+          borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        children: labels.asMap().entries.map((e) {
+          final active = e.key == sel;
+          return GestureDetector(
+            onTap: () => onTap(e.key),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: active ? AppColors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(e.value,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: active
+                          ? AppPalette.onPrimary(context)
+                          : AppPalette.textSecondary(context))),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  double _axisMax(double v) {
+    if (v <= 0) return 1;
+    final m = (v * 1.15);
+    return m > 0 ? m : 1;
+  }
+
+  // 趋势图（金额柱：第2档橙 / 第3档红；按年视图跨年）
+  Widget _trendCard(BuildContext context, {required bool yearMode}) {
+    List<Map> rows;
+    if (yearMode) {
+      rows = _years
+          .map((e) => e as Map)
+          .where((y) => y['hasBill'] == true)
+          .toList()
+        ..sort((a, b) => ((a['year'] as num?)?.toInt() ?? 0)
+            .compareTo((b['year'] as num?)?.toInt() ?? 0));
+    } else {
+      rows = _months.map((e) => e as Map).toList();
+    }
+    if (rows.isEmpty) return const SizedBox.shrink();
+    double maxV = 0;
+    for (final r in rows) {
+      final has = yearMode || (r['hasBill'] == true);
+      final v = has ? _num(r['amount']) : 0.0;
+      if (v > maxV) maxV = v;
+    }
+    final barColor = (Map r, bool has) {
+      if (!has) return AppPalette.divider(context).withOpacity(0.4);
+      final t = _tier(r['tier']);
+      if (t >= 3) return AppColors.expense;
+      if (t == 2) return const Color(0xFFF59E0B);
+      return AppColors.primary;
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+      decoration: BoxDecoration(
+          color: AppPalette.card(context),
+          borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Text('${yearMode ? '历年' : '$_year 年'}金额趋势',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            Text('第2档橙 · 第3档红',
+                style: TextStyle(
+                    fontSize: 10, color: AppPalette.textSecondary(context))),
+          ]),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 120,
+            child: BarChart(
+              BarChartData(
+                maxY: _axisMax(maxV),
+                alignment: BarChartAlignment.spaceAround,
+                barGroups: rows.asMap().entries.map((e) {
+                  final i = e.key;
+                  final m = e.value;
+                  final has = yearMode || (m['hasBill'] == true);
+                  final v = has ? _num(m['amount']) : 0.0;
+                  return BarChartGroupData(x: i, barRods: [
+                    BarChartRodData(
+                      toY: v,
+                      color: barColor(m, has),
+                      width: yearMode ? 20 : 8,
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(3)),
+                    ),
+                  ]);
+                }).toList(),
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (g, gi, rod, ri) {
+                      final m = rows[g.x];
+                      final has = yearMode || (m['hasBill'] == true);
+                      if (!has || rod.toY <= 0) return null;
+                      final lbl = yearMode
+                          ? '${m['year']}年'
+                          : '${(m['month'] as num?)?.toInt() ?? g.x + 1}月';
+                      final u = _num(m['usage']);
+                      final tier = _tier(m['tier']);
+                      return BarTooltipItem(
+                        '$lbl\n¥${fmtMoney2(rod.toY)}'
+                        '${u > 0 ? '\n用量 ${u.round()}' : ''}'
+                        '${tier >= 2 ? '\n第$tier档' : ''}',
+                        TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppPalette.card(context)),
+                      );
+                    },
+                  ),
+                ),
+                gridData: const FlGridData(
+                    show: true, drawVerticalLine: false),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 22,
+                      getTitlesWidget: (v, meta) {
+                        final i = v.toInt();
+                        if (i < 0 || i >= rows.length) return const Text('');
+                        final label = yearMode
+                            ? '${rows[i]['year']}'
+                            : '${i + 1}';
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(label,
+                              style: const TextStyle(
+                                  fontSize: 9,
+                                  color: AppColors.textSecondary)),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 按年：历年汇总行
+  Widget _yearRow(BuildContext context, Map y) {
+    final year = (y['year'] as num?)?.toInt() ?? 0;
+    final hasBill = (y['hasBill'] as bool?) ?? false;
+    final tier = _tier(y['tier']);
+    final usage = _num(y['usage']);
+    final amount = _num(y['amount']);
+    final base = AppPalette.card(context);
+    Color bg;
+    Color? left;
+    if (tier >= 3) {
+      bg = Color.alphaBlend(const Color(0x21F04438), base);
+      left = AppColors.expense;
+    } else if (tier == 2) {
+      bg = Color.alphaBlend(const Color(0x1CF59E0B), base);
+      left = const Color(0xFFF59E0B);
+    } else {
+      bg = base;
+    }
+    final usageText = (!hasBill || usage <= 0) ? '—' : '${usage.round()}';
+    final unit = hasBill ? utilityUnitOf(_type) : '';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: left != null
+            ? Border(left: BorderSide(color: left, width: 3.5))
+            : null,
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: hasBill
+            ? () {
+                setState(() {
+                  _year = year;
+                  _yearMode = false;
+                });
+                _refresh();
+              }
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(children: [
+            SizedBox(
+              width: 62,
+              child: Text('$year年',
+                  style:
+                      const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            ),
+            Expanded(
+              child: Text(usageText,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: tier >= 3 ? AppColors.expense : AppPalette.text(context),
+                  )),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 92,
+              child: Text(
+                amount > 0 ? '¥${fmtMoney2(amount)}' : '—',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: tier >= 3 ? AppColors.expense : AppPalette.text(context),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (tier >= 2)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: tier >= 3 ? AppColors.expense : const Color(0xFFF59E0B),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text('第$tier档',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold)),
+              )
+            else if (hasBill)
+              Icon(Icons.chevron_right,
+                  size: 18, color: AppPalette.textSecondary(context))
+            else
+              Text('·',
+                  style: TextStyle(color: AppPalette.textSecondary(context))),
+          ]),
+        ),
+      ),
     );
   }
 
@@ -565,7 +867,8 @@ class _DetailSheet extends ConsumerStatefulWidget {
 
 class _DetailSheetState extends ConsumerState<_DetailSheet> {
   late Map _sel;
-  late TextEditingController _discountCtrl;
+  // v260908：录入「实际账单金额」（账单应缴原价）；优惠 = 该金额 − 实付，前端换算后仍走 discount 字段
+  late TextEditingController _actualCtrl;
   late TextEditingController _usageCtrl;
 
   @override
@@ -576,10 +879,10 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
   }
 
   void _resetCtrls() {
-    _discountCtrl = TextEditingController(
-        text: (_sel['discount'] as num?) == null
-            ? ''
-            : '${(_sel['discount'] as num).toDouble()}');
+    final paid = (_sel['paid'] as num?)?.toDouble() ?? 0;
+    final disc = (_sel['discount'] as num?)?.toDouble() ?? 0;
+    _actualCtrl = TextEditingController(
+        text: paid + disc > 0 ? '${(paid + disc).toStringAsFixed(2)}' : '');
     final u = _sel['usage_total'];
     _usageCtrl =
         TextEditingController(text: u == null ? '' : '${(u as num).toDouble()}');
@@ -587,7 +890,7 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
 
   @override
   void dispose() {
-    _discountCtrl.dispose();
+    _actualCtrl.dispose();
     _usageCtrl.dispose();
     super.dispose();
   }
@@ -719,7 +1022,7 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
               Expanded(
                 child: Text(
                   status == 'pending'
-                      ? '实付与规则应缴不一致（可能有优惠），请补优惠或改用量'
+                      ? '实付与规则应缴不一致（可能有优惠），请核对实际账单金额或用量'
                       : discount > 0
                           ? '已含优惠 $discount 元'
                           : '',
@@ -729,13 +1032,13 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
               ),
             ]),
             Divider(height: 22, color: AppPalette.divider(context)),
-            Text('优惠金额（实付 + 优惠 = 原价）',
+            Text('实际账单金额（账单上应缴金额；优惠 = 该金额 − 实付，自动计算）',
                 style: TextStyle(
                     fontSize: 12, color: AppPalette.textSecondary(context))),
             Row(children: [
               Expanded(
                 child: TextField(
-                  controller: _discountCtrl,
+                  controller: _actualCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
                       isDense: true, hintText: '0.00'),
@@ -746,8 +1049,8 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
                 style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppPalette.onPrimary(context)),
-                onPressed: () => _save(discount: _discountCtrl.text),
-                child: const Text('保存优惠'),
+                onPressed: () => _save(actual: _actualCtrl.text),
+                child: const Text('保存金额'),
               ),
             ]),
             const SizedBox(height: 12),
@@ -862,15 +1165,21 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
     }
   }
 
-  Future<void> _save({String? discount, String? usage}) async {
+  Future<void> _save({String? actual, String? usage}) async {
     final payload = <String, dynamic>{};
-    if (discount != null && discount.trim().isNotEmpty) {
-      final v = double.tryParse(discount.trim());
-      if (v == null) {
-        toast('优惠金额格式不对');
+    if (actual != null && actual.trim().isNotEmpty) {
+      final v = double.tryParse(actual.trim());
+      if (v == null || v < 0) {
+        toast('金额格式不对');
         return;
       }
-      payload['discount'] = v;
+      final paid = (_sel['paid'] as num?)?.toDouble() ?? 0;
+      if (v + 0.005 < paid) {
+        toast('实际账单金额不能小于实付合计 ¥${paid.toStringAsFixed(2)}（无优惠时填实付金额本身）');
+        return;
+      }
+      // 优惠 = 实际账单金额 − 实付合计（服务端按 实付+优惠 反推用量并校验，保证计算正确）
+      payload['discount'] = ((v - paid) * 100).roundToDouble() / 100;
     }
     if (usage != null && usage.trim().isNotEmpty) {
       final v = double.tryParse(usage.trim());

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
+import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/screens/utility/utility_common.dart';
@@ -120,7 +121,7 @@ class _UtilityRulesPageState extends ConsumerState<UtilityRulesPage> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('生效 $range',
+            Text('分类 ${(r['category'] as String?)?.isNotEmpty == true ? r['category'] : '住房'} · 生效 $range',
                 style:
                     const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             const SizedBox(height: 2),
@@ -206,6 +207,9 @@ List<Map<String, String>> _defaultTiers(String type) {
 class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
   late String _type;
   bool get _editing => widget.editRule != null;
+  // v260908：关联消费分类（识别=规则分类+名称关键词，默认住房兼容老规则）
+  late String _category;
+  List<Category> _cats = [];
   late final TextEditingController _nameCtrl;
   late final TextEditingController _fromCtrl; // YYYY-MM 文本
   late final TextEditingController _toCtrl;
@@ -222,6 +226,9 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
     super.initState();
     final r = widget.editRule;
     _type = widget.initType;
+    final catRaw = (r?['category'] as String?)?.trim() ?? '';
+    _category = catRaw.isEmpty ? '住房' : catRaw;
+    _loadCats();
     final now = DateTime.now();
     final thisYm = ym2(now);
     _nameCtrl = TextEditingController(
@@ -361,6 +368,17 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
     });
   }
 
+  /// 加载支出分类（规则可选绑定任意消费分类）
+  Future<void> _loadCats() async {
+    try {
+      final all = await ref.read(localApiProvider).getCategories();
+      if (!mounted) return;
+      setState(() {
+        _cats = all.where((c) => c.type == 'expense').toList();
+      });
+    } catch (_) {}
+  }
+
   /// 归一化档位：过滤单价<=0；末行 cap 若非空自动补 ∞ 行；空列表返回 null
   List<Map<String, dynamic>>? _norm(List<Map<String, TextEditingController>> rows) {
     final out = <Map<String, dynamic>>[];
@@ -406,6 +424,7 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
       'name': _nameCtrl.text.trim().isEmpty
           ? '${utilityLabel(_type)}规则'
           : _nameCtrl.text.trim(),
+      'category': _category,
       'effective_from': from,
       'effective_to': to,
       'bill_span': span,
@@ -522,7 +541,35 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
             controller: _nameCtrl,
             decoration: _dec('规则名称（如：广州水费）'),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+          Text('关联分类（识别该分类下名称含「水费/电费/燃气费/物业费」的支出流水）',
+              style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            ..._cats.map((c) => ChoiceChip(
+                  avatar: Text(c.icon, style: const TextStyle(fontSize: 14)),
+                  label: Text(c.name),
+                  selected: _category == c.name,
+                  visualDensity: VisualDensity.compact,
+                  onSelected: (_) => setState(() => _category = c.name),
+                )),
+            // 已选分类不在列表（历史分类已被删除）时仍保留显示
+            if (!_cats.any((c) => c.name == _category))
+              ChoiceChip(
+                label: Text('$_category（已删除）'),
+                selected: true,
+                visualDensity: VisualDensity.compact,
+                onSelected: (_) {},
+              ),
+          ]),
+          if (_cats.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('未加载到分类，将使用默认分类「住房」',
+                  style: TextStyle(
+                      fontSize: 11, color: AppPalette.textSecondary(context))),
+            ),
+          const SizedBox(height: 14),
           Row(children: [
             Expanded(
               child: _ymTile('生效起始月', _fromCtrl,

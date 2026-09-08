@@ -75,6 +75,12 @@ class MainActivity : FlutterActivity() {
                 "enabled" -> {
                     result.success(true)
                 }
+                "notifyRecorded" -> {
+                    // v260908：Flutter 自动记账成功后统一弹一次「已记账」heads-up（不再逐条弹）
+                    val body = (call.arguments as? Map<*, *>)?.get("body")?.toString() ?: ""
+                    AutoRecordStore.postRecordedHeadsUp(this, body)
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }
