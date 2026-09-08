@@ -31,6 +31,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
   List<dynamic> _months = [];
   List<dynamic> _years = [];
   bool _loading = true;
+  bool _offlineCache = false; // 本批数据来自本地缓存（断网回退）
 
   @override
   void initState() {
@@ -42,8 +43,9 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
 
   Future<void> _refresh() async {
     setState(() => _loading = true);
+    final api = ref.read(localApiProvider);
+    api.lastUsedCache = false;
     try {
-      final api = ref.read(localApiProvider);
       final r1 = await api.getUtilityRules();
       final r2 = await api.getUtilityRecords(type: _type, year: _year);
       if (_yearMode) {
@@ -54,6 +56,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
           _records = r2;
           _years = rY;
           _loading = false;
+          _offlineCache = api.lastUsedCache;
         });
       } else {
         final r3 = await api.getUtilityMonths(type: _type, year: _year);
@@ -63,11 +66,15 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
           _records = r2;
           _months = ((r3['months'] as List<dynamic>?) ?? []);
           _loading = false;
+          _offlineCache = api.lastUsedCache;
         });
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _offlineCache = false;
+      });
       toast('加载失败：$e');
     }
   }
@@ -138,6 +145,29 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 离线缓存提示条（断网时本页数据来自本地缓存）
+            if (_offlineCache)
+              Container(
+                margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppPalette.cardSubtle(context),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_off,
+                        size: 14, color: AppPalette.textSecondary(context)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text('网络不可用，显示上次缓存数据',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppPalette.textSecondary(context))),
+                    ),
+                  ],
+                ),
+              ),
             // PIN 1: 类型（水/电/燃气/物业）
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),

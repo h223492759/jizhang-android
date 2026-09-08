@@ -1004,10 +1004,17 @@ final w = await _api.getWallets();
           online: () => _api.deleteWalletTxn(id),
           body: {'id': id}, summary: '删除钱包记录', refresh: _refreshWallets);
 
-  Future<Map<String, dynamic>> getSavingsItemHistory(int id) =>
-      _api.getSavingsItemHistory(id);
-  Future<Map<String, dynamic>> getWalletTxns(int id) =>
-      _api.getWalletTxns(id);
+  Future<Map<String, dynamic>> getSavingsItemHistory(int id) async {
+    final bookId = await _curBook();
+    return _cachedGet('apic:shist:$bookId:$id',
+        () => _api.getSavingsItemHistory(id)) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getWalletTxns(int id) async {
+    final bookId = await _curBook();
+    return _cachedGet('apic:wtxn:$bookId:$id',
+        () => _api.getWalletTxns(id)) as Map<String, dynamic>;
+  }
 
   // ================ 派生统计（账单/图表）本地聚合（离线可用） ================
   // 照搬后端 bills/stats SQL 同口径：直接读本地 flows 在 Dart 内聚合
@@ -1549,22 +1556,68 @@ final w = await _api.getWallets();
           {required String category, String period = 'this_month'}) =>
       _api.queryFlows(category: category, period: period);
   Future<List<AiModel>> getAiModels() => _api.getAiModels();
-  Future<Map<String, dynamic>> getSavingsMonthItems(String ym) =>
-      _api.getSavingsMonthItems(ym);
+  Future<Map<String, dynamic>> getSavingsMonthItems(String ym) async {
+    final bookId = await _curBook();
+    return _cachedGet('apic:smonth:$bookId:$ym',
+        () => _api.getSavingsMonthItems(ym)) as Map<String, dynamic>;
+  }
   Future<Meta> getMeta() => _api.getMeta();
   Future<List<Map<String, dynamic>>> getOpLogs({int limit = 50}) =>
       _api.getOpLogs(limit: limit);
 
-  // ================= 水电气物业用量（utility，纯在线透传） =================
-  Future<List<dynamic>> getUtilityRules() => _api.getUtilityRules();
+  // ================= 读缓存回退（v260908 修复断网可用） =================
+  /// 本批读取是否命中过本地缓存（页面据此提示「离线显示上次数据」）。
+  /// 调用方在批量刷新前先置 false，读取过程中任一回退成功都会置 true。
+  bool lastUsedCache = false;
+
+  /// GET 包装：在线成功 → 写 sync_meta 缓存并返回；失败 → 回退最近一次缓存；
+  /// 无缓存才抛错（页面走「加载失败」toast）。
+  Future<dynamic> _cachedGet(String key, Future<dynamic> Function() remote) async {
+    final db = LocalDb.instance;
+    try {
+      final data = await remote();
+      try {
+        await db.setMeta(key, jsonEncode(data));
+      } catch (_) {}
+      return data;
+    } catch (_) {
+      final cached = await db.getMeta(key);
+      if (cached != null) {
+        try {
+          lastUsedCache = true;
+          return jsonDecode(cached);
+        } catch (_) {}
+      }
+      rethrow;
+    }
+  }
+
+  // ================= 水电气物业用量（utility，读走缓存回退） =================
+  Future<List<dynamic>> getUtilityRules() async {
+    final bookId = await _curBook();
+    return _cachedGet('apic:urules:$bookId', () => _api.getUtilityRules())
+        as List<dynamic>;
+  }
+
   Future<List<dynamic>> getUtilityRecords(
-          {required String type, required int year}) =>
-      _api.getUtilityRecords(type: type, year: year);
+          {required String type, required int year}) async {
+    final bookId = await _curBook();
+    return _cachedGet('apic:urecs:$bookId:$type:$year',
+        () => _api.getUtilityRecords(type: type, year: year)) as List<dynamic>;
+  }
+
   Future<Map<String, dynamic>> getUtilityMonths(
-          {required String type, required int year}) =>
-      _api.getUtilityMonths(type: type, year: year);
-  Future<List<dynamic>> getUtilityYears({required String type}) =>
-      _api.getUtilityYears(type: type);
+          {required String type, required int year}) async {
+    final bookId = await _curBook();
+    return _cachedGet('apic:umon:$bookId:$type:$year',
+        () => _api.getUtilityMonths(type: type, year: year)) as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> getUtilityYears({required String type}) async {
+    final bookId = await _curBook();
+    return _cachedGet('apic:uyears:$bookId:$type',
+        () => _api.getUtilityYears(type: type)) as List<dynamic>;
+  }
   Future<void> saveUtilityRecord(int id,
           {double? discount, double? usage}) =>
       _api.saveUtilityRecord(id, discount: discount, usage: usage);
