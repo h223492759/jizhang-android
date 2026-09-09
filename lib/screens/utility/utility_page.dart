@@ -406,10 +406,21 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         ? (m) => _num(m['amount'])
         : (m) => _num(m['usage']);
     double maxV = 0;
+    double maxTierV = 0;
     for (final r in rows) {
       final has = yearMode || (r['hasBill'] == true);
       final double v = has ? colVal(r) : 0.0;
       if (v > maxV) maxV = v;
+      // v2.2.11：maxY 至少覆盖最大档位阈值（避免档位虚线被裁到图表外看不到）
+      final th = r['tierThresholds'];
+      if (th is List) {
+        for (final tv in th) {
+          if (tv is num && tv > 0) {
+            final tdv = tv.toDouble();
+            if (tdv > maxTierV) maxTierV = tdv;
+          }
+        }
+      }
     }
     final barColor = isProperty ? const Color(0xFF6366F1) : const Color(0xFF10B981);
     // 档位虚线：物业无档位 → 不画
@@ -435,6 +446,10 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         ));
       }
     }
+    // v2.2.11：maxY 在 [柱值*1.15, 最大档位阈值*1.05] 中取大，确保档位虚线在视野内
+    final double yMax = maxTierV > 0 && maxTierV * 1.05 > _axisMax(maxV)
+        ? maxTierV * 1.05
+        : _axisMax(maxV);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
@@ -457,7 +472,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
             height: 120,
             child: BarChart(
               BarChartData(
-                maxY: _axisMax(maxV),
+                maxY: yMax,
                 alignment: BarChartAlignment.spaceAround,
                 extraLinesData: ExtraLinesData(horizontalLines: tierLines),
                 barGroups: rows.asMap().entries.map((e) {
