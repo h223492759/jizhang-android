@@ -117,6 +117,15 @@ class AutoRecordAccessibilityService : AccessibilityService() {
         }
         val kw = hits.minByOrNull { it.second }!!.first
         val kwIdx = hits.minByOrNull { it.second }!!.second
+        // v2.2.6：京东 app 的「到账/入账」单字 = 营销/虚拟到账（京东金条借款/白条还款/
+        // 邀请奖励等"我的-金融"模块文案），不是真实收入；招行碰一碰结果页的「到账」
+        // 仍可识别（pkg != 京东）。支付宝 app 的「到账」单字同理多为网商银行/借呗营销文案。
+        if ((kw == "到账" || kw == "入账") &&
+            (pkg == "com.jingdong.app.mall" || pkg.startsWith("com.jd.") ||
+             pkg == "com.eg.android.AlipayGphone")) {
+            logFile("[无障碍] 京东/支付宝app+到账/入账单字=营销到账，跳过 pkg=$pkg kw=$kw")
+            return
+        }
         // v2.0.1：金额必须出现在「强信号词 ±30 字」窗口内——避开页面里无关的余额/费率/
         // 积分数字（之前把账户余额 0.14 / 0.50 当成支付金额误识）。
         val winStart = (kwIdx - 30).coerceAtLeast(0)
