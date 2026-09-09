@@ -8,7 +8,7 @@ publish_to: 'none'
 #   - 服务端 /utility/years 过滤规则起点前年份（minRuleYear）→ 年份列表不再含 2024 等
 #   - 安卓：翻年下限 = /years 升序首年；月模式也拉 years 维护 _minYear；左箭头 _year<=_minYear 禁用；
 #     切类型时 _year 钳制到新类型 minYear（避免停在不可达年份）；渲染层无需改动（服务端数据自动生效）
-version: 2.2.12+1
+version: 2.2.13+1
 
 environment:
   sdk: '>=3.4.0 <4.0.0'

@@ -341,7 +341,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
           final tier = _tier(mm['tier']);
           final note = (mm['note'] as String?) ?? '';
           return _monthRow(context, month, hasBill, tier, note, _num(mm['usage']),
-              _num(mm['amount']));
+              _num(mm['amountAvg']), _num(mm['amount']));
         }),
       ],
     );
@@ -401,36 +401,19 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
     }
     if (rows.isEmpty) return const SizedBox.shrink();
     final isProperty = _type == 'property';
-    // 柱值字段：物业取 amount；水/电/燃气取 usage（_num 返回 double，声明成 double 避免 num 宽化）
+    // v2.2.13：柱值字段——物业取 amountAvg（均摊月金额，如 3月一交→每月82）；
+    // 水/电/燃气取 usage（均摊用量）。_num 返回 double，声明成 double 避免 num 宽化。
     final double Function(Map) colVal = isProperty
-        ? (m) => _num(m['amount'])
+        ? (m) => _num(m['amountAvg'] ?? m['amount'])
         : (m) => _num(m['usage']);
     double maxV = 0;
-    double maxTierV = 0;
-    // v260911-12：跨行最大 tier（用于「全年都没超第 2 档时第 3 档不放」）
-    int maxTierAcross = 0;
-    // v260911-12：跨行 cycleType（燃气 by_year 时月视图不画档位虚线）
-    String? rowsCycleType;
     for (final r in rows) {
       final has = yearMode || (r['hasBill'] == true);
       final double v = has ? colVal(r) : 0.0;
       if (v > maxV) maxV = v;
-      final t = (r['tier'] as num?)?.toInt() ?? 1;
-      if (t > maxTierAcross) maxTierAcross = t;
-      final th = r['tierThresholds'];
-      if (th is List) {
-        for (final tv in th) {
-          if (tv is num && tv > 0) {
-            final tdv = tv.toDouble();
-            if (tdv > maxTierV) maxTierV = tdv;
-          }
-        }
-      }
-      final ct = r['cycleType'] as String?;
-      if (rowsCycleType == null && ct != null) rowsCycleType = ct;
     }
     final barColor = isProperty ? const Color(0xFF6366F1) : const Color(0xFF10B981);
-    // v260911-12：柱按行 tier 着色（1档=主色/2档=橙/3档+=红）
+    // v2.2.13：柱按行 tier 着色（1档=主色/2档=橙/3档+=红）；物业统一蓝（无档位）
     final Color tier1 = barColor;
     final Color tier2 = const Color(0xFFF59E0B);
     final Color tier3Plus = const Color(0xFFEF4444);
@@ -441,47 +424,8 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
       if (t == 2) return tier2;
       return tier1;
     }
-    // 档位虚线：物业无档位 → 不画；燃气 by_year 月视图不画
-    final List<HorizontalLine> tierLines = [];
-    final bool isByYearMonthlyView =
-        !yearMode && rowsCycleType == 'by_year';
-    final bool suppressDueAllLowTier = !isProperty && maxTierAcross < 2 && maxV > 0;
-    if (!isProperty && !isByYearMonthlyView) {
-      final seen = <double>{};
-      for (final r in rows) {
-        final th = r['tierThresholds'];
-        if (th is List) {
-          for (final v in th) {
-            if (v is num && v > 0) seen.add(v.toDouble());
-          }
-        }
-      }
-      final arr = seen.toList()..sort();
-      // v260911-12：全年 maxTier<2 时仅画第 2 档（即 arr 的第 0 个），且放到 yMax*0.95 顶部
-      final drawArr = suppressDueAllLowTier && arr.length >= 2
-          ? arr.sublist(0, 1)
-          : arr;
-      for (var i = 0; i < drawArr.length; i++) {
-        double yVal;
-        if (suppressDueAllLowTier && maxV > 0) {
-          final topY = _axisMax(maxV);
-          yVal = (topY * 0.95);
-        } else {
-          yVal = drawArr[i];
-        }
-        tierLines.add(HorizontalLine(
-          y: yVal,
-          color: i == 0 ? const Color(0xFFF59E0B) : const Color(0xFFEF4444),
-          strokeWidth: 1,
-          dashArray: const [4, 4],
-          label: HorizontalLineLabel(show: false),
-        ));
-      }
-    }
-    // v2.2.11：maxY 在 [柱值*1.15, 最大档位阈值*1.05] 中取大，确保档位虚线在视野内
-    final double yMax = maxTierV > 0 && maxTierV * 1.05 > _axisMax(maxV)
-        ? maxTierV * 1.05
-        : _axisMax(maxV);
+    // v2.2.13：取消档位虚线（服务端不再下发 tierThresholds）
+    final double yMax = _axisMax(maxV);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
@@ -495,7 +439,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
             Text('${yearMode ? '历年' : '$_year 年'}${isProperty ? "金额" : "用量"}趋势',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
             const Spacer(),
-            Text(tierLines.isEmpty ? '第2档起' : '虚线=档位',
+            Text(isProperty ? '月均金额' : '第2档起橙/第3档红',
                 style: TextStyle(
                     fontSize: 10, color: AppPalette.textSecondary(context))),
           ]),
@@ -506,8 +450,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
               BarChartData(
                 maxY: yMax,
                 alignment: BarChartAlignment.spaceAround,
-                extraLinesData: ExtraLinesData(horizontalLines: tierLines),
-                // v260911-12：fl_chart 默认画水平 grid → 关掉（无档位时不要任何横线）
+                // v2.2.13：取消档位虚线 → extraLinesData 省略
                 gridData: const FlGridData(
                     show: false, drawVerticalLine: false),
                 barGroups: rows.asMap().entries.map((e) {
@@ -536,8 +479,9 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                           ? '${m['year']}年'
                           : '${(m['month'] as num?)?.toInt() ?? g.x + 1}月';
                       final u = _num(m['usage']);
-                      final a = _num(m['amount']);
+                      final a = _num(m['amountAvg'] ?? m['amount']);
                       final tier = _tier(m['tier']);
+                      // v2.2.13：物业 tooltip 显示均摊月金额；水电气显示均摊用量
                       final body = isProperty
                           ? '$lbl\n¥${fmtMoney2(a)}'
                           : '$lbl\n用量 ${u.round()} ${utilityUnitOf(_type)}';
@@ -610,7 +554,8 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
       bg = base;
     }
     final usageText = (!hasBill || usage <= 0) ? '—' : '${usage.round()}';
-    final unit = hasBill ? utilityUnitOf(_type) : '';
+    // v2.2.13：数值为 "—" 时不带单位尾巴（避免物业年视图 "-- 元" 观感）
+    final unit = usageText == '—' ? '' : utilityUnitOf(_type);
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
@@ -707,7 +652,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
   }
 
   Widget _monthRow(BuildContext context, int month, bool hasBill, int tier,
-      String note, double usage, double amount) {
+      String note, double usage, double amountAvg, double amount) {
     final base = AppPalette.card(context);
     Color bg;
     Color? left;
@@ -720,7 +665,11 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
     } else {
       bg = base;
     }
-    final usageText = (!hasBill || usage <= 0) ? '—' : '${usage.round()}';
+    // v2.2.13：物业无用量 → 中间列显示「均摊月金额」（amountAvg，如 82元/月）；
+    // 水电气 → 均摊用量。金额列(最右)只在实缴月全额显示（amount）。
+    final isProperty = _type == 'property';
+    final midVal = isProperty ? amountAvg : usage;
+    final usageText = (!hasBill || midVal <= 0) ? '—' : '${midVal.round()}';
     final unit = hasBill ? utilityUnitOf(_type) : '';
 
     return Container(
@@ -743,7 +692,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
               child: Text('$month月',
                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             ),
-            // col 2: 用量
+            // col 2: 用量（物业=均摊月金额 amountAvg；水电气=均摊用量 usage）
             Expanded(
               flex: 14,
               child: Row(
@@ -797,7 +746,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                                 color: Colors.transparent, fontSize: 12)),
               ),
             ),
-            // col 4: 金额
+            // col 4: 金额（物业=实缴月全额 amount；水电气=缴费月全额，双月仅缴费月有值）
             Expanded(
               flex: 14,
               child: Text(
