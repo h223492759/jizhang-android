@@ -394,7 +394,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
     double maxV = 0;
     for (final r in rows) {
       final has = yearMode || (r['hasBill'] == true);
-      final v = has ? colVal(r) : 0.0;
+      final double v = has ? colVal(r) : 0.0;
       if (v > maxV) maxV = v;
     }
     final barColor = isProperty ? const Color(0xFF6366F1) : const Color(0xFF10B981);
@@ -417,7 +417,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
           color: i == 0 ? const Color(0xFFF59E0B) : const Color(0xFFEF4444),
           strokeWidth: 1,
           dashArray: [4, 4],
-          label: const HorizontalLineLabel(show: false),
+          label: HorizontalLineLabel(show: false),
         ));
       }
     }
@@ -450,7 +450,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                   final i = e.key;
                   final m = e.value;
                   final has = yearMode || (m['hasBill'] == true);
-                  final v = has ? colVal(m) : 0.0;
+                  final double v = has ? colVal(m) : 0.0;
                   return BarChartGroupData(x: i, barRods: [
                     BarChartRodData(
                       toY: v,
