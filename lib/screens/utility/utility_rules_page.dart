@@ -685,53 +685,68 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
 
   Widget _ymTile(String label, TextEditingController ctrl,
       ValueChanged<String> onPick, {bool allowClear = false}) {
-    final val = ctrl.text;
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () async {
-        final p = await pickMonth(context,
-            initial: val.isEmpty ? ym2(DateTime.now()) : val);
-        if (p != null) onPick(p);
-      },
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppPalette.divider(context)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 11, color: AppPalette.textSecondary(context))),
-              const SizedBox(height: 2),
-              Row(children: [
-                Expanded(
-                  child: Text(
-                    val.isEmpty ? '永久（不设结束）' : val,
+    // v260911-12：用户反馈「弹窗选月份后 UI 仍显示旧月份」BUG 修：
+    //   原实现 onPick 只 set ctrl.text，不触发父 rebuild → 控件显示快照失效。
+    //   现改为 StatefulBuilder 让 pickMonth 回调触发局部 setState。
+    return StatefulBuilder(builder: (ctx, setSt) {
+      final val = ctrl.text;
+      return InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () async {
+          final p = await pickMonth(context,
+              initial: val.isEmpty ? ym2(DateTime.now()) : val);
+          if (p != null) {
+            setSt(() {
+              ctrl.text = p;
+            });
+            onPick(p);
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppPalette.divider(context)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
                     style: TextStyle(
-                        fontSize: 14,
-                        color: val.isEmpty
-                            ? AppPalette.textSecondary(context)
-                            : AppPalette.text(context)),
-                  ),
-                ),
-                if (allowClear && val.isNotEmpty)
-                  GestureDetector(
-                    onTap: () => onPick(''),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(Icons.close,
-                          size: 14, color: AppPalette.textSecondary(context)),
+                        fontSize: 11, color: AppPalette.textSecondary(context))),
+                const SizedBox(height: 2),
+                Row(children: [
+                  Expanded(
+                    child: Text(
+                      val.isEmpty ? '永久（不设结束）' : val,
+                      style: TextStyle(
+                          fontSize: 14,
+                          color: val.isEmpty
+                              ? AppPalette.textSecondary(context)
+                              : AppPalette.text(context)),
                     ),
                   ),
-                Icon(Icons.calendar_month,
-                    size: 15, color: AppPalette.textSecondary(context)),
+                  if (allowClear && val.isNotEmpty)
+                    GestureDetector(
+                      onTap: () {
+                        setSt(() {
+                          ctrl.text = '';
+                        });
+                        onPick('');
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(Icons.close,
+                            size: 14, color: AppPalette.textSecondary(context)),
+                      ),
+                    ),
+                  Icon(Icons.calendar_month,
+                      size: 15, color: AppPalette.textSecondary(context)),
+                ]),
               ]),
-            ]),
-      ),
-    );
+        ),
+      );
+    });
   }
 
   List<Widget> _tierEditor(List<Map<String, TextEditingController>> rows) {

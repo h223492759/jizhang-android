@@ -407,11 +407,16 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         : (m) => _num(m['usage']);
     double maxV = 0;
     double maxTierV = 0;
+    // v260911-12：跨行最大 tier（用于「全年都没超第 2 档时第 3 档不放」）
+    int maxTierAcross = 0;
+    // v260911-12：跨行 cycleType（燃气 by_year 时月视图不画档位虚线）
+    String? rowsCycleType;
     for (final r in rows) {
       final has = yearMode || (r['hasBill'] == true);
       final double v = has ? colVal(r) : 0.0;
       if (v > maxV) maxV = v;
-      // v2.2.11：maxY 至少覆盖最大档位阈值（避免档位虚线被裁到图表外看不到）
+      final t = (r['tier'] as num?)?.toInt() ?? 1;
+      if (t > maxTierAcross) maxTierAcross = t;
       final th = r['tierThresholds'];
       if (th is List) {
         for (final tv in th) {
@@ -421,11 +426,27 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
           }
         }
       }
+      final ct = r['cycleType'] as String?;
+      if (rowsCycleType == null && ct != null) rowsCycleType = ct;
     }
     final barColor = isProperty ? const Color(0xFF6366F1) : const Color(0xFF10B981);
-    // 档位虚线：物业无档位 → 不画
+    // v260911-12：柱按行 tier 着色（1档=主色/2档=橙/3档+=红）
+    final Color tier1 = barColor;
+    final Color tier2 = const Color(0xFFF59E0B);
+    final Color tier3Plus = const Color(0xFFEF4444);
+    Color barColorOf(Map r) {
+      if (isProperty) return barColor;
+      final t = (r['tier'] as num?)?.toInt() ?? 1;
+      if (t >= 3) return tier3Plus;
+      if (t == 2) return tier2;
+      return tier1;
+    }
+    // 档位虚线：物业无档位 → 不画；燃气 by_year 月视图不画
     final List<HorizontalLine> tierLines = [];
-    if (!isProperty) {
+    final bool isByYearMonthlyView =
+        !yearMode && rowsCycleType == 'by_year';
+    final bool suppressDueAllLowTier = !isProperty && maxTierAcross < 2 && maxV > 0;
+    if (!isProperty && !isByYearMonthlyView) {
       final seen = <double>{};
       for (final r in rows) {
         final th = r['tierThresholds'];
@@ -436,12 +457,23 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         }
       }
       final arr = seen.toList()..sort();
-      for (var i = 0; i < arr.length; i++) {
+      // v260911-12：全年 maxTier<2 时仅画第 2 档（即 arr 的第 0 个），且放到 yMax*0.95 顶部
+      final drawArr = suppressDueAllLowTier && arr.length >= 2
+          ? arr.sublist(0, 1)
+          : arr;
+      for (var i = 0; i < drawArr.length; i++) {
+        double yVal;
+        if (suppressDueAllLowTier && maxV > 0) {
+          final topY = _axisMax(maxV);
+          yVal = (topY * 0.95);
+        } else {
+          yVal = drawArr[i];
+        }
         tierLines.add(HorizontalLine(
-          y: arr[i],
+          y: yVal,
           color: i == 0 ? const Color(0xFFF59E0B) : const Color(0xFFEF4444),
           strokeWidth: 1,
-          dashArray: [4, 4],
+          dashArray: const [4, 4],
           label: HorizontalLineLabel(show: false),
         ));
       }
@@ -475,6 +507,9 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                 maxY: yMax,
                 alignment: BarChartAlignment.spaceAround,
                 extraLinesData: ExtraLinesData(horizontalLines: tierLines),
+                // v260911-12：fl_chart 默认画水平 grid → 关掉（无档位时不要任何横线）
+                gridData: const FlGridData(
+                    show: false, drawVerticalLine: false),
                 barGroups: rows.asMap().entries.map((e) {
                   final i = e.key;
                   final m = e.value;
@@ -483,7 +518,8 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                   return BarChartGroupData(x: i, barRods: [
                     BarChartRodData(
                       toY: v,
-                      color: barColor,
+                      // v260911-12：柱按行 tier 着色（1档主色、2档橙、3档+=红）
+                      color: barColorOf(m),
                       width: yearMode ? 20 : 10,
                       borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(3)),
@@ -516,8 +552,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                     },
                   ),
                 ),
-                gridData: const FlGridData(
-                    show: true, drawVerticalLine: false),
+                // gridData 在前面已设 show:false（Dart 重复 field 会编译错误，故删除此处）
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
                   topTitles: const AxisTitles(
