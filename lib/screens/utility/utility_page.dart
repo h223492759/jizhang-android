@@ -30,6 +30,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
   List<dynamic> _records = [];
   List<dynamic> _months = [];
   List<dynamic> _years = [];
+  int _minYear = 0; // v260910：规则起点前年份不可切换（/years 升序首年；0=未加载/不限）
   bool _loading = true;
   bool _offlineCache = false; // 本批数据来自本地缓存（断网回退）
 
@@ -48,13 +49,21 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
     try {
       final r1 = await api.getUtilityRules();
       final r2 = await api.getUtilityRecords(type: _type, year: _year);
+      // 始终拉 years：v260910 翻年下限 = /years 升序首年（规则起点前不可切换）
+      final rY = await api.getUtilityYears(type: _type);
+      if (!_yearMode) {
+        final minY = rY.isEmpty ? null : ((rY.first as Map)['year'] as num?)?.toInt();
+        if (minY != null && _year < minY) {
+          _year = minY; // 切到规则起点更晚的类型时钳制，避免停在不可达年份
+        }
+      }
       if (_yearMode) {
-        final rY = await api.getUtilityYears(type: _type);
         if (!mounted) return;
         setState(() {
           _rules = r1;
           _records = r2;
           _years = rY;
+          _minYear = rY.isEmpty ? _minYear : ((rY.first as Map)['year'] as num?)?.toInt() ?? _minYear;
           _loading = false;
           _offlineCache = api.lastUsedCache;
         });
@@ -64,6 +73,8 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         setState(() {
           _rules = r1;
           _records = r2;
+          _years = rY;
+          _minYear = rY.isEmpty ? _minYear : ((rY.first as Map)['year'] as num?)?.toInt() ?? _minYear;
           _months = ((r3['months'] as List<dynamic>?) ?? []);
           _loading = false;
           _offlineCache = api.lastUsedCache;
@@ -186,10 +197,13 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     icon: const Icon(Icons.chevron_left),
-                    onPressed: () {
-                      setState(() => _year -= 1);
-                      _refresh();
-                    },
+                    // v260910：规则起点前的年份不可切换（下限 = /years 升序首年）
+                    onPressed: _minYear > 0 && _year <= _minYear
+                        ? null
+                        : () {
+                            setState(() => _year -= 1);
+                            _refresh();
+                          },
                   ),
                   Text('$_year 年',
                       style: const TextStyle(
