@@ -369,7 +369,10 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
     return m > 0 ? m : 1;
   }
 
-  // 趋势图（金额柱：第2档橙 / 第3档红；按年视图跨年）
+  // 趋势图（v2.2.6 改造）：
+  //  - 物业 = 金额柱（蓝）；水/电/燃气 = 用量柱（绿）
+  //  - 档位虚线（无档位/物业费不画）
+  //  - 触摸/悬浮 tooltip 与柱对应（物业只显金额；水电气只显用量；档位仍提示）
   Widget _trendCard(BuildContext context, {required bool yearMode}) {
     List<Map> rows;
     if (yearMode) {
@@ -383,19 +386,41 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
       rows = _months.map((e) => e as Map).toList();
     }
     if (rows.isEmpty) return const SizedBox.shrink();
+    final isProperty = _type == 'property';
+    // 柱值字段：物业取 amount；水/电/燃气取 usage
+    final num Function(Map) colVal = isProperty
+        ? (m) => _num(m['amount'])
+        : (m) => _num(m['usage']);
     double maxV = 0;
     for (final r in rows) {
       final has = yearMode || (r['hasBill'] == true);
-      final v = has ? _num(r['amount']) : 0.0;
+      final v = has ? colVal(r) : 0.0;
       if (v > maxV) maxV = v;
     }
-    final barColor = (Map r, bool has) {
-      if (!has) return AppPalette.divider(context).withOpacity(0.4);
-      final t = _tier(r['tier']);
-      if (t >= 3) return AppColors.expense;
-      if (t == 2) return const Color(0xFFF59E0B);
-      return AppColors.primary;
-    };
+    final barColor = isProperty ? const Color(0xFF6366F1) : const Color(0xFF10B981);
+    // 档位虚线：物业无档位 → 不画
+    final List<HorizontalLine> tierLines = [];
+    if (!isProperty) {
+      final seen = <double>{};
+      for (final r in rows) {
+        final th = r['tierThresholds'];
+        if (th is List) {
+          for (final v in th) {
+            if (v is num && v > 0) seen.add(v.toDouble());
+          }
+        }
+      }
+      final arr = seen.toList()..sort();
+      for (var i = 0; i < arr.length; i++) {
+        tierLines.add(HorizontalLine(
+          y: arr[i],
+          color: i == 0 ? const Color(0xFFF59E0B) : const Color(0xFFEF4444),
+          strokeWidth: 1,
+          dashArray: [4, 4],
+          label: const HorizontalLineLabel(show: false),
+        ));
+      }
+    }
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
@@ -406,10 +431,10 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Text('${yearMode ? '历年' : '$_year 年'}金额趋势',
+            Text('${yearMode ? '历年' : '$_year 年'}${isProperty ? "金额" : "用量"}趋势',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
             const Spacer(),
-            Text('第2档橙 · 第3档红',
+            Text(tierLines.isEmpty ? '第2档起' : '虚线=档位',
                 style: TextStyle(
                     fontSize: 10, color: AppPalette.textSecondary(context))),
           ]),
@@ -420,16 +445,17 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
               BarChartData(
                 maxY: _axisMax(maxV),
                 alignment: BarChartAlignment.spaceAround,
+                extraLinesData: ExtraLinesData(horizontalLines: tierLines),
                 barGroups: rows.asMap().entries.map((e) {
                   final i = e.key;
                   final m = e.value;
                   final has = yearMode || (m['hasBill'] == true);
-                  final v = has ? _num(m['amount']) : 0.0;
+                  final v = has ? colVal(m) : 0.0;
                   return BarChartGroupData(x: i, barRods: [
                     BarChartRodData(
                       toY: v,
-                      color: barColor(m, has),
-                      width: yearMode ? 20 : 8,
+                      color: barColor,
+                      width: yearMode ? 20 : 10,
                       borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(3)),
                     ),
@@ -445,11 +471,14 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                           ? '${m['year']}年'
                           : '${(m['month'] as num?)?.toInt() ?? g.x + 1}月';
                       final u = _num(m['usage']);
+                      final a = _num(m['amount']);
                       final tier = _tier(m['tier']);
+                      final body = isProperty
+                          ? '$lbl\n¥${fmtMoney2(a)}'
+                          : '$lbl\n用量 ${u.round()} ${utilityUnitOf(_type)}';
+                      final tail = (tier >= 2) ? '\n第$tier档' : '';
                       return BarTooltipItem(
-                        '$lbl\n¥${fmtMoney2(rod.toY)}'
-                        '${u > 0 ? '\n用量 ${u.round()}' : ''}'
-                        '${tier >= 2 ? '\n第$tier档' : ''}',
+                        '$body$tail',
                         TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -497,7 +526,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
     );
   }
 
-  // 按年：历年汇总行
+  // 按年：历年汇总行（v2.2.6：4 列等距 grid，年份-用量-档位-金额）
   Widget _yearRow(BuildContext context, Map y) {
     final year = (y['year'] as num?)?.toInt() ?? 0;
     final hasBill = (y['hasBill'] as bool?) ?? false;
@@ -541,23 +570,62 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           child: Row(children: [
-            SizedBox(
-              width: 62,
+            // col 1: 年份（等距）
+            Expanded(
+              flex: 10,
               child: Text('$year年',
                   style:
                       const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             ),
+            // col 2: 用量
             Expanded(
-              child: Text(usageText,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: tier >= 3 ? AppColors.expense : AppPalette.text(context),
-                  )),
+              flex: 14,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(usageText,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: tier >= 3 ? AppColors.expense : AppPalette.text(context),
+                      )),
+                  if (unit.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 3, bottom: 2),
+                      child: Text(unit,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: AppPalette.textSecondary(context))),
+                    ),
+                ],
+              ),
             ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 92,
+            // col 3: 档位（占位）
+            Expanded(
+              flex: 10,
+              child: Center(
+                child: tier >= 2
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: tier >= 3 ? AppColors.expense : const Color(0xFFF59E0B),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text('第$tier档',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold)),
+                      )
+                    : Text('—',
+                        style: TextStyle(
+                            color: Colors.transparent, fontSize: 12)),
+              ),
+            ),
+            // col 4: 金额
+            Expanded(
+              flex: 14,
               child: Text(
                 amount > 0 ? '¥${fmtMoney2(amount)}' : '—',
                 textAlign: TextAlign.right,
@@ -568,26 +636,6 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            if (tier >= 2)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: tier >= 3 ? AppColors.expense : const Color(0xFFF59E0B),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text('第$tier档',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-              )
-            else if (hasBill)
-              Icon(Icons.chevron_right,
-                  size: 18, color: AppPalette.textSecondary(context))
-            else
-              Text('·',
-                  style: TextStyle(color: AppPalette.textSecondary(context))),
           ]),
         ),
       ),
@@ -600,10 +648,10 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
     Color bg;
     Color? left;
     if (tier >= 3) {
-      bg = Color.alphaBlend(const Color(0x21F04438), base); // 13% 红
+      bg = Color.alphaBlend(const Color(0x21F04438), base);
       left = AppColors.expense;
     } else if (tier == 2) {
-      bg = Color.alphaBlend(const Color(0x1CF59E0B), base); // 11% 橙
+      bg = Color.alphaBlend(const Color(0x1CF59E0B), base);
       left = const Color(0xFFF59E0B);
     } else {
       bg = base;
@@ -625,13 +673,17 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           child: Row(children: [
-            SizedBox(
-              width: 42,
+            // col 1: 月份
+            Expanded(
+              flex: 10,
               child: Text('$month月',
                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             ),
+            // col 2: 用量
             Expanded(
+              flex: 14,
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(usageText,
@@ -653,8 +705,37 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                 ],
               ),
             ),
-            SizedBox(
-              width: 92,
+            // col 3: 档位（占位）
+            Expanded(
+              flex: 10,
+              child: Center(
+                child: tier >= 2
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: tier >= 3 ? AppColors.expense : const Color(0xFFF59E0B),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text('第$tier档',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold)),
+                      )
+                    : note.isNotEmpty
+                        ? Text(note,
+                            style: const TextStyle(
+                                color: AppColors.expense,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600))
+                        : Text('—',
+                            style: TextStyle(
+                                color: Colors.transparent, fontSize: 12)),
+              ),
+            ),
+            // col 4: 金额
+            Expanded(
+              flex: 14,
               child: Text(
                 amount > 0 ? '¥${fmtMoney2(amount)}' : '—',
                 textAlign: TextAlign.right,
@@ -665,30 +746,6 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            if (tier >= 2)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color:
-                      tier >= 3 ? AppColors.expense : const Color(0xFFF59E0B),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text('第$tier档',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-              )
-            else if (note.isNotEmpty)
-              Text(note,
-                  style: const TextStyle(
-                      color: AppColors.expense,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600))
-            else
-              Text('·',
-                  style: TextStyle(color: AppPalette.textSecondary(context))),
           ]),
         ),
       ),

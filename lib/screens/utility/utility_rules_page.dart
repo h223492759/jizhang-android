@@ -605,6 +605,24 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
               ),
             ),
           ]),
+          // v2.2.6：快捷月数 chips（物业/水/电常用 1/3/4/6/12 月；燃气默认 2 月不让改）
+          if (!isGas) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final n in const [1, 3, 4, 6, 12])
+                  ChoiceChip(
+                    label: Text('${n}月'),
+                    selected: (int.tryParse(_spanCtrl.text) ?? 0) == n,
+                    onSelected: (_) {
+                      setState(() => _spanCtrl.text = '$n');
+                    },
+                  ),
+              ],
+            ),
+          ],
           if (isGas) ...[
             const SizedBox(height: 8),
             Container(
