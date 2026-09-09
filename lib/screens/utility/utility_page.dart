@@ -766,19 +766,47 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
   }
 
   // ================= 详情（补优惠/改用量/删除） =================
+  // 账单在月份里的出现条件（v2.2.14 与「金额锚真实缴费月」配套）：
+  // ① 覆盖该月（用量归属）；② 该月实缴过（缴费月可能不在覆盖区间内，如燃气缴
+  // 2026-02 → 覆盖 2025-12~2026-01，2 月行右列 ¥219.52 需点得开）。
+  // 实缴月命中排序优先（弹窗默认展示与右列金额一致的那张）。
+  String _billPayYm(Map b) {
+    final flows = (b['flows'] as List?)?.cast<Map>() ?? const [];
+    if (flows.isNotEmpty) {
+      final yms = <String>[];
+      for (final f in flows) {
+        final t = (f['flow_time'] as String?) ?? '';
+        if (t.length >= 7 && RegExp(r'^\d{4}-\d{2}').hasMatch(t)) {
+          yms.add(t.substring(0, 7));
+        }
+      }
+      if (yms.isNotEmpty) {
+        yms.sort(); // 首笔 = 真实缴费月（与服务端 payMonthOf 一致）
+        return yms.first;
+      }
+    }
+    final bs = (b['bill_start'] as String?) ?? '';
+    return bs.length >= 7 ? bs.substring(0, 7) : '';
+  }
+
   List<Map> _billsOf(String ym) {
-    return _records
+    final matched = _records
         .where((r) {
           final m = r as Map;
           final bs = m['bill_start'] as String?;
           final be = m['bill_end'] as String?;
-          return bs != null &&
-              be != null &&
-              bs.compareTo(ym) <= 0 &&
-              be.compareTo(ym) >= 0;
+          final covers =
+              bs != null && be != null && bs.compareTo(ym) <= 0 && be.compareTo(ym) >= 0;
+          return covers || _billPayYm(m) == ym;
         })
         .cast<Map>()
         .toList();
+    matched.sort((a, b) {
+      final aHit = _billPayYm(a) == ym ? 0 : 1;
+      final bHit = _billPayYm(b) == ym ? 0 : 1;
+      return aHit.compareTo(bHit);
+    });
+    return matched;
   }
 
   Future<void> _openDetail(int month) async {
