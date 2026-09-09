@@ -121,7 +121,11 @@ class _UtilityRulesPageState extends ConsumerState<UtilityRulesPage> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('分类 ${(r['category'] as String?)?.isNotEmpty == true ? r['category'] : '住房'} · 生效 $range',
+            Text('分类 ${(r['category'] as String?)?.isNotEmpty == true ? r['category'] : '住房'} · 账期 $range',
+                style:
+                    const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            const SizedBox(height: 2),
+            Text(_coverBrief(type, r['cover'] as Map?),
                 style:
                     const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             const SizedBox(height: 2),
@@ -165,6 +169,138 @@ class _UtilityRulesPageState extends ConsumerState<UtilityRulesPage> {
 }
 
 // ==================== 规则编辑页 ====================
+
+/// v2.2.17 出账窗口 → 覆盖账期行（显式账期，取代「覆盖月数」文本框）
+class _CovRow {
+  final TextEditingController fromCtrl; // 窗口起始日
+  final TextEditingController toCtrl; // 窗口结束日
+  String key; // '-2_2' | '-1_2' | '-1_1' | '0_1' | 'q3' | '0_3'
+  _CovRow(this.fromCtrl, this.toCtrl, this.key);
+  int get start {
+    if (key == 'q3') return 0;
+    return int.parse(key.split('_')[0]);
+  }
+
+  int get span {
+    if (key == 'q3') return 3;
+    return int.parse(key.split('_')[1]);
+  }
+
+  bool get quarter => key == 'q3';
+  Map<String, dynamic> toJson() => {
+        'from': int.parse(fromCtrl.text.trim().isEmpty ? '1' : fromCtrl.text.trim()),
+        'to': int.parse(toCtrl.text.trim().isEmpty ? '31' : toCtrl.text.trim()),
+        'start': start,
+        'span': span,
+        if (quarter) 'quarter': true,
+      };
+}
+
+// 覆盖方案（与网页 COV_PRESETS 一致；水/气双窗口、电/物业单窗口）
+const Map<String, String> kCovLabel = {
+  '-2_2': '上月 + 上上月',
+  '-1_2': '当月 + 上月',
+  '-1_1': '上月（单月）',
+  '0_1': '当月（单月）',
+  'q3': '缴费月所在自然季度（季度缴）',
+  '0_3': '当月起连缴 3 个月',
+};
+List<String> _covKeys(String type) {
+  if (type == 'property') return const ['q3', '0_1', '-1_1', '0_3'];
+  if (type == 'electric') return const ['-1_1', '0_1', '-1_2'];
+  return const ['-2_2', '-1_2', '-1_1', '0_1']; // water/gas
+}
+// 非法/自定义 key（不在下拉预设里）→ 回落该类型默认第一项，避免 Dropdown 断言崩溃
+String _covKeySafe(String type, String key) =>
+    _covKeys(type).contains(key) ? key : _covKeys(type).first;
+
+// 后端 decorateRule 的 cover → 编辑行（缺省按类型默认，与后端 defaultCover 一致）
+List<_CovRow> _coverRowsOf(String type, Map? cover) {
+  final wins = (cover != null && cover['windows'] is List && (cover['windows'] as List).isNotEmpty)
+      ? (cover['windows'] as List)
+      : null;
+  if (wins != null) {
+    return wins.map((w) {
+      final m = w as Map;
+      final start = (m['start'] as num?)?.toInt() ?? 0;
+      final span = (m['span'] as num?)?.toInt() ?? 1;
+      final quarter = m['quarter'] == true;
+      // (start,span,quarter) → 下拉预设 key；非预设组合回落该类型默认
+      String key = quarter
+          ? 'q3'
+          : (start == -2 && span == 2)
+              ? '-2_2'
+              : (start == -1 && span == 2)
+                  ? '-1_2'
+                  : (start == -1 && span == 1)
+                      ? '-1_1'
+                      : (start == 0 && span == 1)
+                          ? '0_1'
+                          : (start == 0 && span == 3)
+                              ? '0_3'
+                              : '';
+      key = _covKeySafe(type, key.isEmpty ? '${start}_$span' : key);
+      return _CovRow(
+        TextEditingController(text: '${m['from'] ?? 1}'),
+        TextEditingController(text: '${m['to'] ?? 31}'),
+        key,
+      );
+    }).toList();
+  }
+  if (type == 'water' || type == 'gas') {
+    return [
+      _CovRow(TextEditingController(text: '1'), TextEditingController(text: '15'), '-2_2'),
+      _CovRow(TextEditingController(text: '16'), TextEditingController(text: '31'), '-1_2'),
+    ];
+  }
+  if (type == 'electric') {
+    return [_CovRow(TextEditingController(text: '1'), TextEditingController(text: '31'), '-1_1')];
+  }
+  return [_CovRow(TextEditingController(text: '1'), TextEditingController(text: '31'), 'q3')];
+}
+
+// 规则卡片摘要：出账窗口 → 覆盖账期（只读解析 cover，不建编辑器行）
+String _coverBrief(String type, Map? cover) {
+  final wins = (cover != null && cover['windows'] is List)
+      ? (cover['windows'] as List).cast<Map>()
+      : null;
+  String keyOf(Map w) {
+    final start = (w['start'] as num?)?.toInt() ?? 0;
+    final span = (w['span'] as num?)?.toInt() ?? 1;
+    if (w['quarter'] == true) return 'q3';
+    if (start == -2 && span == 2) return '-2_2';
+    if (start == -1 && span == 2) return '-1_2';
+    if (start == -1 && span == 1) return '-1_1';
+    if (start == 0 && span == 1) return '0_1';
+    if (start == 0 && span == 3) return '0_3';
+    return '';
+  }
+
+  String wText(Map w) {
+    final k = keyOf(w);
+    final lbl = (kCovLabel[k] ?? k)
+        .replaceAll('（单月）', '')
+        .replaceAll('（季度缴）', '')
+        .replaceAll('（月初缴上月）', '');
+    final from = '${w['from'] ?? 1}';
+    final to = '${w['to'] ?? 31}';
+    return w['quarter'] == true
+        ? '季内任意一天 → $lbl'
+        : (from == '1' && to == '31'
+            ? '任意日 → $lbl'
+            : '$from-$to号 → $lbl');
+  }
+
+  if (wins == null || wins.isEmpty) {
+    // 老规则无 cover → 按类型默认语义描述
+    if (type == 'water' || type == 'gas') {
+      return '1-15号→覆盖上月+上上月；16-31号→覆盖当月+上月';
+    }
+    if (type == 'electric') return '任意日出账 → 覆盖上月';
+    return type == 'property' ? '季度缴 → 覆盖缴费月所在自然季度' : '';
+  }
+  return wins.map(wText).join('；');
+}
 
 class _RuleEditPage extends ConsumerStatefulWidget {
   final String initType;
@@ -211,9 +347,9 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
   late String _category;
   List<Category> _cats = [];
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _fromCtrl; // YYYY-MM 文本
-  late final TextEditingController _toCtrl;
-  late final TextEditingController _spanCtrl;
+  late final TextEditingController _fromCtrl; // YYYY-MM 起始账期文本
+  late final TextEditingController _toCtrl; // YYYY-MM 结束账期
+  late final List<_CovRow> _covRows; // v2.2.17 出账窗口 → 覆盖账期
   late final TextEditingController _unitCtrl;
   late final List<Map<String, TextEditingController>> _rows; // tiers 行
   bool _seasonOn = false;
@@ -237,10 +373,7 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
         text: (r?['effective_from'] as String?) ?? thisYm);
     _toCtrl =
         TextEditingController(text: (r?['effective_to'] as String?) ?? '');
-    _spanCtrl = TextEditingController(
-        text: r?['bill_span'] == null
-            ? '${_spanDefault(_type)}'
-            : '${r?['bill_span']}');
+    _covRows = _coverRowsOf(_type, r?['cover'] as Map?);
     _unitCtrl = TextEditingController(
         text: (r?['unit'] as String?) ?? _unitDefault(_type));
     _rows = _makeRows(
@@ -267,17 +400,6 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
               'price': TextEditingController(text: '0.8889')
             },
           ];
-  }
-
-  int _spanDefault(String type) {
-    switch (type) {
-      case 'water':
-      case 'gas':
-        return 2;
-      case 'property':
-        return 3;
-    }
-    return 1;
   }
 
   String _unitDefault(String type) {
@@ -329,7 +451,10 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
     _nameCtrl.dispose();
     _fromCtrl.dispose();
     _toCtrl.dispose();
-    _spanCtrl.dispose();
+    for (final row in _covRows) {
+      row.fromCtrl.dispose();
+      row.toCtrl.dispose();
+    }
     _unitCtrl.dispose();
     for (final row in _rows) {
       row['cap']!.dispose();
@@ -346,8 +471,14 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
     setState(() {
       _type = type;
       _nameCtrl.text = '';
-      _spanCtrl.text = '${_spanDefault(type)}';
       _unitCtrl.text = _unitDefault(type);
+      for (final row in _covRows) {
+        row.fromCtrl.dispose();
+        row.toCtrl.dispose();
+      }
+      _covRows
+        ..clear()
+        ..addAll(_coverRowsOf(type, null));
       _seasonOn = false;
       _seasonMonths.clear();
       _seasonMonths.addAll({5, 6, 7, 8, 9, 10});
@@ -401,12 +532,12 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
   Future<void> _save() async {
     final from = _fromCtrl.text.trim();
     if (!RegExp(r'^\d{4}-\d{2}$').hasMatch(from)) {
-      toast('请选择生效起始月');
+      toast('请选择起始账期（首个被覆盖月份）');
       return;
     }
     final to = _toCtrl.text.trim();
     if (to.isNotEmpty && !RegExp(r'^\d{4}-\d{2}$').hasMatch(to)) {
-      toast('结束月格式不对');
+      toast('结束账期格式不对');
       return;
     }
     final tiers = _norm(_rows);
@@ -414,11 +545,16 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
       toast('至少填写一个有效档位（单价>0）');
       return;
     }
-    final span = int.tryParse(_spanCtrl.text.trim()) ?? 0;
-    if (span < 1) {
-      toast('覆盖月数至少为 1');
-      return;
+    // v2.2.17：出账窗口合法性（1~31 且起始≤结束）
+    for (final row in _covRows) {
+      final f = int.tryParse(row.fromCtrl.text.trim());
+      final t = int.tryParse(row.toCtrl.text.trim());
+      if (f == null || t == null || f < 1 || f > 31 || t < f || t > 31) {
+        toast('出账日窗口需为 1~31 且起始 ≤ 结束');
+        return;
+      }
     }
+    final span = _covRows.map((r) => r.span).fold(1, (a, b) => a > b ? a : b);
     final body = <String, dynamic>{
       'type': _type,
       'name': _nameCtrl.text.trim().isEmpty
@@ -431,6 +567,9 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
       'cycle_type': _type == 'gas' ? 'by_year' : 'by_span',
       'unit': _unitCtrl.text.trim().isEmpty ? _unitDefault(_type) : _unitCtrl.text.trim(),
       'tiers': tiers,
+      'cover': {
+        'windows': _covRows.map((r) => r.toJson()).toList(),
+      },
     };
     if (_type == 'electric') {
       if (_seasonOn) {
@@ -572,65 +711,33 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
           const SizedBox(height: 14),
           Row(children: [
             Expanded(
-              child: _ymTile('生效起始月', _fromCtrl,
+              child: _ymTile('起始账期（首个覆盖月）', _fromCtrl,
                   (v) => _fromCtrl.text = v),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: _ymTile('生效结束月（可选）', _toCtrl, (v) => _toCtrl.text = v,
+              child: _ymTile('结束账期（可选）', _toCtrl, (v) => _toCtrl.text = v,
                   allowClear: true),
             ),
           ]),
           const SizedBox(height: 4),
-          Text('生效起始月之前、结束月之后的流水不会自动计入（搬家/调价可新开一段）',
+          Text('「起始账期」是首个被覆盖的月份：水费选 2024-02 → 首期覆盖 2~3 月、首笔流水约 3 月下旬；起始账期之前的流水不计入。',
               style: TextStyle(fontSize: 11, color: AppPalette.textSecondary(context))),
           const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              child: TextField(
-                controller: _spanCtrl,
-                keyboardType: TextInputType.number,
-                decoration: _dec(isProp
-                    ? '覆盖月数（季度预付=3）'
-                    : isGas
-                        ? '覆盖月数（隔月缴费=2）'
-                        : '覆盖月数（每月=1）'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: _unitCtrl,
-                decoration: _dec('计量单位'),
-              ),
-            ),
-          ]),
-          // v2.2.6：快捷月数 chips（物业/水/电常用 1/3/4/6/12 月；燃气默认 2 月不让改）
-          if (!isGas) ...[
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                for (final n in const [1, 3, 4, 6, 12])
-                  ChoiceChip(
-                    label: Text('${n}月'),
-                    selected: (int.tryParse(_spanCtrl.text) ?? 0) == n,
-                    onSelected: (_) {
-                      setState(() => _spanCtrl.text = '$n');
-                    },
-                  ),
-              ],
-            ),
-          ],
+          _coverEditor(),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _unitCtrl,
+            decoration: _dec('计量单位（m³ / kWh / 元）'),
+          ),
           if (isGas) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                   color: AppPalette.cardSubtle(context),
                   borderRadius: BorderRadius.circular(8)),
-              child: const Text('燃气费按「年累计金额」分档：一年内缴费金额累计跨档后自动升档，次年归零。',
+              child: const Text('燃气费按「年累计金额」分档：覆盖账期落在同一年内的账单按年累计跨档自动升档，次年归零。',
                   style: TextStyle(fontSize: 12)),
             ),
           ],
@@ -681,6 +788,115 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
         ],
       ),
     );
+  }
+
+  /// v2.2.17 出账窗口 → 覆盖账期编辑器（行 = 一个出账日窗口 + 覆盖方案下拉）
+  Widget _coverEditor() {
+    final twoCond = _type == 'water' || _type == 'gas';
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(
+        twoCond
+            ? '出账窗口 → 覆盖账期（两个条件互斥：一笔流水只命中一个窗口）'
+            : (_type == 'property'
+                ? '出账窗口 → 覆盖账期（季内任一天缴都算该季度）'
+                : '出账窗口 → 覆盖账期（月初缴上月用量）'),
+        style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context)),
+      ),
+      const SizedBox(height: 6),
+      for (var i = 0; i < _covRows.length; i++) ...[
+        Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
+          decoration: BoxDecoration(
+            color: AppPalette.cardSubtle(context),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text(twoCond ? '条件 ${i + 1}：' : '出账日：',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppPalette.textSecondary(context))),
+              const SizedBox(width: 8),
+              if (!_covRows[i].quarter) ...[
+                SizedBox(
+                  width: 68,
+                  child: TextField(
+                    controller: _covRows[i].fromCtrl,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: _dec('起始日'),
+                  ),
+                ),
+                const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Text('—')),
+                SizedBox(
+                  width: 68,
+                  child: TextField(
+                    controller: _covRows[i].toCtrl,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: _dec('结束日'),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Text('号', style: TextStyle(fontSize: 13)),
+              ] else
+                const Expanded(
+                    child: Text('季内任意一天',
+                        style: TextStyle(fontSize: 13))),
+              const Spacer(),
+              if (_covRows.length > 1)
+                IconButton(
+                  icon: const Icon(Icons.remove_circle_outline, size: 18),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => setState(() {
+                    final rm = _covRows.removeAt(i);
+                    rm.fromCtrl.dispose();
+                    rm.toCtrl.dispose();
+                  }),
+                ),
+            ]),
+            Row(children: [
+              const Padding(
+                padding: EdgeInsets.only(left: 2, right: 6),
+                child: Text('→ 覆盖', style: TextStyle(fontSize: 13)),
+              ),
+              Expanded(
+                child: DropdownButton<String>(
+                  value: _covRows[i].key,
+                  isExpanded: true,
+                  isDense: true,
+                  underline: const SizedBox.shrink(),
+                  style: TextStyle(
+                      fontSize: 13, color: AppPalette.text(context)),
+                  items: _covKeys(_type).map((k) {
+                    return DropdownMenuItem(
+                        value: k, child: Text(kCovLabel[k] ?? k));
+                  }).toList(),
+                  onChanged: (v) =>
+                      setState(() => _covRows[i].key = v ?? _covRows[i].key),
+                ),
+              ),
+            ]),
+          ]),
+        ),
+        if (i < _covRows.length - 1) const SizedBox(height: 2),
+      ],
+      if (twoCond)
+        TextButton.icon(
+          onPressed: () => setState(() {
+            _covRows.add(_CovRow(
+                TextEditingController(text: '1'),
+                TextEditingController(text: '15'),
+                '-2_2'));
+          }),
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('加条件'),
+        ),
+    ]);
   }
 
   Widget _ymTile(String label, TextEditingController ctrl,

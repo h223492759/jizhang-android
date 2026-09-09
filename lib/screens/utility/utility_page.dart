@@ -666,7 +666,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
       bg = base;
     }
     // v2.2.13：物业无用量 → 中间列显示「均摊月金额」（amountAvg，如 82元/月）；
-    // 水电气 → 均摊用量。金额列(最右)只在实缴月全额显示（amount）。
+    // 水电气 → 均摊用量。金额列(最右) v2.2.17 起在账期末月全额显示（amount）。
     final isProperty = _type == 'property';
     final midVal = isProperty ? amountAvg : usage;
     final usageText = (!hasBill || midVal <= 0) ? '—' : '${midVal.round()}';
@@ -746,7 +746,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                                 color: Colors.transparent, fontSize: 12)),
               ),
             ),
-            // col 4: 金额（物业=实缴月全额 amount；水电气=缴费月全额，双月仅缴费月有值）
+            // col 4: 金额（v2.2.17 起在「账期末月」全额显示 amount；双月/季度只期末月有值）
             Expanded(
               flex: 14,
               child: Text(
