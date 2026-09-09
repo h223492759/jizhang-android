@@ -387,8 +387,8 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
     }
     if (rows.isEmpty) return const SizedBox.shrink();
     final isProperty = _type == 'property';
-    // 柱值字段：物业取 amount；水/电/燃气取 usage
-    final num Function(Map) colVal = isProperty
+    // 柱值字段：物业取 amount；水/电/燃气取 usage（_num 返回 double，声明成 double 避免 num 宽化）
+    final double Function(Map) colVal = isProperty
         ? (m) => _num(m['amount'])
         : (m) => _num(m['usage']);
     double maxV = 0;
