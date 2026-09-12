@@ -3,6 +3,12 @@
 安卓端记账 App，对接 [jizhang](https://github.com/h223492759/jizhang) 后端 REST API。
 本人不会代码，全部由我提需求发现bug，workbuddy提交代码并发布。
 
+软件截图
+
+<img width="437" height="944" alt="eec5a72daeb46c92148fa0436b60467a_101524r71e19912s91bzgs" src="https://github.com/user-attachments/assets/6d49b9b3-4dae-481a-90f4-c02dad6d1c5c" />
+<img width="433" height="922" alt="71ab1a7ed65ba548589a0b285addc653_101805d5xhegooozmgoeho" src="https://github.com/user-attachments/assets/5700e12e-e36d-487b-93bf-3384092e0e7a" />
+
+
 ## 功能
 - 多服务器配置（内网 / 外网地址）、登录、账本切换
 - 记一笔：分类选择（支出/收入）+ 自定义数字键盘 + 日期/备注
