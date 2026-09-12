@@ -195,7 +195,8 @@ class MePage extends ConsumerWidget {
   }
 
   // 切换账本
-  Future<void> _switchBook(BuildContext context, WidgetRef ref, SessionState s) async {    if (s.books.isEmpty) {
+  Future<void> _switchBook(BuildContext context, WidgetRef ref, SessionState s) async {
+    if (s.books.isEmpty) {
       toast('暂无可切换的账本');
       return;
     }
@@ -320,7 +321,8 @@ class MePage extends ConsumerWidget {
         ),
       );
 
-  Widget _aiRow(WidgetRef ref) {    return FutureBuilder<AiStatus>(
+  Widget _aiRow(WidgetRef ref) {
+    return FutureBuilder<AiStatus>(
       future: _aiStatus(ref),
       builder: (ctx, snap) {
         final ai = snap.data;

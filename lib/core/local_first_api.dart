@@ -64,7 +64,9 @@ class LocalFirstApi {
     return (firstTime: first, total: total);
   }
 
-  // ---- 镜像刷新 helpers ----  Future<void> _refreshRecurring() async {
+  // ---- 镜像刷新 helpers ----
+
+  Future<void> _refreshRecurring() async {
     try {
       final bookId = await _curBook();
       final rows = await _api.getRecurring();
