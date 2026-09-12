@@ -322,7 +322,8 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('拉黑删除这笔？'),
         content: Text('将删除「${widget.flow.description}」这笔流水，'
-            '并把该商户拉黑，以后它不会自动记账。'),
+            '并把该商户拉黑，以后它不会自动记账。\n\n'
+            '（可在 设置 → 自动记账 → 忽略商户名单 里查看或解除）'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
           TextButton(

@@ -62,13 +62,18 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // v2.2.17：顶部压缩——「存款 / 资金细则」tab 提到与返回按钮同一行，
+      // 去掉原来的 bottom: TabBar（额外占约 46px），让下方内容多显示一截
       appBar: AppBar(
-        title: const SizedBox(),
-        bottom: TabBar(
+        toolbarHeight: 48,
+        titleSpacing: 0,
+        title: TabBar(
           controller: _tab,
           tabs: const [Tab(text: '存款'), Tab(text: '资金细则')],
           indicatorColor: AppPalette.text(context),
           labelColor: AppPalette.text(context),
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
         ),
       ),
       body: _loading

@@ -5,6 +5,7 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
+import 'package:jizhang_android/screens/flows/search_flows_page.dart';
 
 class DiscoverPage extends ConsumerStatefulWidget {
   const DiscoverPage({super.key});
@@ -102,7 +103,16 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
       appBar: AppBar(
         title: const Text('发现'),
         actions: [
-          TextButton(onPressed: _busy ? null : _analyze, child: Text('本月分析', style: TextStyle(color: AppPalette.text(context)))),
+          // v2.2.17：原「本月分析」文字按钮改为放大镜——进关键字搜索流水
+          // （本月分析移入空态「试试这些」里的一个入口，不再占 AppBar）
+          IconButton(
+            tooltip: '搜索流水',
+            icon: const Icon(Icons.search),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SearchFlowsPage()),
+            ),
+          ),
         ],
       ),
       body: Column(
@@ -179,18 +189,28 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: examples
-                .map((e) => ActionChip(
-                      label: Text(e, style: TextStyle(fontSize: 13, color: AppPalette.text(context))),
-                      backgroundColor: AppPalette.cardSubtle(context),
-                      side: BorderSide(color: AppPalette.divider(context)),
-                      onPressed: () {
-                        // 只填到输入框，由用户确认/修改后再发送，避免示例直接记账造成误记
-                        _ctrl.text = e;
-                        _ctrl.selection = TextSelection.collapsed(offset: e.length);
-                      },
-                    ))
-                .toList(),
+            children: [
+              // v2.2.17：本月分析从 AppBar 移到这里（点击直接出分析结果）
+              ActionChip(
+                avatar: const Icon(Icons.auto_awesome, size: 16),
+                label: Text('本月分析', style: TextStyle(fontSize: 13, color: AppPalette.text(context))),
+                backgroundColor: AppPalette.primaryDim(context),
+                side: BorderSide(color: AppPalette.divider(context)),
+                onPressed: _busy ? null : _analyze,
+              ),
+              ...examples
+                  .map((e) => ActionChip(
+                        label: Text(e, style: TextStyle(fontSize: 13, color: AppPalette.text(context))),
+                        backgroundColor: AppPalette.cardSubtle(context),
+                        side: BorderSide(color: AppPalette.divider(context)),
+                        onPressed: () {
+                          // 只填到输入框，由用户确认/修改后再发送，避免示例直接记账造成误记
+                          _ctrl.text = e;
+                          _ctrl.selection = TextSelection.collapsed(offset: e.length);
+                        },
+                      ))
+                  .toList(),
+            ],
           ),
         ],
       ),

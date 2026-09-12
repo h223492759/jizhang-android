@@ -113,6 +113,11 @@ class _BillsPageState extends ConsumerState<BillsPage> {
     final head = _yearMode
         ? ['年份', '年收入', '年支出', '年结余']
         : ['月份', '月收入', '月支出', '月结余'];
+    // v2.2.17：年份左右切换（样式同水电气用量页）——下限=有记录的最早年份，上限=当前年
+    final yearsList = _monthly?.years ?? const <int>[];
+    final minYear =
+        yearsList.isEmpty ? _year : yearsList.reduce((a, b) => a < b ? a : b);
+    final maxYear = DateTime.now().year;
     return Scaffold(
       appBar: AppBar(title: const Text('账单')),
       body: _loading
@@ -127,12 +132,37 @@ class _BillsPageState extends ConsumerState<BillsPage> {
                       _load();
                     }),
                     const Spacer(),
-                    if (!_yearMode)
-                      TextButton.icon(
-                        onPressed: _pickYear,
-                        icon: const Icon(Icons.calendar_today, size: 18),
-                        label: Text('$_year'),
+                    if (!_yearMode) ...[
+                      // v2.2.17：改用水电气用量页的年份切换样式（← 年份 →）
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: _year <= minYear
+                            ? null
+                            : () {
+                                setState(() => _year -= 1);
+                                _load();
+                              },
                       ),
+                      // 点年份文字仍打开年份选择弹窗（只列有流水的年份）
+                      GestureDetector(
+                        onTap: _pickYear,
+                        behavior: HitTestBehavior.opaque,
+                        child: Text('$_year 年',
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.bold)),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: _year >= maxYear
+                            ? null
+                            : () {
+                                setState(() => _year += 1);
+                                _load();
+                              },
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 12),

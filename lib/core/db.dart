@@ -292,6 +292,7 @@ class LocalDb {
     String? category,
     String? start,
     String? end,
+    String? keyword,
     int page = 1,
     int pageSize = 50,
   }) async {
@@ -305,6 +306,11 @@ class LocalDb {
     if (category != null && category.isNotEmpty) {
       w.add('category=?');
       args.add(category);
+    }
+    // v2.2.17：关键字搜索（与网页端一致：匹配流水名称 description）
+    if (keyword != null && keyword.isNotEmpty) {
+      w.add('description LIKE ?');
+      args.add('%$keyword%');
     }
     if (start != null && start.isNotEmpty) {
       w.add('flow_time>=?');
@@ -325,7 +331,7 @@ class LocalDb {
 
   /// 筛选条件下的总条数与收支汇总（流水列表页用）
   Future<Map<String, Object?>> countAndSum(int bookId,
-      {String? type, String? category, String? start, String? end}) async {
+      {String? type, String? category, String? start, String? end, String? keyword}) async {
     final d = await db;
     final w = <String>['book_id=?'];
     final args = <Object?>[bookId];
@@ -336,6 +342,11 @@ class LocalDb {
     if (category != null && category.isNotEmpty) {
       w.add('category=?');
       args.add(category);
+    }
+    // v2.2.17：关键字搜索（与 queryFlows 保持一致）
+    if (keyword != null && keyword.isNotEmpty) {
+      w.add('description LIKE ?');
+      args.add('%$keyword%');
     }
     if (start != null && start.isNotEmpty) {
       w.add('flow_time>=?');
@@ -406,6 +417,17 @@ class LocalDb {
     return (r.first['n'] as int?) ?? 0;
   }
 
+  /// 最早一笔流水的日期（YYYY-MM-DD）——「我的」页展示「首次记账时间」
+  Future<String?> firstFlowTime(int bookId) async {
+    final d = await db;
+    final rows = await d.rawQuery(
+        'SELECT MIN(flow_time) AS m FROM flows WHERE book_id=? AND flow_time IS NOT NULL',
+        [bookId]);
+    final m = rows.isNotEmpty ? rows.first['m'] as String? : null;
+    if (m == null || m.length < 10) return null;
+    return m.substring(0, 10);
+  }
+
   Future<List<Map<String, Object?>>> allFlows(int bookId) async {
     final d = await db;
     return d.query('flows',
@@ -414,8 +436,7 @@ class LocalDb {
   }
 
   /// 整个账簿最早一笔流水的年份（用于预算页年份选择的下限）
-  Future<int> minFlowYear(int bookId) async {
-    final d = await db;
+  Future<int> minFlowYear(int bookId) async {    final d = await db;
     final rows = await d.rawQuery(
         'SELECT MIN(flow_time) AS m FROM flows WHERE book_id=? AND flow_time IS NOT NULL',
         [bookId]);
