@@ -31,6 +31,8 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
   List<String> _users = [];
   List<List<String>> _andGroups = [];
   List<String> _orKws = [];
+  // v2.2.17：忽略商户名单（流水详情「拉黑删」写入 auto_ignore_merchants，此前无查看入口）
+  List<String> _ignoredMerchants = [];
   // v1.5.4：系统跳过词（可编辑/恢复默认）
   Map<String, List<String>> _systemKw = {};
   List<List<String>> _systemRepayGroups = [];
@@ -103,6 +105,7 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
     _users = await svc.userList;
     _andGroups = await svc.andGroups;
     _orKws = await svc.orKeywords;
+    _ignoredMerchants = await svc.ignoreMerchants;
     _systemKw = await svc.systemKeywords;
     _systemRepayGroups = await svc.systemRepayGroups;
     _a11yOn = await _readA11yState();
@@ -169,6 +172,60 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
   Future<void> _removeUser(String name) async {
     setState(() => _users.remove(name));
     await AutoRecordService.instance.setUserList(_users);
+  }
+
+  // ---------------- v2.2.17：忽略商户名单（拉黑删） ----------------
+  // 写入方：流水详情页「拉黑删」→ AutoRecordService.addIgnoreMerchant
+  Future<void> _addIgnoredMerchant() async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('添加忽略商户'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+              hintText: '通知里出现的商户/名称（如：某某便利店）',
+              border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('添加')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    await AutoRecordService.instance.addIgnoreMerchant(name);
+    if (mounted) setState(() => _ignoredMerchants = [..._ignoredMerchants, name]);
+  }
+
+  Future<void> _removeIgnoredMerchant(String name) async {
+    final list = [..._ignoredMerchants]..remove(name);
+    await AutoRecordService.instance.setIgnoreMerchants(list);
+    if (mounted) setState(() => _ignoredMerchants = list);
+  }
+
+  Future<void> _clearIgnoredMerchants() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('清空忽略商户名单？'),
+        content: const Text('清空后这些商户的通知会重新参与自动记账识别。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('清空', style: TextStyle(color: AppColors.expense))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await AutoRecordService.instance.setIgnoreMerchants([]);
+    if (mounted) setState(() => _ignoredMerchants = []);
+    toast('已清空忽略商户名单');
   }
 
   // 添加「同时出现才屏蔽」组：输入多个关键词（逗号/空格分隔）→ 一组 AND 规则
@@ -551,6 +608,49 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                     value: _silent,
                     onChanged: _setSilent,
                   ),
+                ),
+                const SizedBox(height: 12),
+                // v2.2.17：忽略商户名单（流水详情「拉黑删」的查看/管理入口）
+                Row(children: [
+                  const Text('忽略商户名单（拉黑）',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _addIgnoredMerchant,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('添加'),
+                  ),
+                ]),
+                Text('流水详情点「拉黑删」会把该商户加入这里（不再自动记账）；点 × 可解除',
+                    style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                const SizedBox(height: 4),
+                Card(
+                  child: _ignoredMerchants.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text('暂无。在流水详情点「拉黑删」即可加入。',
+                              style: TextStyle(fontSize: 13, color: AppPalette.textSecondary(context))),
+                        )
+                      : Column(
+                          children: [
+                            ..._ignoredMerchants.map((m) => ListTile(
+                                  dense: true,
+                                  title: Text(m),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.close, size: 18),
+                                    onPressed: () => _removeIgnoredMerchant(m),
+                                  ),
+                                )),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: _clearIgnoredMerchants,
+                                icon: const Icon(Icons.delete_outline, size: 16),
+                                label: const Text('清空名单'),
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
                 const SizedBox(height: 12),
                 // v2.2.0：支持的支付方式（未勾选的不识别、不弹窗、不记账）

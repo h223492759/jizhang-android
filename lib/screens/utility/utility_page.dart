@@ -211,7 +211,8 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     icon: const Icon(Icons.chevron_right),
-                    onPressed: _year < DateTime.now().year + 3
+                    // v2.2.17：未来年份不可切换（上限=当前年，与网页端一致；原为 +3 年）
+                    onPressed: _year < DateTime.now().year
                         ? () {
                             setState(() => _year += 1);
                             _refresh();

@@ -18,6 +18,8 @@ class BudgetPage extends ConsumerStatefulWidget {
 
 class _BudgetPageState extends ConsumerState<BudgetPage> {
   int _year = DateTime.now().year;
+  // v2.2.17：年份左右切换下限 = 第一笔记账的年份（本地库查，避免切到更早的空年份）
+  int _minYear = DateTime.now().year;
   BudgetData? _data;
   List<Category> _expenseCats = [];
   bool _loading = true;
@@ -35,6 +37,13 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       final results = await Future.wait([api.getBudgets(year: _year), api.getCategories()]);
       _data = results[0] as BudgetData;
       _expenseCats = (results[1] as List<Category>).where((c) => c.type == 'expense').toList();
+      try {
+        final bookId = ref.read(sessionProvider).bookId ?? 0;
+        final minY = await LocalDb.instance.minFlowYear(bookId);
+        if (minY <= DateTime.now().year) _minYear = minY;
+      } catch (_) {
+        // 查不到就保持默认下限（当前年），不影响页面
+      }
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     } finally {
@@ -231,13 +240,35 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // v2.2.17：年份切换改用水电气用量页的样式（← 年份 →）；
+                // 上限仍保留「未来一年」（预算是允许提前给明年设的），下限=第一笔记账年份
                 Row(children: [
-                  Text('$_year 年度', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: _loading ? null : _pickYear,
-                    icon: const Icon(Icons.calendar_today),
-                    label: const Text('切换年份'),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: _loading || _year <= _minYear
+                        ? null
+                        : () {
+                            setState(() => _year -= 1);
+                            _load();
+                          },
+                  ),
+                  GestureDetector(
+                    onTap: _loading ? null : _pickYear,
+                    behavior: HitTestBehavior.opaque,
+                    child: Text('$_year 年度',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: _loading || _year >= DateTime.now().year + 1
+                        ? null
+                        : () {
+                            setState(() => _year += 1);
+                            _load();
+                          },
                   ),
                 ]),
                 const SizedBox(height: 12),
@@ -340,6 +371,11 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       );
 
   Future<void> _pickCategory() async {
+    // v2.2.17：已设过预算的分类置灰、不可点（避免重复添加；金额为 0 视为未设）
+    final used = <String>{
+      for (final c in _data?.categories ?? const <BudgetCat>[])
+        if (c.amount > 0) c.category
+    };
     final cat = await showDialog<String>(
       context: context,
       builder: (ctx) => SimpleDialog(
@@ -349,10 +385,22 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
             onPressed: () => Navigator.pop(ctx, null),
             child: const Text('年度总预算', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
-          ..._expenseCats.map((c) => SimpleDialogOption(
-                onPressed: () => Navigator.pop(ctx, c.name),
-                child: Text('${c.icon} ${c.name}'),
-              )),
+          ..._expenseCats.map((c) {
+            final disabled = used.contains(c.name);
+            final grey = AppPalette.textSecondary(context);
+            return SimpleDialogOption(
+              // 已添加 → onPressed 传 null，Flutter 自动置灰且不可点
+              onPressed: disabled ? null : () => Navigator.pop(ctx, c.name),
+              child: Row(children: [
+                Expanded(
+                  child: Text('${c.icon} ${c.name}',
+                      style: disabled ? TextStyle(color: grey) : null),
+                ),
+                if (disabled)
+                  Text('已添加', style: TextStyle(fontSize: 12, color: grey)),
+              ]),
+            );
+          }),
         ],
       ),
     );

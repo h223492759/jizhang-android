@@ -30,18 +30,20 @@ class LocalFirstApi {
     String? end,
     String? type,
     String? category,
+    String? keyword,
     int page = 1,
     int pageSize = 50,
   }) async {
     final bookId = await _curBook();
     final db = LocalDb.instance;
     final cs = await db.countAndSum(bookId,
-        type: type, category: category, start: start, end: end);
+        type: type, category: category, start: start, end: end, keyword: keyword);
     final rows = await db.queryFlows(bookId,
         type: type,
         category: category,
         start: start,
         end: end,
+        keyword: keyword,
         page: page,
         pageSize: pageSize);
     return FlowPage(
@@ -53,8 +55,16 @@ class LocalFirstApi {
 
   }
 
-  // ---- 镜像刷新 helpers ----
-  Future<void> _refreshRecurring() async {
+  /// v2.2.17：「我的」页头部用——首次记账时间 + 流水总笔数（本地镜像，offline-first）
+  Future<({String? firstTime, int total})> getFlowSummary() async {
+    final bookId = await _curBook();
+    final db = LocalDb.instance;
+    final first = await db.firstFlowTime(bookId);
+    final total = await db.totalFlowCount(bookId);
+    return (firstTime: first, total: total);
+  }
+
+  // ---- 镜像刷新 helpers ----  Future<void> _refreshRecurring() async {
     try {
       final bookId = await _curBook();
       final rows = await _api.getRecurring();

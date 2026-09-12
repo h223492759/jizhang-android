@@ -61,6 +61,24 @@ class MePage extends ConsumerWidget {
                       Text(user?.nickname ?? user?.username ?? '未登录',
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       Text('@${user?.username ?? ''}', style: TextStyle(color: AppPalette.textSecondary(context))),
+                      const SizedBox(height: 6),
+                      // v2.2.17：昵称下方两行统计（第一行首次记账时间 / 第二行流水总笔数）
+                      FutureBuilder<({String? firstTime, int total})>(
+                        future: ref.read(localApiProvider).getFlowSummary(),
+                        builder: (ctx, snap) {
+                          final first = snap.data?.firstTime;
+                          final total = snap.data?.total;
+                          final st = TextStyle(
+                              fontSize: 12, color: AppPalette.textSecondary(ctx));
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('首次记账：${first ?? '—'}', style: st),
+                              Text('流水总笔数：${total == null ? '—' : '$total 笔'}', style: st),
+                            ],
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -90,36 +108,68 @@ class MePage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _tile(Icons.palette, '归属人底色', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OwnerColorSettingsPage()))),
-          // 当前账本：点击切换
-          _tile(Icons.book, '当前账本', () => _switchBook(context, ref, s), subtitle: book?.name ?? '未选择'),
-          _tile(Icons.auto_awesome, '自动记账', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoRecordSettingsPage()))),
-          _tile(Icons.water_drop, '水电气用量', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UtilityPage())), subtitle: '水/电/燃气/物业每月用量与档位高亮'),
-          _tile(Icons.restore_from_trash, '回收站', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrashPage())), subtitle: '误删的流水可恢复（共享账本全员可见）'),
-          // 同步状态：点击手动同步
-          AnimatedBuilder(
-            animation: SyncEngine.instance,
-            builder: (context, _) {
-              final se = SyncEngine.instance;
-              String sub;
-              if (se.status == SyncStatus.syncing) {
-                sub = '同步中…';
-              } else if (se.status == SyncStatus.offline) {
-                sub = '离线 · 本地数据可用';
-              } else if (se.lastSyncAt != null) {
-                final t = se.lastSyncAt!;
-                sub = '上次同步 ${t.month}月${t.day}日 ${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-              } else {
-                sub = '点按立即同步';
-              }
-              return           _tile(Icons.sync, '同步', () => _syncNow(context, ref),
-                  subtitle: sub);
-            },
+          // v2.2.17：常用功能改为「一行 4 个图标 + 文字」×2 行（原竖排 9 个 ListTile 太长）
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
+              child: Column(
+                children: [
+                  Row(children: [
+                    Expanded(
+                      child: _gridItem(context, Icons.palette, '归属人底色',
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OwnerColorSettingsPage()))),
+                    ),
+                    Expanded(
+                      child: _gridItem(context, Icons.book, '当前账本',
+                          () => _switchBook(context, ref, s), subtitle: book?.name),
+                    ),
+                    Expanded(
+                      child: _gridItem(context, Icons.auto_awesome, '自动记账',
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoRecordSettingsPage()))),
+                    ),
+                    Expanded(
+                      child: _gridItem(context, Icons.water_drop, '水电气',
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UtilityPage()))),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(
+                      child: _gridItem(context, Icons.restore_from_trash, '回收站',
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrashPage()))),
+                    ),
+                    // 同步：状态文字放图标下方，点击立即同步
+                    Expanded(
+                      child: AnimatedBuilder(
+                        animation: SyncEngine.instance,
+                        builder: (context, _) =>
+                            _gridItem(context, Icons.sync, '同步', () => _syncNow(context, ref)),
+                      ),
+                    ),
+                    Expanded(
+                      child: _gridItem(context, Icons.history, '操作日志',
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OpLogsPage()))),
+                    ),
+                    Expanded(
+                      child: _gridItem(context, Icons.swap_horiz, '切换服务器',
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage()))),
+                    ),
+                  ]),
+                  // 同步状态一行（保留「上次同步 xx」信息，原 ListTile 副标题）
+                  AnimatedBuilder(
+                    animation: SyncEngine.instance,
+                    builder: (context, _) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        _syncStatusText(context),
+                        style: TextStyle(fontSize: 11, color: AppPalette.textSecondary(context)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          _tile(Icons.history, '操作日志', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OpLogsPage())), subtitle: '本地/服务器操作记录'),
-          _tile(Icons.swap_horiz, '切换服务器', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage()))),
-          _tile(Icons.code, '开源地址（GitHub）', () => _copyRepo(context),
-              subtitle: 'github.com/h223492759/jizhang-android'),
           const SizedBox(height: 12),
           // 版本信息 + 设置信息合并展示
           _versionCard(context, ref, s),
@@ -209,6 +259,9 @@ class MePage extends ConsumerWidget {
               _infoRow('服务器', s.serverUrl ?? '-'),
               _infoRow('当前账号', s.user?.nickname ?? s.user?.username ?? '-'),
               _aiRow(ref),
+              // v2.2.17：开源地址从独立列表项移入版本信息（AI 记账下面一行，右侧蓝色下划线，点击复制）
+              _linkRow(context, '开源地址', 'github.com/h223492759/jizhang-android',
+                  () => _copyRepo(context)),
               const Divider(height: 20),
               Text('本 App 为「记账本」安卓客户端，UI 参考鲨鱼记账的交互设计，'
                   '后端对接 jizhang 服务。数据均存储在你自己的服务器上。',
@@ -237,8 +290,37 @@ class MePage extends ConsumerWidget {
         ),
       );
 
-  Widget _aiRow(WidgetRef ref) {
-    return FutureBuilder<AiStatus>(
+  // v2.2.17：带链接样式的信息行（右对齐、蓝色、下划线、点击可复制）
+  Widget _linkRow(BuildContext context, String label, String value, VoidCallback onTap) =>
+      Builder(
+        builder: (ctx) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(children: [
+            SizedBox(
+              width: 80,
+              child: Text(label,
+                  style: TextStyle(color: AppPalette.textSecondary(ctx), fontSize: 13)),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: onTap,
+                behavior: HitTestBehavior.opaque,
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.blue,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      );
+
+  Widget _aiRow(WidgetRef ref) {    return FutureBuilder<AiStatus>(
       future: _aiStatus(ref),
       builder: (ctx, snap) {
         final ai = snap.data;
@@ -260,13 +342,44 @@ class MePage extends ConsumerWidget {
     }
   }
 
-  Widget _tile(IconData icon, String title, VoidCallback? onTap, {String? subtitle}) => Card(
-        child: ListTile(
-          leading: Icon(icon, color: AppColors.primaryDark),
-          title: Text(title),
-          subtitle: subtitle != null ? Text(subtitle) : null,
-          trailing: onTap != null ? const Icon(Icons.chevron_right) : null,
-          onTap: onTap,
+  // v2.2.17：同步状态文案（原 ListTile 副标题，现作为网格下方一行小字）
+  String _syncStatusText(BuildContext context) {
+    final se = SyncEngine.instance;
+    if (se.status == SyncStatus.syncing) return '同步中…';
+    if (se.status == SyncStatus.offline) return '离线 · 本地数据可用（点「同步」重试）';
+    final t = se.lastSyncAt;
+    if (t == null) return '点「同步」立即同步';
+    return '上次同步 ${t.month}月${t.day}日 '
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  // 网格单元：图标 + 文字（可选第二行小字）
+  Widget _gridItem(BuildContext context, IconData icon, String label, VoidCallback? onTap,
+          {String? subtitle}) =>
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: AppColors.primaryDark, size: 24),
+              const SizedBox(height: 6),
+              Text(label,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+              if (subtitle != null && subtitle.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(subtitle,
+                      style: TextStyle(fontSize: 10, color: AppPalette.textSecondary(context)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
+            ],
+          ),
         ),
       );
 }
