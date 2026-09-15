@@ -374,6 +374,10 @@ class SavingsItem {
   final String asOf;
   final String asOfEnd;
   final int sort;
+  // v2.2.19：「最近一次保存的金额」——服务端按最新月快照口径给出，供「更新资产和负债」弹窗预填
+  //（历史回填只写快照、不改当前余额，用当前余额预填会显示更早的旧值）
+  final double lastAmount;
+  final String lastAmountYmd;
   SavingsItem({
     required this.id,
     required this.name,
@@ -383,7 +387,10 @@ class SavingsItem {
     required this.asOf,
     required this.asOfEnd,
     required this.sort,
-  });
+    double? lastAmount,
+    String? lastAmountYmd,
+  })  : lastAmount = lastAmount ?? amount,
+        lastAmountYmd = lastAmountYmd ?? '';
   factory SavingsItem.fromJson(Map<String, dynamic> j) => SavingsItem(
         id: j['id'],
         name: j['name'] ?? '',
@@ -393,6 +400,8 @@ class SavingsItem {
         asOf: j['as_of'] ?? '',
         asOfEnd: j['as_of_end'] ?? '',
         sort: j['sort'] ?? 0,
+        lastAmount: (j['last_amount'] as num?)?.toDouble(),
+        lastAmountYmd: (j['last_amount_ymd'] ?? '').toString(),
       );
   static List<SavingsItem> listFrom(dynamic v) =>
       (v as List? ?? []).map((e) => SavingsItem.fromJson(e)).toList();

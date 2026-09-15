@@ -64,20 +64,31 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     return Scaffold(
       // v2.2.17：顶部压缩——「存款 / 资金细则」tab 提到与返回按钮同一行，
       // 去掉原来的 bottom: TabBar（额外占约 46px），让下方内容多显示一截
-      // v2.2.18：centerTitle=true —— 返回按钮位置不变，「存款/资金细则」两 tab 作为整体居中
-      // （即两个 tab 中间的间隙落在画面正中）
+      // v2.2.19：两个 tab 的间隙精确落在画面正中——返回按钮和右侧等宽占位各 48，
+      // 中间 Expanded 的中心 = 画面中心，两个 tab 各占一半宽度，交界处即正中
       appBar: AppBar(
         toolbarHeight: 48,
+        automaticallyImplyLeading: false,
         titleSpacing: 0,
-        centerTitle: true,
-        title: TabBar(
-          controller: _tab,
-          tabs: const [Tab(text: '存款'), Tab(text: '资金细则')],
-          indicatorColor: AppPalette.text(context),
-          labelColor: AppPalette.text(context),
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-        ),
+        title: Row(children: [
+          SizedBox(
+            width: 48,
+            child: IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          ),
+          Expanded(
+            child: TabBar(
+              controller: _tab,
+              tabs: const [Tab(text: '存款'), Tab(text: '资金细则')],
+              indicatorColor: AppPalette.text(context),
+              labelColor: AppPalette.text(context),
+            ),
+          ),
+          const SizedBox(width: 48),
+        ]),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -641,6 +652,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     }
   }
 
+  // 金额转输入框文本：整数不带小数点（204000.0 → 204000）
+  String _amtText(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+
   // 更新资产和负债（批量填金额）
   Future<void> _updateAssets() async {
     // v2.2.18：弹窗前先重新拉一次（getSavings 会先把服务端最新资金细则刷进本地镜像），
@@ -652,7 +667,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
       toast('请先新增资金细则');
       return;
     }
-    final ctrls = {for (final it in s.items) it.id: TextEditingController(text: it.amount.toString())};
+    // v2.2.19：预填「最近一次保存的金额」而不是当前余额——
+    // 历史回填只写快照、不改当前余额，用当前余额会显示更早的旧值（与页面顶部对不上）
+    final prefillYmd = s.items.map((e) => e.lastAmountYmd).firstWhere((e) => e.isNotEmpty, orElse: () => '');
+    final ctrls = {for (final it in s.items) it.id: TextEditingController(text: _amtText(it.lastAmount))};
     final date = TextEditingController(text: DateTime.now().toIso8601String().substring(0, 10));
     final ok = await showDialog<bool>(
       context: context,
@@ -670,6 +688,12 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(controller: date, decoration: const InputDecoration(labelText: '记录日期（默认今天，可选历史日期回填）')),
+                  if (prefillYmd.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text('已按 $prefillYmd 最后一次保存的金额预填',
+                          style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
+                    ),
                   const Divider(),
                   ...s.items.map((it) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
