@@ -91,14 +91,15 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
     setState(() => _loading = true);
     try {
       final api = ref.read(localApiProvider);
-      final fp = await api.getFlows(
+      // v2.2.20：全量拉取后再按归属人/类型过滤——单页 pageSize:2000 会截断，
+      // 周期内流水多时合计与图表页占比对不上
+      final fp = await api.getAllFlows(
         start: _start(),
         end: _end(),
-        pageSize: 2000,
         category: widget.category,
       );
       final cats = await api.getCategories();
-      var matched = fp.list.where((f) => f.attribution == widget.attribution).toList();
+      var matched = fp.where((f) => f.attribution == widget.attribution).toList();
       if (_typeFilter != 'all') {
         matched = matched.where((f) => f.type == _typeFilter).toList();
       }

@@ -64,7 +64,9 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       final api = ref.read(localApiProvider);
       final cats = await api.getCategoryStat(type: _type, start: _start(), end: _end());
       final catMeta = await api.getCategories();
-      final flows = await api.getFlows(start: _start(), end: _end(), pageSize: 2000);
+      // v2.2.20：改用全量加载——pageSize:2000 单页在周期内流水 >2000 条时截断，
+      // 归属占比条/周期总额会与点进去的明细对不上
+      final flowList = await api.getAllFlows(start: _start(), end: _end());
       if (_yearMode) {
         _monthly = await api.getMonthly(year: _period.year);
         _daily = [];
@@ -76,7 +78,7 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
         setState(() {
           _cats = cats;
           _catMeta = catMeta;
-          _flows = flows.list;
+          _flows = flowList;
         });
       }
     } catch (e) {

@@ -55,6 +55,38 @@ class LocalFirstApi {
 
   }
 
+  /// v2.2.20：循环翻页拉全量流水。
+  /// 之前图表页/归属明细页用 pageSize:2000 单页拉取，周期内流水超过 2000 条时
+  /// 会被截断（按 flow_time DESC 只留最新 2000 条），导致归属占比条与点进去的
+  /// 明细合计对不上。本方法按页取全量，统计口径与明细完全一致。
+  Future<List<Flow>> getAllFlows({
+    String? start,
+    String? end,
+    String? type,
+    String? category,
+    String? keyword,
+    int pageSize = 1000,
+  }) async {
+    final all = <Flow>[];
+    int page = 1;
+    while (true) {
+      final fp = await getFlows(
+        start: start,
+        end: end,
+        type: type,
+        category: category,
+        keyword: keyword,
+        page: page,
+        pageSize: pageSize,
+      );
+      all.addAll(fp.list);
+      // 翻满 total、或本页为空（防御 total 异常）即停
+      if (fp.list.isEmpty || all.length >= fp.total) break;
+      page += 1;
+    }
+    return all;
+  }
+
   /// v2.2.17：「我的」页头部用——首次记账时间 + 流水总笔数（本地镜像，offline-first）
   Future<({String? firstTime, int total})> getFlowSummary() async {
     final bookId = await _curBook();

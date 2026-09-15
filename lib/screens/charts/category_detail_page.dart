@@ -98,12 +98,13 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
     setState(() => _loading = true);
     try {
       final api = ref.read(localApiProvider);
-      final fp = await api.getFlows(
-          category: widget.category, type: widget.type, start: _start(), end: _end(), pageSize: 2000);
+      // v2.2.20：全量加载——单页 pageSize:2000 截断会让归属占比/排行与明细对不上
+      final flows = await api.getAllFlows(
+          category: widget.category, type: widget.type, start: _start(), end: _end());
       final cats = await api.getCategories();
       if (mounted) {
         setState(() {
-          _flows = fp.list;
+          _flows = flows;
           _cats = cats;
         });
       }
