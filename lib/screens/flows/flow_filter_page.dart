@@ -44,17 +44,17 @@ class _FlowFilterPageState extends ConsumerState<FlowFilterPage> {
   Future<void> _load() async {
     try {
       final api = ref.read(localApiProvider);
-      final fp = await api.getFlows(
+      // v2.2.21：全量加载——单页 500 在筛选结果多时列表会缺
+      final flows = await api.getAllFlows(
             category: widget.category,
             type: widget.type,
             start: widget.start,
             end: widget.end,
-            pageSize: 500,
           );
       final cats = await api.getCategories();
       if (mounted) {
         setState(() {
-          _flows = fp.list;
+          _flows = flows;
           _cats = cats;
         });
       }

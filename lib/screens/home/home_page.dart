@@ -53,12 +53,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     try {
       final api = ref.read(localApiProvider);
       final ov = await api.getOverview(start: _rangeStart(), end: _rangeEnd());
-      final fp = await api.getFlows(start: _rangeStart(), end: _rangeEnd(), pageSize: 500);
+      // v2.2.21：改全量加载——pageSize:500 单页在月流水 >500 条时会截断，
+      // 后果：①列表滚到底看不到更早的流水；②「更换归属人」的候选 chip 由 _flows
+      // 推导，缺流水的归属人不会出现在候选项里（顶部收支走 _overview 的 SQL 聚合不受影响）
+      final flows = await api.getAllFlows(start: _rangeStart(), end: _rangeEnd());
       final cats = await api.getCategories();
       if (mounted) {
         setState(() {
           _overview = ov;
-          _flows = fp.list;
+          _flows = flows;
           _cats = cats;
           _loading = false;
         });

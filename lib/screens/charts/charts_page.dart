@@ -443,8 +443,10 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
       dateLabel = '${_period.year}年$m月';
       final s = DateFormat('yyyy-MM-01').format(DateTime(_period.year, m));
       final e = DateFormat('yyyy-MM-dd').format(DateTime(_period.year, m + 1, 0));
-      final fp = await ref.read(localApiProvider).getFlows(start: s, end: e, pageSize: 2000);
-      final list = fp.list.where((f) => f.type == _type).toList()
+      // v2.2.21：全量加载——单页 2000 在月流水多时截断，top3 与合计都会错
+      final list = (await ref.read(localApiProvider).getAllFlows(start: s, end: e))
+          .where((f) => f.type == _type)
+          .toList()
         ..sort((a, b) => b.amount.compareTo(a.amount));
       top = list.take(3).map((f) => _TopItem(f)).toList();
       barTotal = list.fold(0.0, (s, f) => s + f.amount);

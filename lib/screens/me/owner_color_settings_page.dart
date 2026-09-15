@@ -32,9 +32,10 @@ class _OwnerColorSettingsPageState extends ConsumerState<OwnerColorSettingsPage>
 
   Future<void> _loadOwners() async {
     try {
-      final fp = await ref.read(localApiProvider).getFlows(pageSize: 1000);
+      // v2.2.21：全量加载——单页 1000 会在流水多时漏掉早期才出现过的归属人
+      final flows = await ref.read(localApiProvider).getAllFlows();
       final set = <String>{};
-      for (final f in fp.list) {
+      for (final f in flows) {
         if (f.attribution.isNotEmpty) set.add(f.attribution);
       }
       // 合并已设置的

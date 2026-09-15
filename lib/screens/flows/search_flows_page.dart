@@ -82,15 +82,22 @@ class _SearchFlowsPageState extends ConsumerState<SearchFlowsPage> {
     }
     setState(() => _loading = true);
     try {
-      final fp = await ref
-          .read(localApiProvider)
-          .getFlows(keyword: kw, pageSize: 500);
+      // v2.2.21：全量加载（翻页）——命中超过 500 条时列表会缺，与顶部「共 N 笔」对不上
+      final flows = await ref.read(localApiProvider).getAllFlows(keyword: kw);
+      double exp = 0, inc = 0;
+      for (final f in flows) {
+        if (f.isExpense) {
+          exp += f.amount;
+        } else {
+          inc += f.amount;
+        }
+      }
       if (mounted) {
         setState(() {
-          _flows = fp.list;
-          _total = fp.total;
-          _expense = fp.expense;
-          _income = fp.income;
+          _flows = flows;
+          _total = flows.length;
+          _expense = exp;
+          _income = inc;
           _searched = true;
         });
       }
