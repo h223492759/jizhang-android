@@ -357,6 +357,12 @@ final w = await _api.getWallets();
 
   Future<SavingsOverview> getSavings() async {
     final bookId = await _curBook();
+    // v2.2.18：与 getBudgets 同口径——先拉最新资金细则刷新本地镜像，再展示。
+    // 此前只读本地镜像 → 网页端/另一台设备保存过的资产数据要等同步才可见，
+    // 「更新资产和负债」弹窗里显示的不是最新一次保存的金额。刷新失败仍回退旧镜像。
+    try {
+      await _refreshSavings();
+    } catch (_) {}
     final j = await LocalDb.instance.getSavingsJson(bookId);
     if (j == null || j.isEmpty) {
       return SavingsOverview(
@@ -905,6 +911,16 @@ final w = await _api.getWallets();
             await LocalDb.instance.deleteBudgetLocal(b, year, category);
           },
           refresh: _refreshBudgets);
+
+  /// v2.2.18：复制预算——把 fromYear 的「年度总预算 + 分类预算」一次性复制到 toYear（覆盖式）。
+  /// 与网页端一致；走在线（来源数据在服务端，离线无法复制），成功后刷新本地预算镜像。
+  Future<int> copyBudgets({required int fromYear, required int toYear}) async {
+    final n = await _api.copyBudgets(fromYear: fromYear, toYear: toYear);
+    try {
+      await _refreshBudgets();
+    } catch (_) {}
+    return n;
+  }
 
   // ---- 钱包：读本地整包 / 写离线 ----
   Future<WalletsData> getWallets() async {

@@ -286,6 +286,15 @@ class ApiClient {
         .delete('/budgets', queryParameters: {'year': year, 'category': category}));
   }
 
+  /// v2.2.18：复制预算——把 fromYear 的「年度总预算 + 分类预算」一次性复制到 toYear（覆盖式）
+  /// 语义与网页端 Budgets.vue 的「复制预算」完全一致（POST /budgets/copy）
+  Future<int> copyBudgets({required int fromYear, required int toYear}) async {
+    final d = await _req(() => _dio.post('/budgets/copy',
+        data: {'fromYear': fromYear, 'toYear': toYear}));
+    final n = (d is Map) ? d['copied'] : null;
+    return n is num ? n.toInt() : 0;
+  }
+
   Future<BillMonthly> getBillMonthly({int? year}) async {
     final q = <String, dynamic>{};
     if (year != null) q['year'] = year;

@@ -112,6 +112,78 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     }
   }
 
+  // v2.2.18：复制预算——把某一年已设的「年度总预算 + 分类预算」一次性复制到当前年份（覆盖式）
+  // 语义与网页端 Budgets.vue「复制预算」一致（服务端 POST /budgets/copy）
+  Future<void> _copyBudget() async {
+    final maxY = DateTime.now().year + 1;
+    int minY = _minYear < maxY ? _minYear : maxY;
+    final years = [for (var y = maxY; y >= minY; y--) y]
+        .where((y) => y != _year)
+        .toList();
+    if (years.isEmpty) return toast('没有其他年份可复制');
+    final from = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('复制预算到 $_year 年'),
+        content: SizedBox(
+          width: 320,
+          height: (years.length / 4).ceil() * 64.0 + 24,
+          child: GridView.count(
+            crossAxisCount: 4,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1,
+            children: years
+                .map((y) => InkWell(
+                      onTap: () => Navigator.pop(ctx, y),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppPalette.cardSubtle(ctx),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppPalette.divider(ctx)),
+                        ),
+                        child: Text('$y', style: const TextStyle(fontSize: 13)),
+                      ),
+                    ))
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+        ],
+      ),
+    );
+    if (from == null) return;
+    // 当前年份已有预算 → 先确认覆盖（复制是覆盖同名项，避免误清掉已设好的预算）
+    final has = (_data?.totalAmount ?? 0) > 0 ||
+        (_data?.categories ?? const <BudgetCat>[]).any((c) => c.amount > 0);
+    if (has) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('覆盖当前年份预算？'),
+          content: Text('$_year 年已有预算，复制 $from 年会覆盖同名项（年度总预算 + 分类预算）。'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('覆盖')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    try {
+      final n = await ref
+          .read(localApiProvider)
+          .copyBudgets(fromYear: from, toYear: _year);
+      toast(n > 0 ? '已复制 $n 条预算到 $_year 年' : '$from 年没有可复制的预算');
+      _load();
+    } catch (e) {
+      toast(e.toString().replaceFirst('ApiException: ', ''));
+    }
+  }
+
   // 卡片标题：单分类显示分类名；多分类显示「多分类N」（N = 该多分类在列表中的序号，从 1 开始）
   // 列表页/详情页传分类名显示（保留 _catLabel/_catLabelOf 旧 API）
   String _catCardTitle(BudgetCat c, int i) {
@@ -269,6 +341,16 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                             setState(() => _year += 1);
                             _load();
                           },
+                  ),
+                  // v2.2.18：复制预算（与年份切换同一行、最右边）
+                  const Spacer(),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8)),
+                    onPressed: _loading ? null : _copyBudget,
+                    icon: const Icon(Icons.copy, size: 16),
+                    label: const Text('复制预算'),
                   ),
                 ]),
                 const SizedBox(height: 12),

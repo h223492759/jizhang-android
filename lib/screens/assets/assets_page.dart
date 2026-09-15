@@ -64,9 +64,12 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     return Scaffold(
       // v2.2.17：顶部压缩——「存款 / 资金细则」tab 提到与返回按钮同一行，
       // 去掉原来的 bottom: TabBar（额外占约 46px），让下方内容多显示一截
+      // v2.2.18：centerTitle=true —— 返回按钮位置不变，「存款/资金细则」两 tab 作为整体居中
+      // （即两个 tab 中间的间隙落在画面正中）
       appBar: AppBar(
         toolbarHeight: 48,
         titleSpacing: 0,
+        centerTitle: true,
         title: TabBar(
           controller: _tab,
           tabs: const [Tab(text: '存款'), Tab(text: '资金细则')],
@@ -640,6 +643,9 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
 
   // 更新资产和负债（批量填金额）
   Future<void> _updateAssets() async {
+    // v2.2.18：弹窗前先重新拉一次（getSavings 会先把服务端最新资金细则刷进本地镜像），
+    // 保证输入框里的金额是「最新一次保存的数据」，而不是进页面那一刻的旧快照
+    await _load();
     final s = _sav;
     if (s == null) return;
     if (s.items.isEmpty) {
@@ -676,6 +682,8 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                           controller: ctrls[it.id],
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: const InputDecoration(labelText: '金额'),
+                          // v2.2.18：输入即重算下方「资产/负债/净资产」合计（此前合计不会随输入变）
+                          onChanged: (_) => set(() {}),
                         ),
                       ),
                     ]),
