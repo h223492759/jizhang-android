@@ -406,6 +406,23 @@ class SavingsItem {
   static List<SavingsItem> listFrom(dynamic v) =>
       (v as List? ?? []).map((e) => SavingsItem.fromJson(e)).toList();
   bool get isLiability => sign < 0;
+
+  /// 写入本地镜像用的 JSON（键名与服务端 /savings 返回一致）。
+  /// ⚠️ 新增字段必须在这里补上：本地镜像整存整取，漏字段会让读取端静默退回默认值。
+  /// （v2.2.22 踩过：漏 last_amount/last_amount_ymd → fromJson 里 lastAmount 退回 amount，
+  ///   「更新资产和负债」弹窗预填成了当前余额，合计与网页端对不上）
+  Map<String, dynamic> toMirrorJson() => {
+        'id': id,
+        'name': name,
+        'sign': sign,
+        'amount': amount,
+        'note': note,
+        'as_of': asOf,
+        'as_of_end': asOfEnd,
+        'sort': sort,
+        'last_amount': lastAmount,
+        'last_amount_ymd': lastAmountYmd,
+      };
 }
 
 class SavingsMonth {

@@ -314,16 +314,7 @@ class SyncEngine extends ChangeNotifier {
 
     Future<void> pullSavings() async {
       final sav = await a.getSavings();
-      Map itemJson(SavingsItem it) => {
-            'id': it.id,
-            'name': it.name,
-            'sign': it.sign,
-            'amount': it.amount,
-            'note': it.note,
-            'as_of': it.asOf,
-            'as_of_end': it.asOfEnd,
-            'sort': it.sort,
-          };
+      Map itemJson(SavingsItem it) => it.toMirrorJson();
       Map monthJson(SavingsMonth m) => {
             'ymd': m.ymd,
             'asset': m.asset,

@@ -749,30 +749,9 @@ final w = await _api.getWallets();
           bookId,
           jsonEncode({
             'goal': sav.goal,
-            'items': sav.items
-                .map((it) => {
-                      'id': it.id,
-                      'name': it.name,
-                      'sign': it.sign,
-                      'amount': it.amount,
-                      'note': it.note,
-                      'as_of': it.asOf,
-                      'as_of_end': it.asOfEnd,
-                      'sort': it.sort,
-                    })
-                .toList(),
-            'expiredItems': sav.expiredItems
-                .map((it) => {
-                      'id': it.id,
-                      'name': it.name,
-                      'sign': it.sign,
-                      'amount': it.amount,
-                      'note': it.note,
-                      'as_of': it.asOf,
-                      'as_of_end': it.asOfEnd,
-                      'sort': it.sort,
-                    })
-                .toList(),
+            'items': sav.items.map((it) => it.toMirrorJson()).toList(),
+            'expiredItems':
+                sav.expiredItems.map((it) => it.toMirrorJson()).toList(),
             'current': sav.current,
             'months': sav.months
                 .map((m) => {

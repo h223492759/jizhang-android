@@ -114,7 +114,7 @@ class MePage extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
               child: Column(
                 children: [
-                  Row(children: [
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Expanded(
                       child: _gridItem(context, Icons.palette, '归属人底色',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OwnerColorSettingsPage()))),
@@ -133,7 +133,7 @@ class MePage extends ConsumerWidget {
                     ),
                   ]),
                   const SizedBox(height: 10),
-                  Row(children: [
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Expanded(
                       child: _gridItem(context, Icons.restore_from_trash, '回收站',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrashPage()))),
@@ -155,15 +155,30 @@ class MePage extends ConsumerWidget {
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage()))),
                     ),
                   ]),
-                  // 同步状态一行（保留「上次同步 xx」信息，原 ListTile 副标题）
+                  // v2.2.22：同步状态小字「居中于第二列『同步』」——
+                  // 即这段文字的横向中心对齐「同步」二字的中心（4 列等宽 → 第 2 列中心在 3/8 处）。
+                  // 文字比该列宽时用 UnconstrainedBox 让它左右对称溢出，保证中心点精确成立。
                   AnimatedBuilder(
                     animation: SyncEngine.instance,
                     builder: (context, _) => Padding(
                       padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        _syncStatusText(context),
-                        style: TextStyle(fontSize: 11, color: AppPalette.textSecondary(context)),
-                      ),
+                      child: Row(children: [
+                        const Expanded(child: SizedBox()),
+                        Expanded(
+                          child: Center(
+                            child: UnconstrainedBox(
+                              child: Text(
+                                _syncStatusText(context),
+                                maxLines: 1,
+                                softWrap: false,
+                                style: TextStyle(fontSize: 11, color: AppPalette.textSecondary(context)),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const Expanded(child: SizedBox()),
+                        const Expanded(child: SizedBox()),
+                      ]),
                     ),
                   ),
                 ],
@@ -263,11 +278,7 @@ class MePage extends ConsumerWidget {
               // v2.2.17：开源地址从独立列表项移入版本信息（AI 记账下面一行，右侧蓝色下划线，点击复制）
               _linkRow(context, '开源地址', 'github.com/h223492759/jizhang-android',
                   () => _copyRepo(context)),
-              const Divider(height: 20),
-              Text('本 App 为「记账本」安卓客户端，UI 参考鲨鱼记账的交互设计，'
-                  '后端对接 jizhang 服务。数据均存储在你自己的服务器上。',
-                  style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 13)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Center(
                 child: Text('© 记账本', style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 12)),
               ),
@@ -309,6 +320,10 @@ class MePage extends ConsumerWidget {
                 child: Text(
                   value,
                   textAlign: TextAlign.right,
+                  // v2.2.22：网址不换行，显示不完整走省略号（点击即整条复制，不需要看全）
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.blue,
@@ -372,14 +387,21 @@ class MePage extends ConsumerWidget {
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis),
-              if (subtitle != null && subtitle.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(subtitle,
-                      style: TextStyle(fontSize: 10, color: AppPalette.textSecondary(context)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+              // v2.2.22：副标题槽位「固定高度、无副标题也占位」。
+              // 否则同一行里只有「有副标题」的格子更高，Row 垂直居中会让其余格子的
+              // 图标与文字整体下沉 → 第一行 4 个功能区图标/文字不在一个高度。
+              SizedBox(
+                height: 16,
+                child: Center(
+                  child: Text(
+                    subtitle ?? '',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 10, color: AppPalette.textSecondary(context)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+              ),
             ],
           ),
         ),
