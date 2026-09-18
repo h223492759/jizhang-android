@@ -42,10 +42,10 @@ class _BookPickerPageState extends ConsumerState<BookPickerPage> {
     if (name == null || name.isEmpty) return;
     setState(() => _loading = true);
     try {
-      await ref.read(localApiProvider).createBook(name);
+      // 直接用创建接口返回的账本（含 id），不再从列表里按名字反查
+      // （网络抖动时列表可能还没刷新到，firstWhere/last 会拿错或抛错）
+      final created = await ref.read(localApiProvider).createBook(name);
       await ref.read(sessionProvider.notifier).refreshBooks();
-      final books = ref.read(sessionProvider).books;
-      final created = books.firstWhere((b) => b.name == name, orElse: () => books.last);
       await _select(created.id);
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));

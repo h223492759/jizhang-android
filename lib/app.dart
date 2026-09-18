@@ -49,7 +49,9 @@ class RootRouter extends ConsumerWidget {
     if (!s.hasServer) return const ServerListPage();
     if (!s.hasToken) return const LoginPage();
     if (!s.hasBook) return const BookPickerPage();
-    return const MainShell();
+    // v2.2.23：按 bookId 作为 key —— 切换账本后整壳重建，各页重新取数，
+    // 否则切完账本界面还是旧账本的数据（看起来像「切了没反应」）。
+    return MainShell(key: ValueKey('shell-${s.bookId}'));
   }
 }
 
@@ -87,6 +89,8 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       AutoRecordService.instance.processNow(ref, context);
+      // 顺带刷新账本列表：启动那次请求失败时能自愈（「切换账本」不再空着直到重启）
+      ref.read(sessionProvider.notifier).refreshBooks().catchError((_) {});
       _sync();
     }
   }

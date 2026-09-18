@@ -136,32 +136,37 @@ class MePage extends ConsumerWidget {
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Expanded(
                       child: _gridItem(context, Icons.restore_from_trash, '回收站',
-                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrashPage()))),
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrashPage())),
+                          reserveSubtitle: false),
                     ),
                     // 同步：状态文字放图标下方，点击立即同步
                     Expanded(
                       child: AnimatedBuilder(
                         animation: SyncEngine.instance,
                         builder: (context, _) =>
-                            _gridItem(context, Icons.sync, '同步', () => _syncNow(context, ref)),
+                            _gridItem(context, Icons.sync, '同步', () => _syncNow(context, ref),
+                                reserveSubtitle: false),
                       ),
                     ),
                     Expanded(
                       child: _gridItem(context, Icons.history, '操作日志',
-                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OpLogsPage()))),
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OpLogsPage())),
+                          reserveSubtitle: false),
                     ),
                     Expanded(
                       child: _gridItem(context, Icons.swap_horiz, '切换服务器',
-                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage()))),
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage())),
+                          reserveSubtitle: false),
                     ),
                   ]),
                   // v2.2.22：同步状态小字「居中于第二列『同步』」——
                   // 即这段文字的横向中心对齐「同步」二字的中心（4 列等宽 → 第 2 列中心在 3/8 处）。
                   // 文字比该列宽时用 UnconstrainedBox 让它左右对称溢出，保证中心点精确成立。
+                  // v2.2.23：第二行不再预留副标题槽位 → 状态小字紧贴「同步」下方，中间不再空一行。
                   AnimatedBuilder(
                     animation: SyncEngine.instance,
                     builder: (context, _) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.only(top: 2, bottom: 4),
                       child: Row(children: [
                         const Expanded(child: SizedBox()),
                         Expanded(
@@ -273,7 +278,7 @@ class MePage extends ConsumerWidget {
               const SizedBox(height: 10),
               _infoRow('版本', 'v$version ($build) · 构建 ${BuildInfo.buildTime}'),
               _infoRow('服务器', s.serverUrl ?? '-'),
-              _infoRow('当前账号', s.user?.nickname ?? s.user?.username ?? '-'),
+              // v2.2.23：去掉「当前账号」——上方头像卡已有昵称 + @账号，重复
               _aiRow(ref),
               // v2.2.17：开源地址从独立列表项移入版本信息（AI 记账下面一行，右侧蓝色下划线，点击复制）
               _linkRow(context, '开源地址', 'github.com/h223492759/jizhang-android',
@@ -371,8 +376,10 @@ class MePage extends ConsumerWidget {
   }
 
   // 网格单元：图标 + 文字（可选第二行小字）
+  // reserveSubtitle：副标题槽位是否固定占位（第一行「当前账本」有账本名，其余三格必须占位
+  // 才能基线对齐；第二行四格都没有副标题 → 传 false，否则「同步」下方小字会多空出一行）
   Widget _gridItem(BuildContext context, IconData icon, String label, VoidCallback? onTap,
-          {String? subtitle}) =>
+          {String? subtitle, bool reserveSubtitle = true}) =>
       InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
@@ -390,18 +397,19 @@ class MePage extends ConsumerWidget {
               // v2.2.22：副标题槽位「固定高度、无副标题也占位」。
               // 否则同一行里只有「有副标题」的格子更高，Row 垂直居中会让其余格子的
               // 图标与文字整体下沉 → 第一行 4 个功能区图标/文字不在一个高度。
-              SizedBox(
-                height: 16,
-                child: Center(
-                  child: Text(
-                    subtitle ?? '',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 10, color: AppPalette.textSecondary(context)),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+              if (reserveSubtitle || (subtitle ?? '').isNotEmpty)
+                SizedBox(
+                  height: 16,
+                  child: Center(
+                    child: Text(
+                      subtitle ?? '',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 10, color: AppPalette.textSecondary(context)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

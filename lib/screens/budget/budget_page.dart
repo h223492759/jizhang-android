@@ -453,18 +453,22 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       );
 
   Future<void> _pickCategory() async {
-    // v2.2.17：已设过预算的分类置灰、不可点（避免重复添加；金额为 0 视为未设）
+    // v2.2.23：已设过预算的分类置灰、不可点（避免重复添加；金额为 0 视为未设）。
+    // ⚠️ 多分类合并记录的 category 存的是 JSON 数组字符串（如 ["餐饮","交通"]），
+    // 必须拆成单个分类名再判重，否则这些分类不会被置灰、可被重复添加。
     final used = <String>{
       for (final c in _data?.categories ?? const <BudgetCat>[])
-        if (c.amount > 0) c.category
+        if (c.amount > 0) ..._parseNames(c.category)
     };
-    final cat = await showDialog<String>(
+    // 「年度总预算」用哨兵值，避免与「取消」（返回 null）撞车
+    const totalSentinel = '__TOTAL__';
+    final picked = await showDialog<String>(
       context: context,
       builder: (ctx) => SimpleDialog(
         title: const Text('选择分类（添加预算）'),
         children: [
           SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, null),
+            onPressed: () => Navigator.pop(ctx, totalSentinel),
             child: const Text('年度总预算', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           ..._expenseCats.map((c) {
@@ -486,9 +490,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
         ],
       ),
     );
-    if (cat != null || cat == null) {
-      // null 表示选「总预算」
-      await _setBudget(category: cat);
-    }
+    if (picked == null) return; // 取消：不做任何事
+    await _setBudget(category: picked == totalSentinel ? null : picked);
   }
 }

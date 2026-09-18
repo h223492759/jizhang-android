@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/api.dart';
+import 'package:jizhang_android/core/db.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/storage.dart';
 
@@ -54,24 +56,22 @@ class SessionNotifier extends StateNotifier<SessionState> {
     final token = await Storage.getToken();
     final userJson = await Storage.getUserJson();
     final bookId = await Storage.getBookId();
+    // v2.2.23：账本列表先用本地兜底（持久化 JSON），再向服务器刷新。
+    // 否则「启动瞬间请求失败」会让 books 一直空着 → 「切换账本」里没有可选项，
+    // 要重启 App 才恢复（用户报的「账本不可切换」）。
     state = state.copyWith(
       serverUrl: server,
       token: token,
       user: userJson != null ? User.fromJsonString(userJson) : null,
       bookId: bookId,
+      books: _decodeBooks(await Storage.getBooksJson()),
     );
-    if (state.hasToken) {
-      try {
-        final books = await state.api.getBooks();
-        final raw = await Storage.getBooksJson();
-        state = state.copyWith(books: books);
-        if (raw != null) {
-          // 保留持久化的账本列表排序
-        }
-      } catch (_) {
-        // 启动时不因网络失败而退出登录
-      }
+    if (!state.hasToken) return;
+    if (state.books.isEmpty) {
+      // 老版本升上来的：没有持久化 JSON，用本地镜像表兜底（同步时写入）
+      state = state.copyWith(books: await _mirrorBooks());
     }
+    await refreshBooks();
   }
 
   Future<void> setServer(String url) async {
@@ -103,10 +103,20 @@ class SessionNotifier extends StateNotifier<SessionState> {
     state = state.copyWith(bookId: bookId);
   }
 
+  /// v2.2.23：刷新账本列表——成功则落盘持久化；失败保留本地已有列表（绝不清空）。
+  /// 回前台也会调用一次，这样启动时那次请求失败能自愈，不需要重启 App。
   Future<void> refreshBooks() async {
     if (!state.hasToken) return;
-    final books = await state.api.getBooks();
-    state = state.copyWith(books: books);
+    try {
+      final books = await state.api.getBooks();
+      await Storage.setBooksJson(_booksToJson(books));
+      state = state.copyWith(books: books);
+    } catch (_) {
+      if (state.books.isEmpty) {
+        final fallback = await _mirrorBooks();
+        if (fallback.isNotEmpty) state = state.copyWith(books: fallback);
+      }
+    }
   }
 
   Future<void> logout() async {
@@ -116,6 +126,34 @@ class SessionNotifier extends StateNotifier<SessionState> {
 
   String _booksToJson(List<Book> books) =>
       '[' + books.map((b) => b.toJsonString()).join(',') + ']';
+
+  List<Book> _decodeBooks(String? raw) {
+    if (raw == null || raw.isEmpty) return const <Book>[];
+    try {
+      return Book.listFrom(jsonDecode(raw));
+    } catch (_) {
+      return const <Book>[];
+    }
+  }
+
+  /// 本地镜像表（SyncEngine 同步时写入），离线时用作账本列表兜底
+  Future<List<Book>> _mirrorBooks() async {
+    try {
+      final rows = await LocalDb.instance.getBooks();
+      return rows
+          .map((r) => Book(
+                id: ((r['id'] ?? 0) as num).toInt(),
+                name: (r['name'] ?? '') as String,
+                ownerId: ((r['owner_id'] ?? 0) as num).toInt(),
+                role: (r['role'] ?? 'editor') as String,
+                members: ((r['members'] ?? 0) as num).toInt(),
+                flows: ((r['flows'] ?? 0) as num).toInt(),
+              ))
+          .toList();
+    } catch (_) {
+      return const <Book>[];
+    }
+  }
 }
 
 final sessionProvider =
