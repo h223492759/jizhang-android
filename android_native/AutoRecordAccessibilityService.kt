@@ -58,11 +58,20 @@ class AutoRecordAccessibilityService : AccessibilityService() {
     )
 
     // v2.0.1：覆盖支付宝/微信日常入口页 + 原列表页（修「打开就记」主因之一）
-    private val listPageTopKw = listOf(
+    // v2.2.24 拆成两组（修「支付成功页被当成历史明细页」漏记）：
+    //   2026-09-19 11:23 支付宝碰一碰成功后页面顶部是「支付成功，回首页，佳丰生活超市黄村店」，
+    //   旧逻辑用 top.contains("首页") 判定 → "回首页".contains("首页")=true → 整笔被丢弃（漏记）。
+    //   ① exact：短导航词（首页/我的/服务…）**必须整段相等**才算命中，
+    //      "回首页"/"客户服务"/"送朋友" 这类按钮/营销文案不再误伤；
+    //   ② contains：列表页特征长词，段内含即算命中（"账单明细"、"交易记录"…）。
+    private val listPageTopExactKw = listOf(
         "我的", "朋友", "通讯录", "消息", "聊天", "首页", "扫一扫",
-        "付款码", "收钱码", "卡包", "余额", "好友", "服务",
-        // 原列表页
-        "账单", "明细", "交易记录", "收支", "流水", "历史", "全部"
+        "付款码", "收钱码", "卡包", "余额", "服务", "全部", "收藏", "设置"
+    )
+    private val listPageTopContainsKw = listOf(
+        "账单", "明细", "交易记录", "收支", "流水", "历史", "账户余额", "待还",
+        // 入口页的按钮/栏位文案（整段经常带前后缀，故用 contains；支付结果页不会出现）
+        "客户服务", "搜索好友", "好友", "我的户号", "缴费记录"
     )
 
     // 命中冷却：同「包|金额」30s 内只入队一次（防同一结果页/同额行反复触发误抓；
@@ -99,8 +108,13 @@ class AutoRecordAccessibilityService : AccessibilityService() {
         }
         if (texts.isEmpty()) return
         // 顶部词疑似历史明细页 → 不记（防浏览旧账单被当成新支付）
-        val top = texts.take(3).joinToString("，")
-        if (listPageTopKw.any { top.contains(it) }) {
+        // v2.2.24：①短导航词改整段相等匹配（"回首页" 不再命中 "首页"，修碰一碰漏记）
+        //          ②顶部已出现【完成态强信号词】→ 判定为支付结果页，结果页优先，
+        //            直接跳过列表页启发式（历史明细页顶部极少出现「支付成功」这类完成态词）
+        val topSegs = texts.take(3).map { it.trim() }
+        val top = topSegs.joinToString("，")
+        val topIsResultPage = topSegs.any { seg -> strongKw.any { seg.contains(it) } }
+        if (!topIsResultPage && isListPageTop(topSegs)) {
             logFile("[无障碍] 顶部命中列表词，疑似历史明细，跳过 pkg=$pkg top=$top")
             return
         }
@@ -131,7 +145,16 @@ class AutoRecordAccessibilityService : AccessibilityService() {
         val winStart = (kwIdx - 30).coerceAtLeast(0)
         val winEnd = (kwIdx + kw.length + 30).coerceAtMost(all.length)
         val window = all.substring(winStart, winEnd)
-        val amt = extractAmount(window)
+        // v2.2.24：成功页常把「￥」和数字放进两个可访问性节点，页面文本就成了
+        // 「支付成功，回首页，￥，12.00」→ 严格正则匹配不到 → 旧逻辑判「窗口内无金额」丢弃整笔
+        // （2026-09-19 碰一碰漏记的第二道闸）。依次尝试：严格(±30) → 宽松(±30) → 宽松(±60)。
+        var amt = extractAmount(window)
+        if (amt.isEmpty()) amt = extractAmountLoose(window)
+        if (amt.isEmpty()) {
+            val w2s = (kwIdx - 60).coerceAtLeast(0)
+            val w2e = (kwIdx + kw.length + 60).coerceAtMost(all.length)
+            amt = extractAmountLoose(all.substring(w2s, w2e))
+        }
         // v2.0.1：窗口内既无金额也无「0 元 / 0.00 / 免支付」明确字样 → 跳过不入账
         // （修「打开支付宝就记 0 元占位」问题；保留 0 元保底以防页面无金额的成功页漏记）
         if (amt.isEmpty()) {
@@ -201,12 +224,37 @@ class AutoRecordAccessibilityService : AccessibilityService() {
         }
     }
 
+    /** 顶部三词是否像「列表 / 入口页」（历史明细页防误抓）；见 listPageTopExactKw 注释 */
+    private fun isListPageTop(segs: List<String>): Boolean {
+        for (raw in segs) {
+            val s = raw.trim()
+            if (s.isEmpty()) continue
+            if (listPageTopExactKw.any { it == s }) return true
+            if (listPageTopContainsKw.any { s.contains(it) }) return true
+        }
+        return false
+    }
+
     /** 金额提取（与通知监听同款正则族：¥xx / xx元 / xx人民币），归一化两位小数 */
     private fun extractAmount(all: String): String {
         val m = Regex("[¥￥]\\s*([0-9]+(?:\\.[0-9]{1,2})?)").find(all)
             ?: Regex("([0-9]+(?:\\.[0-9]{1,2})?)\\s*(?:元|人民币)").find(all)
             ?: Regex("(?:人民币|RMB)\\s*([0-9]+(?:\\.[0-9]{1,2})?)").find(all)
-        val v = m?.groupValues?.getOrNull(1) ?: return ""
+        return normAmount(m?.groupValues?.getOrNull(1))
+    }
+
+    /**
+     * 宽松金额提取（v2.2.24）：容忍「￥」与数字被拆成两个节点——
+     * 中间只允许空白/常见分隔符（，,、:：）最多 4 个，**不允许汉字**，
+     * 避免把「￥ 余额 1000.00」这类无关数字当成支付金额。
+     */
+    private fun extractAmountLoose(all: String): String {
+        val m = Regex("[¥￥][\\s，,、:：]{0,4}?([0-9]+(?:\\.[0-9]{1,2})?)").find(all)
+        return normAmount(m?.groupValues?.getOrNull(1))
+    }
+
+    private fun normAmount(v: String?): String {
+        if (v.isNullOrEmpty()) return ""
         return try {
             String.format(Locale.US, "%.2f", v.toDouble())
         } catch (_: Exception) {

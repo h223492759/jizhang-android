@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:jizhang_android/core/theme.dart';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:jizhang_android/core/build_info.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:path_provider/path_provider.dart';
@@ -16,7 +18,10 @@ import 'package:jizhang_android/screens/record/auto_record_dialog.dart';
 /// 解析金额/方向/商户 → 排除规则 → 去重 → 直接自动记账（source=auto，带 AI 标识）。
 /// 误记时在流水详情页点「不再记」删除并加入忽略名单。
 class AutoRecordService {
-  // 运行日志（最近 50 条，可一键复制给开发者）
+  // 运行日志（最近 _kLogMax 条，可一键复制给开发者）
+  // v2.2.24：留存 50 → 300 条（无障碍通道日志量大，50 条几小时就滚没了）；
+  // 且会同步到服务端（client_logs 表，**不限条数**）——家人反馈「某笔没记上」时可后台回查。
+  static const int _kLogMax = 300;
   final List<String> _logs = [];
   final ValueNotifier<List<String>> _logsListenable = ValueNotifier([]);
   static const _logSpKey = 'auto_record_logs';
@@ -47,6 +52,9 @@ class AutoRecordService {
         loaded.addAll((jsonDecode(file.readAsStringSync()) as List).cast<String>().where((x) => x.isNotEmpty));
       }
     } catch (_) {}
+    // 3) 内存里已有的（v2.2.24：SP 写入是异步的，刚落库的行可能还没进 SP，
+    //    不带上会被这次重排"吃掉"——日志同步上传时尤其明显）
+    loaded.addAll(_logs);
     // 去重（按行精确匹配，避免 sp/file 重复行）
     final unique = <String>[];
     final seen = <String>{};
@@ -58,7 +66,7 @@ class AutoRecordService {
     // （残留 '-' 与空格）→ int.tryParse 全部 null → 全落到 -1 → sort 完全失效，
     // 日志永远按「SP 组 + native 组」两块拼接显示（用户看到的"按类型分组"乱序）。
     unique.sort(_logCmpDesc);
-    if (unique.length > 50) unique.removeRange(50, unique.length);
+    if (unique.length > _kLogMax) unique.removeRange(_kLogMax, unique.length);
     _logs
       ..clear()
       ..addAll(unique);
@@ -101,17 +109,20 @@ class AutoRecordService {
     return kb.compareTo(ka);
   }
 
-  void recordLog(String msg) {
+  void recordLog(String msg, {bool markDirty = true}) {
     // v1.5.4 加日期前缀：跨天不会因 HH:mm:ss 撞车而乱序；与 native 端 SimpleDateFormat
     // ("yyyy-MM-dd HH:mm:ss") 保持一致（双端统一，loadPersistedLogs 排序正则一并改）
     final ts = DateTime.now().toString().substring(0, 19);
     final line = "[$ts] $msg";
-    // v1.5.5：运行期追加也保持降序时间线（add 后整体重排，≤50 条开销可忽略），
+    // v1.5.5：运行期追加也保持降序时间线（add 后整体重排，≤300 条开销可忽略），
     // 否则 UI 显示的日志会混入未排序的实时行
     _logs.add(line);
     _logs.sort(_logCmpDesc);
-    if (_logs.length > 50) _logs.removeRange(50, _logs.length);
+    if (_logs.length > _kLogMax) _logs.removeRange(_kLogMax, _logs.length);
     _logsListenable.value = List.from(_logs);
+    // v2.2.24：有新的业务日志 → 标记待上传（上传结果自身用 markDirty:false，避免"上传→
+    // 产生新日志→又上传"的自我循环）
+    if (markDirty) _logDirty = true;
     // 持久化（native 弹窗记录也写同一个 key，重启不清空）
     SharedPreferences.getInstance().then((sp) async {
       var raw = sp.getString(_logSpKey) ?? '[]';
@@ -122,9 +133,79 @@ class AutoRecordService {
         list = [];
       }
       list.add(line);
-      if (list.length > 50) list.removeAt(0);
+      if (list.length > _kLogMax) list.removeAt(0);
       await sp.setString(_logSpKey, jsonEncode(list));
     });
+  }
+
+  // ---------------- v2.2.24：运行日志同步到服务端 ----------------
+  // 本地只留最近 300 条，家人反馈「某笔没记上」时往往已经滚没了；服务端 client_logs
+  // 表**不限条数**，且 (book_id, device, ts, line) 唯一 → 客户端整包重传即可，
+  // 不用维护上传游标，重复行由服务端 INSERT OR IGNORE 丢掉。
+  bool _logDirty = true; // 首次启动就同步一次本地存量（true = 待上传）
+  bool _uploadingLogs = false;
+  DateTime? _lastLogUploadAt;
+  DateTime? _lastLogFailLogAt;
+  static const _kLogDeviceId = 'auto_log_device_id';
+
+  /// 设备标识（首次生成后持久化）：家人多设备时服务端能区分是哪一台传的
+  Future<String> logDeviceId() async {
+    final sp = await SharedPreferences.getInstance();
+    var id = sp.getString(_kLogDeviceId);
+    if (id == null || id.isEmpty) {
+      final r = Random();
+      final tail = List.generate(6, (_) => r.nextInt(16).toRadixString(16)).join();
+      id = '${Platform.operatingSystem}-$tail';
+      await sp.setString(_kLogDeviceId, id);
+    }
+    return id;
+  }
+
+  /// 节流上传本地日志（≥60s 一次，且仅在有新日志时）。
+  /// 由 processNow（启动 / 回前台 / 6s 轮询）驱动；失败静默，下次再传，绝不影响记账主流程。
+  Future<void> uploadLogsIfNeeded(WidgetRef ref) async {
+    if (_uploadingLogs || !_logDirty) return;
+    final now = DateTime.now();
+    if (_lastLogUploadAt != null &&
+        now.difference(_lastLogUploadAt!) < const Duration(seconds: 60)) {
+      return;
+    }
+    _lastLogUploadAt = now;
+    _uploadingLogs = true;
+    try {
+      final s = ref.read(sessionProvider);
+      if (!s.hasToken || !s.hasBook) return;
+      // 先合并 native 文件里的日志（App 没运行时由原生写入，只有这里能带上）
+      await loadPersistedLogs();
+      if (_logs.isEmpty) {
+        _logDirty = false;
+        return;
+      }
+      final device = await logDeviceId();
+      final r = await ref.read(apiProvider).uploadAutoLogs(
+            lines: List<String>.from(_logs),
+            device: device,
+            appVersion: '${BuildInfo.version}+${BuildInfo.tag}',
+          );
+      if (r['ok'] == true) {
+        _logDirty = false;
+        final n = (r['inserted'] as num?)?.toInt() ?? 0;
+        if (n > 0) {
+          recordLog('日志已同步后台：新增 $n 条（后台累计 ${r['total'] ?? '-'} 条）',
+              markDirty: false);
+        }
+      }
+    } catch (_) {
+      // 离线/服务器不可达：保持 _logDirty，下次再试（失败日志 10 分钟最多一条，防刷屏）
+      final t = DateTime.now();
+      if (_lastLogFailLogAt == null ||
+          t.difference(_lastLogFailLogAt!) > const Duration(minutes: 10)) {
+        _lastLogFailLogAt = t;
+        recordLog('日志同步失败（离线或服务器不可达），稍后自动重试', markDirty: false);
+      }
+    } finally {
+      _uploadingLogs = false;
+    }
   }
   static const _kChannel = 'jizhang/auto_record';
   // v1.5.4 修复：与 native 端通信的 MethodChannel 实例（native MainActivity.kt
@@ -604,6 +685,8 @@ class AutoRecordService {
     try {
       await _processQueue(ref, context);
     } catch (_) {}
+    // v2.2.24：顺带把本地日志同步到服务端（内部 60s 节流 + 待上传标记，未登录/离线自动跳过）
+    uploadLogsIfNeeded(ref).catchError((_) {});
   }
 
   // ---------------- 主流程 ----------------

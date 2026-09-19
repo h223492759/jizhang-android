@@ -177,6 +177,10 @@ object AutoRecordStore {
     private const val KEY_SILENT = "silent"
     private const val KEY_PAY_METHODS = "pay_methods_enabled"
 
+    // v2.2.24：本地运行日志留存上限（与 Flutter 端 AutoRecordService._kLogMax 保持一致）。
+    // 服务端（client_logs 表）不限条数，本地只做「最近 N 条」滚动缓冲。
+    const val LOG_MAX = 300
+
     // 静默模式：开启后自动记账只弹 heads-up 通知，不拉起 App 主界面（v2.1.0 默认 true）
     fun isSilent(ctx: Context): Boolean =
         sp(ctx).getBoolean(KEY_SILENT, true)
@@ -228,6 +232,8 @@ object AutoRecordStore {
 
     // 弹窗/处理日志：直接写文件到 app 私有目录（Flutter 端通过 path_provider 读同一文件）
     // 不通过 SharedPreferences，因为 native sp 文件 ≠ Flutter sp 文件（跨沙箱）
+    // v2.2.24：留存上限 50 → 300（无障碍通道日志量大，50 条几小时就滚没了）；
+    // 同时 Flutter 端会把日志同步到服务端【不限条数】留存，便于事后查漏记。
     fun appendLog(ctx: Context, msg: String) {
         val file = java.io.File(ctx.filesDir, "native_logs.json")
         val cur = try {
@@ -235,7 +241,7 @@ object AutoRecordStore {
         } catch (_: Exception) {
             JSONArray()
         }
-        while (cur.length() >= 50) cur.remove(0)
+        while (cur.length() >= AutoRecordStore.LOG_MAX) cur.remove(0)
         cur.put(msg)
         file.writeText(cur.toString())
     }

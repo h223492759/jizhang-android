@@ -226,6 +226,43 @@ class ApiClient {
     return ((d as Map)['list'] as List? ?? []).cast<Map<String, dynamic>>();
   }
 
+  // ================= 自动记账运行日志上报（v2.2.24） =================
+  /// 把本地日志缓冲整包上传到后台（服务端不限条数留存，便于回查漏记原因）。
+  /// 幂等：(book_id, device, ts, line) 唯一 → 重复行服务端自动忽略，客户端无需维护游标。
+  /// bookId 由拦截器自动带上（后台按账本隔离，家人各自的设备日志能区分）。
+  Future<Map<String, dynamic>> uploadAutoLogs({
+    required List<String> lines,
+    required String device,
+    String platform = 'android',
+    String appVersion = '',
+  }) async {
+    final d = await _req(() => _dio.post('/logs/client', data: {
+          'device': device,
+          'platform': platform,
+          'app_version': appVersion,
+          'lines': lines,
+        }));
+    return (d as Map).cast<String, dynamic>();
+  }
+
+  /// 后台留存的自动记账日志（分页查询，可选按设备/关键词过滤）
+  Future<Map<String, dynamic>> getAutoLogs({
+    int limit = 200,
+    int offset = 0,
+    String device = '',
+    String q = '',
+    String order = 'desc',
+  }) async {
+    final d = await _req(() => _dio.get('/logs/client', queryParameters: {
+          'limit': limit,
+          'offset': offset,
+          if (device.isNotEmpty) 'device': device,
+          if (q.isNotEmpty) 'q': q,
+          'order': order,
+        }));
+    return (d as Map).cast<String, dynamic>();
+  }
+
   Future<Overview> getOverview({String? start, String? end}) async {
     final q = <String, dynamic>{};
     if (start != null) q['start'] = start;

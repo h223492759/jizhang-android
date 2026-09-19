@@ -499,14 +499,14 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // 运行日志（最近 50 条，可一键复制给开发者定位）
+                // 运行日志（最近 300 条，可一键复制给开发者定位；同时自动同步到后台留存）
                 Card(
                   child: ExpansionTile(
                     leading: const Icon(Icons.list_alt, size: 18),
-                    title: const Text("自动记账日志（最新 50 条，最新在上）"),
+                    title: const Text("自动记账日志（最新 300 条，最新在上）"),
                     subtitle: ValueListenableBuilder(
                       valueListenable: AutoRecordService.instance.logsListenable,
-                      builder: (c, v, _) => Text("已记录 ${v.length} 条"),
+                      builder: (c, v, _) => Text("已记录 ${v.length} 条 · 自动同步到后台"),
                     ),
                     children: [
                       Padding(
@@ -525,10 +525,10 @@ class _AutoRecordSettingsPageState extends ConsumerState<AutoRecordSettingsPage>
                             const Spacer(),
                             TextButton.icon(
                               icon: const Icon(Icons.delete_outline, size: 14),
-                              label: const Text("清空"),
+                              label: const Text("清空本机"),
                               onPressed: () {
                                 AutoRecordService.instance.clearLogs();
-                                toast("已清空");
+                                toast("已清空本机日志（后台已同步的仍保留）");
                               },
                             ),
                           ],
