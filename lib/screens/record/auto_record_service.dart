@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:jizhang_android/core/auth_trace.dart';
 import 'package:jizhang_android/core/build_info.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
@@ -677,6 +678,15 @@ class AutoRecordService {
   void stopPolling() {
     _timer?.cancel();
     _timer = null;
+  }
+
+  /// v2.2.25：把「登录态」事件接进运行日志（这些日志会同步到服务端，后台不限条数）。
+  /// 用于事后定位「账户为什么被登出」——是启动没读到、还是被谁清了。
+  void attachAuthTrace() {
+    AuthTrace.sink = (msg) => recordLog(msg);
+    for (final line in AuthTrace.drain()) {
+      recordLog(line);
+    }
   }
 
   /// 立即处理一次待处理队列（App 启动 / 回到前台时调用）

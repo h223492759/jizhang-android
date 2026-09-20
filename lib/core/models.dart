@@ -14,7 +14,10 @@ class User {
     this.color,
   });
   factory User.fromJson(Map<String, dynamic> j) => User(
-        id: j['id'],
+        // ⚠️ 早期版本存下的 user_json 可能缺 id / 类型不对；
+        // 裸写 `j['id']` 赋给 `final int id` 会抛 TypeError，
+        // 而启动读盘的调用方在解析抛异常时会中断（用户看到「打开变登录页」）→ 这里容错。
+        id: (j['id'] as num?)?.toInt() ?? 0,
         username: j['username'] ?? '',
         nickname: j['nickname'] ?? j['username'] ?? '',
         role: j['role'] ?? 'user',
@@ -42,7 +45,8 @@ class Book {
     required this.flows,
   });
   factory Book.fromJson(Map<String, dynamic> j) => Book(
-        id: j['id'],
+        // 同 User.fromJson：持久化数据里 id 缺失/类型异常不能抛（否则启动读盘中断）
+        id: (j['id'] as num?)?.toInt() ?? 0,
         name: j['name'] ?? '',
         ownerId: j['owner_id'] ?? 0,
         role: j['role'] ?? 'editor',

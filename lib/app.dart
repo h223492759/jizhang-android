@@ -46,12 +46,40 @@ class RootRouter extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(sessionProvider);
+    // v2.2.25：登录态是异步从本地读出来的，读完之前不要判 hasServer/hasToken，
+    // 否则冷启动会先渲染「服务器 / 登录」页再跳走 —— 看起来就像「打开 App 被登出了」。
+    if (s.restoring) return const _RestoringPage();
     if (!s.hasServer) return const ServerListPage();
     if (!s.hasToken) return const LoginPage();
     if (!s.hasBook) return const BookPickerPage();
     // v2.2.23：按 bookId 作为 key —— 切换账本后整壳重建，各页重新取数，
     // 否则切完账本界面还是旧账本的数据（看起来像「切了没反应」）。
     return MainShell(key: ValueKey('shell-${s.bookId}'));
+  }
+}
+
+/// 启动时恢复本地登录态的过渡页（通常只有几十毫秒，正常看不到）
+class _RestoringPage extends StatelessWidget {
+  const _RestoringPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.account_balance_wallet, size: 56, color: AppColors.primaryDark),
+            const SizedBox(height: 16),
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -72,6 +100,9 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
     // 事件驱动同步（用户：离线极少，不需要 30s 高频轮询）：
     // 启动一次 + 从后台切回前台一次 + 写操作成功后（LocalFirstApi 内触发）
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // v2.2.25：把「登录态」事件接进运行日志（会同步到后台），
+      // 下次再出现「莫名登出」可直接查后台那一行知道是谁清的
+      AutoRecordService.instance.attachAuthTrace();
       AutoRecordService.instance.processNow(ref, context);
       AutoRecordService.instance.startPolling(ref, context);
       _sync();
