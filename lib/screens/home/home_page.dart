@@ -419,9 +419,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // ============ 点图标改分类 ============
+  // ============ 点图标改分类（v2.2.26：可同时切收入/支出） ============
   Future<void> _editCategory(Flow f) async {
-    final name = await showModalBottomSheet<String>(
+    final pick = await showModalBottomSheet<_CatPick>(
       context: context,
       isScrollControlled: true, // v260908：分类多时最后一行可滚动到底
       backgroundColor: AppPalette.card(context),
@@ -430,9 +430,16 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
       builder: (ctx) => _CategoryPickerSheet(cats: _cats, type: f.type),
     );
-    if (name != null && name.isNotEmpty) {
-      _update(f, {'category': name});
+    if (pick == null || pick.name.isEmpty) return;
+    final body = <String, dynamic>{'category': pick.name};
+    if (pick.type != f.type) {
+      // 换了收入/支出 → 金额符号跟着换（取绝对值，数值不变）：
+      // 服务端 amount 恒为正数、方向由 type 决定，列表里的 +/− 由 type 推导 —— 一并传绝对值，
+      // 保证任何存量数据（含带符号的）切过去后都落在「正数 + 正确方向」上。
+      body['type'] = pick.type;
+      body['amount'] = f.amount.abs();
     }
+    await _update(f, body);
   }
 
   // ============ 点名称改名 ============
@@ -594,6 +601,12 @@ class _YearMonthPickerState extends State<_YearMonthPicker> {
   }
 }
 
+class _CatPick {
+  final String type;
+  final String name;
+  const _CatPick(this.type, this.name);
+}
+
 class _CategoryPickerSheet extends ConsumerStatefulWidget {
   final List<Category> cats;
   final String type;
@@ -604,9 +617,43 @@ class _CategoryPickerSheet extends ConsumerStatefulWidget {
 }
 
 class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
+  /// v2.2.26：弹窗内可切「支出 / 收入」，默认跟随该流水当前方向。
+  /// 切过去选分类 = 该流水改方向（金额符号随之变化，数值不变）。
+  late String _type;
+
+  @override
+  void initState() {
+    super.initState();
+    _type = widget.type == 'income' ? 'income' : 'expense';
+  }
+
+  Widget _typeBtn(String t, String label) {
+    final active = _type == t;
+    final accent = t == 'expense' ? AppColors.expense : AppColors.income;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _type = t),
+        child: Container(
+          margin: const EdgeInsets.all(3),
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: BoxDecoration(
+            color: active ? accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          alignment: Alignment.center,
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                  color: active ? AppColors.card : AppPalette.textSecondary(context))),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cats = widget.cats.where((c) => c.type == widget.type).toList();
+    final cats = widget.cats.where((c) => c.type == _type).toList();
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -614,6 +661,25 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('选择分类', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 180,
+                  decoration: BoxDecoration(
+                    color: AppPalette.background(context),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      _typeBtn('expense', '支出'),
+                      _typeBtn('income', '收入'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             ConstrainedBox(
               constraints: BoxConstraints(
@@ -634,7 +700,7 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                   final c = cats[i];
                   // 点击任意分类即直接落库并关闭弹窗（无需再点"确定"）
                   return InkWell(
-                    onTap: () => Navigator.pop(context, c.name),
+                    onTap: () => Navigator.pop(context, _CatPick(_type, c.name)),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

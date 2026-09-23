@@ -854,7 +854,9 @@ class AutoRecordService {
       // （与手动记账行为一致：断网也能写本地）
       await ref.read(localApiProvider).createFlow(body);
       ref.read(dataVersionProvider.notifier).state++;
-      recordLog("已记账：${p.merchant} ¥${p.amount.toStringAsFixed(2)} ");
+      // v2.2.26：日志带上方向（收入/支出），便于事后在「记账日志」里核对方向判错
+      recordLog(
+          "已记账：${p.isIncome ? '收入' : '支出'} ${p.merchant} ¥${p.amount.toStringAsFixed(2)} ");
       // v260908：记账成功才弹一次 heads-up 提醒（此前每条通知入队都弹「已加入待处理」，弹窗太多）
       await _notifyRecorded(p);
     } catch (e) {
@@ -894,6 +896,30 @@ class AutoRecordService {
     // 无分类信息的支出通知保底用「餐饮」不符合直觉；改为「其他」（用户可在详情改）
     return isIncome ? '其他' : '其他';
   }
+
+  // ---- 收支方向词表（v2.2.26） ----
+  // ⚠️ 方向判断老写法是「在整段文本里找裸词 收入/收款/入账/到账/已收款」，只出现一边就算。
+  // 无障碍通道送上来的是**整页文本**（最多 600 字），页面上的营销文案/导航词
+  // （京东「…已到账」、美团「特惠好物已到账」）会把一笔支出翻成收入 ——
+  // 用户 2026-09-23 反馈「最近有几笔支出记成了收入」就是这个原因。
+  // 现在：标题（通知标题 / 无障碍「命中关键词」）优先 + 支出词优先 + 默认支出。
+  /// 支出方向词：只用**完成态/状态明确**的词。
+  /// ⚠️ 绝不收裸「支付」——那是平台名「微信支付 / 支付宝」的一部分，会把收入通知判成支出。
+  static const _expenseKw = <String>[
+    '支付成功', '付款成功', '成功付款', '支付完成', '已支付', '已付款',
+    '扣款成功', '已扣款', '扣款', '已消费', '消费', '支出', '已支出',
+    '还款成功', '已还款', '缴费',
+  ];
+  /// 收入方向词（强）：真收入通知的常用词，出现即算收入信号
+  static const _incomeKw = <String>[
+    '收入', '收款', '入账', '已收款', '收到转账',
+  ];
+  /// 收入方向词（弱）：只有「到账」——它同时是营销文案的常客
+  /// （「今日特惠好物已到账」「积分已到账」），所以仅在**没有营销词**时才当收入信号。
+  static const _incomeWeakKw = <String>['到账'];
+
+  static bool _hitAny(String s, List<String> kws) =>
+      s.isNotEmpty && kws.any((k) => s.contains(k));
 
   // 解析通知文本 → 结构化记录
   // v1.5.4：virtualKw/marketingKw 改为从 SP 读取（设置页可编辑/恢复默认）；
@@ -991,10 +1017,36 @@ class AutoRecordService {
     // 金额合理性区间（0.01 ~ 10万），防异常识别。占位 0 跳过此检查
     if (amount != 0 && (amount <= 0 || amount > 100000)) return null;
 
-    // ---- ③ 方向 ----
-    final isIncome =
-        text.contains('收入') || text.contains('收款') || text.contains('入账') ||
-        text.contains('到账') || text.contains('已收款');
+    // ---- ③ 方向（v2.2.26 重写：标题优先 + 支出优先 + 默认支出） ----
+    // 旧写法只看整段文本里有没有裸词「收入/收款/入账/到账」，无障碍通道的整页文本里
+    // 夹带的营销到账文案就能把支出翻成收入（用户 2026-09-23 反馈的几笔）。
+    // 判定顺序（先定结论的优先）：
+    //   ① 标题/命中关键词里只有支出完成态词（如「支付成功」）→ 支出，正文杂词不翻案；
+    //   ② 标题里只有收入词 → 收入；
+    //   ③ 标题无定论 → 再看正文：只出现支出词 → 支出；只出现收入词 → 收入；
+    //   ④ 两边都有 / 都没有 → 支出（本 App 主场景是花钱，误记收入的代价更高）。
+    final titleStr = (raw['title'] ?? '').toString();
+    final bodyStr = (raw['text'] ?? '').toString();
+    // 「到账」要额外过一遍营销词：命中营销（限时/特惠/优惠…）就不算收入信号
+    final marketingHit =
+        marketingKw.isNotEmpty && marketingKw.any((kw) => text.contains(kw));
+    bool incSig(String s) =>
+        _hitAny(s, _incomeKw) ||
+        (!marketingHit && _hitAny(s, _incomeWeakKw));
+    final tExp = _hitAny(titleStr, _expenseKw);
+    final tInc = incSig(titleStr);
+    final bExp = _hitAny(bodyStr, _expenseKw);
+    final bInc = incSig(bodyStr);
+    var isIncome = false;
+    if (tExp && !tInc) {
+      isIncome = false;
+    } else if (tInc && !tExp) {
+      isIncome = true;
+    } else if (bExp && !bInc) {
+      isIncome = false;
+    } else if (bInc && !bExp) {
+      isIncome = true;
+    }
 
     // ---- ④ 商户提取（升级版） ----
     // 平台词：出现即视为"未识别到商户"，需要从 text 里找
