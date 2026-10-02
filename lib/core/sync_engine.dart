@@ -6,6 +6,7 @@ import 'package:jizhang_android/core/api.dart';
 import 'package:jizhang_android/core/db.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
 import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/screens/record/auto_record_service.dart';
 
 enum SyncStatus {
   idle, // 空闲（未开始 / 上次成功）
@@ -28,6 +29,7 @@ class SyncEngine extends ChangeNotifier {
   String? lastError;
   bool _syncing = false;
   int _syncTick = 0; // 每次完成自增，供页面监听刷新
+  DateTime? _lastFailLogAt; // 失败日志节流（防离线时每次同步都刷一条）
 
   void bind(ApiClient api) {
     _api = api;
@@ -58,13 +60,23 @@ class SyncEngine extends ChangeNotifier {
       final lastFp = await db.getMeta(_fpKey(bookId));
       final fpResp = await a.getFingerprint(lastFp: lastFp);
       final unchanged = fpResp['unchanged'] == true;
-      await db.setMeta(_fpKey(bookId), (fpResp['fp'] ?? '') as String);
       if (!unchanged) {
-        // 3) 小表 + 流水并行拉取（互不依赖，一次网络往返时间）
-        await Future.wait([
-          _pullSmallTables(bookId, a),
-          _pullFlows(bookId, a),
-        ]);
+        // 3) 小表 + 流水并行拉取（互不依赖，一次网络往返时间）。
+        // _pullSmallTables 内部全部走 guard 吞错、永远不会抛 → 先 await 它
+        // 不会出现「一个 Future 报错后另一个 Future 的错误无人监听」。
+        final smallF = _pullSmallTables(bookId, a);
+        final flowsF = _pullFlows(bookId, a);
+        await smallF;
+        final flowRows = await flowsF;
+        // v2.2.27 修复：指纹必须等拉取【全部成功】之后再落盘！
+        // 旧版先存指纹再拉取：拉取一旦中途失败（网络抖动、任一请求超时），
+        // 指纹已被存成「最新」，之后每次同步服务器都返回 unchanged:true →
+        // 拉取被整体跳过，家庭成员新增的流水永远拉不到，直到服务器数据
+        // 再次变化才解锁（「队友记的账一直看不到、自己记一笔才出来」即此因）。
+        await db.setMeta(_fpKey(bookId), (fpResp['fp'] ?? '') as String);
+        AutoRecordService.instance.recordLog('[同步] 完成：流水变更 $flowRows 条');
+      } else {
+        AutoRecordService.instance.recordLog('[同步] 指纹一致，跳过拉取');
       }
       // 同步完成（无论 unchanged）：刷新 lastSyncAt → '我的'页能立即显示新时间
       lastSyncAt = DateTime.now();
@@ -84,6 +96,16 @@ class SyncEngine extends ChangeNotifier {
           s.contains('Failed host lookup');
       status = isNet ? SyncStatus.offline : SyncStatus.error;
       lastError = s;
+      // v2.2.27：失败也写运行日志（5 分钟最多一条，防离线时每次同步都刷）。
+      // 同步引擎此前零日志，「同步了但没数据」只能靠反推，无法定位。
+      final now = DateTime.now();
+      if (_lastFailLogAt == null ||
+          now.difference(_lastFailLogAt!) > const Duration(minutes: 5)) {
+        _lastFailLogAt = now;
+        AutoRecordService.instance.recordLog(
+            '[同步] 失败${isNet ? '（网络不可达）' : ''}：'
+            '${s.length > 120 ? s.substring(0, 120) : s}');
+      }
       notifyListeners();
       return false;
     } finally {
@@ -403,7 +425,8 @@ class SyncEngine extends ChangeNotifier {
   }
 
   // ---------------- 流水增量 / 全量 ----------------
-  Future<void> _pullFlows(int bookId, ApiClient a) async {
+  /// 拉取流水（增量/全量），返回写入本地镜像的变更行数（供运行日志展示）。
+  Future<int> _pullFlows(int bookId, ApiClient a) async {
     final db = LocalDb.instance;
     final since = await db.getMeta(_cursorKey(bookId));
     final d = await a.fetchFlowsSync(since: since);
@@ -432,6 +455,7 @@ class SyncEngine extends ChangeNotifier {
         DateTime.now().toIso8601String();
     await db.setMeta(_cursorKey(bookId), serverTime);
     lastSyncAt = DateTime.tryParse(serverTime.replaceFirst(' ', 'T'));
+    return rows.length;
   }
 
   Map<String, Object?> _flowToRow(int bookId, Map<String, dynamic> j) => {
