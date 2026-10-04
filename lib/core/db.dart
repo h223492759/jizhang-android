@@ -265,23 +265,27 @@ class LocalDb {
     }
     if (allIds.isEmpty) {
       if (useSafe) {
+        // v2.2.28：id > 0 保护——负 id 是本地未推送成功的流水（还在 outbox
+        // 排队补传），绝不能按「服务器已删」清掉（弱网流水消失事故根因之一）
         await d.rawDelete(
-            'DELETE FROM flows WHERE book_id=? AND (created_at IS NULL OR created_at < ?)',
+            'DELETE FROM flows WHERE book_id=? AND id > 0 '
+            'AND (created_at IS NULL OR created_at < ?)',
             [bookId, cutoff]);
       } else {
-        await d.delete('flows', where: 'book_id=?', whereArgs: [bookId]);
+        await d.delete('flows',
+            where: 'book_id=? AND id > 0', whereArgs: [bookId]);
       }
       return;
     }
     final marks = List.filled(allIds.length, '?').join(',');
     if (useSafe) {
       await d.rawDelete(
-          'DELETE FROM flows WHERE book_id=? AND id NOT IN ($marks) '
+          'DELETE FROM flows WHERE book_id=? AND id > 0 AND id NOT IN ($marks) '
           'AND (created_at IS NULL OR created_at < ?)',
           [bookId, ...allIds, cutoff]);
     } else {
       await d.rawDelete(
-          'DELETE FROM flows WHERE book_id=? AND id NOT IN ($marks)',
+          'DELETE FROM flows WHERE book_id=? AND id > 0 AND id NOT IN ($marks)',
           [bookId, ...allIds]);
     }
   }
@@ -594,6 +598,58 @@ class LocalDb {
   Future<void> removeOutbox(int id) async {
     final d = await db;
     await d.delete('outbox', where: 'id=?', whereArgs: [id]);
+  }
+
+  /// v2.2.28 改写队列中某条流水的 create 操作 body（负 id 本地编辑走本地路径时用）：
+  /// 按 uuid 定位（create 入队只带 uuid），patch 合并进原 body。返回是否找到。
+  Future<bool> mergeOutboxFlowCreate(
+      {String? uuid, int? entityId, required Map<String, dynamic> patch}) async {
+    final d = await db;
+    final rows = await d.query('outbox',
+        where: "entity='flow' AND op='create'", orderBy: 'id');
+    for (final r in rows) {
+      final rUuid = r['uuid'] as String?;
+      final rEid = (r['entity_id'] as num?)?.toInt();
+      final uuidHit = uuid != null && uuid.isNotEmpty && rUuid == uuid;
+      final eidHit = entityId != null && rEid == entityId;
+      if (!uuidHit && !eidHit) continue;
+      final bodyRaw = r['body'] as String?;
+      final body = bodyRaw == null
+          ? <String, dynamic>{}
+          : jsonDecode(bodyRaw) as Map<String, dynamic>;
+      body.addAll(patch);
+      await d.update('outbox', {'body': jsonEncode(body)},
+          where: 'id=?', whereArgs: [r['id'] as int]);
+      return true;
+    }
+    return false;
+  }
+
+  /// v2.2.28 撤回队列中某条流水的 create 操作（负 id 本地删除时用）。返回是否找到。
+  Future<bool> removeOutboxFlowCreate({String? uuid}) async {
+    if (uuid == null || uuid.isEmpty) return false;
+    final d = await db;
+    final n = await d.delete('outbox',
+        where: "entity='flow' AND op='create' AND uuid=?", whereArgs: [uuid]);
+    return n > 0;
+  }
+
+  /// v2.2.28 按 client_uuid 查本地流水 id（补传 update/delete 时解析负 id 用）
+  Future<int?> flowIdByUuid(String uuid) async {
+    final d = await db;
+    final r = await d.query('flows',
+        columns: ['id'], where: 'client_uuid=?', whereArgs: [uuid], limit: 1);
+    if (r.isEmpty) return null;
+    return (r.first['id'] as num).toInt();
+  }
+
+  /// v2.2.28 补传成功后：把负 id 临时行原地提升为服务器真实 id
+  /// （保留 created_at 等本地信息，不依赖后续拉取回填——万一拉取失败本地也不丢）。
+  /// 行已被拉取替换（id>0）或已被删除时返回 0。
+  Future<int> promoteTmpFlow(String uuid, int realId) async {
+    final d = await db;
+    return d.rawUpdate('UPDATE flows SET id=?, dirty=0 WHERE client_uuid=? AND id<0',
+        [realId, uuid]);
   }
 
   Future<void> bumpRetries(int id) async {

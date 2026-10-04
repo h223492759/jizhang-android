@@ -433,27 +433,18 @@ final w = await _api.getWallets();
     final bookId = await _curBook();
     final db = LocalDb.instance;
     final uuid = SyncEngine.newUuid();
-    try {
-      final id = await _api.createFlow({...body, 'uuid': uuid});
-      await db.upsertFlow(_rowFromBody(bookId, id, body));
-      await _safeOpLog(bookId,
-          op: 'createFlow', entity: 'flow', entityId: id, uuid: uuid,
-          summary: '新增流水 ${_flowSummary(body, id: id)}', status: 'ok');
-      _syncAfterWrite(); // 写成功 → 触发一次同步（常用名/小表刷新；指纹可跳过）
-      return id;
-    } catch (e) {
-      if (_isNetworkErr(e)) {
-        final tmpId = -DateTime.now().millisecondsSinceEpoch;
-        await db.upsertFlow(
-            _rowFromBody(bookId, tmpId, body, uuid: uuid, dirty: true));
-        await db.enqueue('create', 'flow', uuid: uuid, body: body);
-        await _safeOpLog(bookId,
-            op: 'createFlow', entity: 'flow', uuid: uuid,
-            summary: '新增流水 ${_flowSummary(body)}', status: 'queued');
-        return tmpId;
-      }
-      rethrow;
-    }
+    // v2.2.28 本地先行：立即写镜像（负 id 临时行）+ 入队，UI 零等待；
+    // 推送由同步引擎补传（网络好时秒级完成并用真实 id 原地提升临时行）。
+    // 之前在线直发等服务器返回，弱网下要等满超时才落本地 →「半天没反应」。
+    final tmpId = -DateTime.now().millisecondsSinceEpoch;
+    await db.upsertFlow(
+        _rowFromBody(bookId, tmpId, body, uuid: uuid, dirty: true));
+    await db.enqueue('create', 'flow', uuid: uuid, body: body);
+    await _safeOpLog(bookId,
+        op: 'createFlow', entity: 'flow', uuid: uuid,
+        summary: '新增流水 ${_flowSummary(body)}', status: 'queued');
+    _syncAfterWrite();
+    return tmpId;
   }
 
   /// 写操作成功后触发一次同步（事件驱动：用户离线极少，不需要 30s 轮询）。
@@ -468,72 +459,75 @@ final w = await _api.getWallets();
     } catch (_) {}
   }
 
-  /// 修改流水：true=在线成功，false=离线入队（已写入本地镜像+出站队列，连网后补传）。
-  /// 抛出的异常是真正的非网络错误（如服务器 400、参数错等）。
+  /// 修改流水：v2.2.28 本地先行——立即写本地镜像（UI 零等待），推送交给
+  /// 同步引擎补传。返回值恒为 false（本地已生效、待推送），不再有「在线等
+  /// 服务器返回」的阻塞路径（弱网下等满超时就是「改了半天没反应」的来源）。
   Future<bool> updateFlow(int id, Map<String, dynamic> body) async {
     final bookId = await _curBook();
     final db = LocalDb.instance;
     final existing = await db.flowById(id);
-    try {
+    if (existing == null) {
+      // 本地没有该行（异常兜底）：在线直改，让真正的错误正常暴露给用户
       await _api.updateFlow(id, body);
-      // 同步更新本地镜像（关键）：否则首页/流水列表读本地仍是旧值，
-      // 必须切页重进才触发重新同步才会刷新
-      if (existing != null) {
-        final updated = <String, Object?>{...existing, ...body, 'id': id, 'dirty': 0};
-        // flow_time 保持原值（用户澄清：不改时间就留在原日期分组），
-        // 修改时间写 updated_at → 该日期分组内修改过的流水排最上方
-        if (!body.containsKey('flow_time')) {
-          updated['flow_time'] = existing['flow_time'];
-        }
-        updated['updated_at'] = _nowFull();
-        await db.upsertFlow(updated);
-      }
       await _safeOpLog(bookId,
           op: 'updateFlow', entity: 'flow', entityId: id,
           summary: '修改流水 ${_flowSummary(body, id: id)}', status: 'ok');
       _syncAfterWrite();
       return true;
-    } catch (e) {
-      if (_isNetworkErr(e) && existing != null) {
-        // 离线：同样把修改后的值写回本地镜像（dirty=1），否则首页读本地还是旧值，
-        // 用户会以为"改了没反应"。出站队列会在联网后补传服务器。
-        final updated = <String, Object?>{...existing, ...body, 'id': id, 'dirty': 1};
-        if (!body.containsKey('flow_time')) {
-          updated['flow_time'] = existing['flow_time'];
-        }
-        updated['updated_at'] = _nowFull();
-        await db.upsertFlow(updated);
-        await db.enqueue('update', 'flow', entityId: id, body: body);
-        await _safeOpLog(bookId,
-            op: 'updateFlow', entity: 'flow', entityId: id,
-            summary: '修改流水 ${_flowSummary(body, id: id)}', status: 'queued');
-        return false;
-      }
-      rethrow;
     }
+    // 本地先行：dirty=1，拉取对账按 outbox 跳过覆盖该行
+    final updated = <String, Object?>{...existing, ...body, 'id': id, 'dirty': 1};
+    // flow_time 保持原值（用户澄清：不改时间就留在原日期分组），
+    // 修改时间写 updated_at → 该日期分组内修改过的流水排最上方
+    if (!body.containsKey('flow_time')) {
+      updated['flow_time'] = existing['flow_time'];
+    }
+    updated['updated_at'] = _nowFull();
+    await db.upsertFlow(updated);
+    if (id < 0) {
+      // 未推送成功的新建流水：改写队列里的 create body（绝不直发 PUT，
+      // 负 id 服务器 404 →「改分类没反应」事故根因之二）
+      final uuid = (existing['client_uuid'] as String?) ?? '';
+      final merged = await db.mergeOutboxFlowCreate(uuid: uuid, patch: body);
+      if (!merged) {
+        // 罕见竞态：create 刚补传成功 → 入 update，重放时按 uuid 解析真实 id
+        await db.enqueue('update', 'flow',
+            body: {...body, 'client_uuid': uuid});
+      }
+    } else {
+      await db.enqueue('update', 'flow', entityId: id, body: body);
+    }
+    await _safeOpLog(bookId,
+        op: 'updateFlow', entity: 'flow', entityId: id,
+        summary: '修改流水 ${_flowSummary(body, id: id)}', status: 'queued');
+    _syncAfterWrite();
+    return false;
   }
 
   Future<void> deleteFlow(int id) async {
     final bookId = await _curBook();
     final db = LocalDb.instance;
-    try {
-      await _api.deleteFlow(id);
-      await db.deleteFlowById(id);
-      await _safeOpLog(bookId,
-          op: 'deleteFlow', entity: 'flow', entityId: id,
-          summary: '删除流水#$id', status: 'ok');
-      _syncAfterWrite();
-    } catch (e) {
-      if (_isNetworkErr(e)) {
-        await db.deleteFlowById(id);
-        await db.enqueue('delete', 'flow', entityId: id);
-        await _safeOpLog(bookId,
-            op: 'deleteFlow', entity: 'flow', entityId: id,
-            summary: '删除流水#$id', status: 'queued');
-        return;
-      }
-      rethrow;
+    String uuid = '';
+    if (id < 0) {
+      final row = await db.flowById(id);
+      uuid = (row?['client_uuid'] as String?) ?? '';
     }
+    // v2.2.28 本地先行：立即删除（UI 零等待），推送交给同步引擎补传
+    await db.deleteFlowById(id);
+    if (id < 0) {
+      // 未推送成功的新建：撤回队列里的 create（否则补传会把已删的又建回来）；
+      // 已不在队列（罕见竞态）→ 入 delete，重放时按 uuid 解析真实 id
+      final removed = await db.removeOutboxFlowCreate(uuid: uuid);
+      if (!removed) {
+        await db.enqueue('delete', 'flow', body: {'client_uuid': uuid});
+      }
+    } else {
+      await db.enqueue('delete', 'flow', entityId: id);
+    }
+    await _safeOpLog(bookId,
+        op: 'deleteFlow', entity: 'flow', entityId: id,
+        summary: '删除流水#$id', status: 'queued');
+    _syncAfterWrite();
   }
 
   /// 流水操作的日志摘要：名称（空则分类）＋金额；信息不足时回落 #id

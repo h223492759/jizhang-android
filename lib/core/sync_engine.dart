@@ -135,31 +135,75 @@ class SyncEngine extends ChangeNotifier {
         await LocalDb.instance.removeOutbox(id);
         replayed = true;
       } catch (e) {
-        await LocalDb.instance.bumpRetries(id);
-        rethrow; // 网络或服务器错误：中止补传，等待下次同步
+        if (_isNetErr(e)) {
+          await LocalDb.instance.bumpRetries(id);
+          rethrow; // 网络错误：中止补传，等待下次同步
+        }
+        // v2.2.28 服务器明确拒绝（400/404 等）＝重试永远不会成功：
+        // 移除该条并记日志，防止毒丸卡死整个队列
+        await LocalDb.instance.removeOutbox(id);
+        final msg = e.toString();
+        AutoRecordService.instance.recordLog('[同步] 补传失败(已跳过)：$op ${msg.length > 80 ? msg.substring(0, 80) : msg}');
       }
     }
     // 有补传成功 → 重拉小表保证镜像一致
     if (replayed) await _pullSmallTables(bookId, a);
   }
 
+  /// v2.2.28 网络类错误判定（与 LocalFirstApi._isNetworkErr 同口径）：
+  /// 网络错误 → 保留队列重试；其余（400/404 等）→ 永久失败，跳过防毒丸。
+  bool _isNetErr(Object e) {
+    final s = e.toString();
+    return s.contains('SocketException') ||
+        s.contains('Connection') ||
+        s.contains('timed out') ||
+        s.contains('TimeoutException') ||
+        s.contains('HandshakeException') ||
+        s.contains('Failed host lookup') ||
+        s.contains('网络');
+  }
+
   Future<void> _replay(ApiClient a, String op, int? entityId, String? uuid,
       Map<String, dynamic> body, int bookId) async {
     switch (op) {
-      // ---- 流水 ----
-      case 'createFlow':
+      // ---- 流水（op 名必须与 LocalFirstApi 入队一致：create/update/delete。
+      // v2.2.28 前这里误写成 createFlow/updateFlow/deleteFlow，与入队名对不上
+      // → 全部落入 default 被静默丢弃，弱网流水「记了又消失」的根因） ----
+      case 'create':
         final newId = await a.createFlow({...body, 'uuid': uuid ?? ''});
         if (uuid != null && uuid.isNotEmpty) {
-          await LocalDb.instance.deleteFlowByUuid(uuid);
+          // 用服务器真实 id 原地提升负 id 临时行（保留 created_at/本地编辑），
+          // 不依赖后续拉取回填——万一拉取失败本地也不会丢这条流水
+          await LocalDb.instance.promoteTmpFlow(uuid, newId);
         }
         break;
-      case 'updateFlow':
-        await a.updateFlow(body['id'] as int, body);
-        await LocalDb.instance.markDirty(body['id'] as int, false);
+      case 'update':
+        // 用 entityId（入队时带的），body 里从来没有 id 字段——
+        // 旧代码从 body 里强取 id 是潜伏空指针毒丸；负/缺 id 时按 uuid 解析
+        var rid = entityId ?? 0;
+        if (rid <= 0) {
+          final cu = (body['client_uuid'] as String?) ?? '';
+          if (cu.isNotEmpty) {
+            rid = await LocalDb.instance.flowIdByUuid(cu) ?? 0;
+          }
+        }
+        if (rid > 0) {
+          await a.updateFlow(rid, body);
+          await LocalDb.instance.markDirty(rid, false);
+        }
         break;
-      case 'deleteFlow':
-        await a.deleteFlow(body['id'] as int);
-        await LocalDb.instance.deleteFlowById(body['id'] as int);
+      case 'delete':
+        var did = entityId ?? 0;
+        if (did <= 0) {
+          final cu = (body['client_uuid'] as String?) ?? '';
+          if (cu.isNotEmpty) {
+            did = await LocalDb.instance.flowIdByUuid(cu) ?? 0;
+          }
+        }
+        if (did > 0) {
+          await a.deleteFlow(did);
+          await LocalDb.instance.deleteFlowById(did);
+        }
         break;
       // ---- 预算（budgets 天然幂等） ----
       case 'setBudget':
