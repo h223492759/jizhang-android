@@ -491,17 +491,31 @@ final w = await _api.getWallets();
       final merged = await db.mergeOutboxFlowCreate(uuid: uuid, patch: body);
       if (!merged) {
         // 罕见竞态：create 刚补传成功 → 入 update，重放时按 uuid 解析真实 id
+        final opUuid = SyncEngine.newUuid();
         await db.enqueue('update', 'flow',
-            body: {...body, 'client_uuid': uuid});
+            uuid: opUuid, body: {...body, 'client_uuid': uuid});
+        await _safeOpLog(bookId,
+            op: 'updateFlow', entity: 'flow', entityId: id, uuid: opUuid,
+            summary: '修改流水 ${_flowSummary(body, id: id)}', status: 'queued');
+        _syncAfterWrite();
+        return false;
       }
+      // 已并入 create op：op_log 挂在 create 的 uuid 上，create 补传成功时一并回写
+      await _safeOpLog(bookId,
+          op: 'updateFlow', entity: 'flow', entityId: id, uuid: uuid,
+          summary: '修改流水 ${_flowSummary(body, id: id)}', status: 'queued');
+      _syncAfterWrite();
+      return false;
     } else {
-      await db.enqueue('update', 'flow', entityId: id, body: body);
+      // v2.2.29：入队行带 opUuid，补传成功/失败后回写操作日志状态
+      final opUuid = SyncEngine.newUuid();
+      await db.enqueue('update', 'flow', entityId: id, uuid: opUuid, body: body);
+      await _safeOpLog(bookId,
+          op: 'updateFlow', entity: 'flow', entityId: id, uuid: opUuid,
+          summary: '修改流水 ${_flowSummary(body, id: id)}', status: 'queued');
+      _syncAfterWrite();
+      return false;
     }
-    await _safeOpLog(bookId,
-        op: 'updateFlow', entity: 'flow', entityId: id,
-        summary: '修改流水 ${_flowSummary(body, id: id)}', status: 'queued');
-    _syncAfterWrite();
-    return false;
   }
 
   Future<void> deleteFlow(int id) async {
@@ -519,13 +533,28 @@ final w = await _api.getWallets();
       // 已不在队列（罕见竞态）→ 入 delete，重放时按 uuid 解析真实 id
       final removed = await db.removeOutboxFlowCreate(uuid: uuid);
       if (!removed) {
-        await db.enqueue('delete', 'flow', body: {'client_uuid': uuid});
+        final opUuid = SyncEngine.newUuid();
+        await db.enqueue('delete', 'flow', uuid: opUuid,
+            body: {'client_uuid': uuid});
+        await _safeOpLog(bookId,
+            op: 'deleteFlow', entity: 'flow', entityId: id, uuid: opUuid,
+            summary: '删除流水#$id', status: 'queued');
+      } else {
+        // create 已随撤回消失（从未到服务器）→ 两条相关日志直接置为已处理，
+        // 不再永远挂「待同步」
+        await db.markOpLogOkByUuid(uuid);
+        await _safeOpLog(bookId,
+            op: 'deleteFlow', entity: 'flow', entityId: id,
+            summary: '删除流水#$id', status: 'ok');
       }
-    } else {
-      await db.enqueue('delete', 'flow', entityId: id);
+      _syncAfterWrite();
+      return;
     }
+    // v2.2.29：入队行带 opUuid，补传成功/失败后回写操作日志状态
+    final opUuid = SyncEngine.newUuid();
+    await db.enqueue('delete', 'flow', entityId: id, uuid: opUuid);
     await _safeOpLog(bookId,
-        op: 'deleteFlow', entity: 'flow', entityId: id,
+        op: 'deleteFlow', entity: 'flow', entityId: id, uuid: opUuid,
         summary: '删除流水#$id', status: 'queued');
     _syncAfterWrite();
   }
@@ -611,6 +640,9 @@ final w = await _api.getWallets();
     Future<void> Function()? localApply,
   }) async {
     final bookId = await _curBook();
+    // v2.2.29：入队行与操作日志写同一个 uuid（调用方未传则生成 op 级 uuid），
+    // 补传成功/失败后由同步引擎按 uuid 回写操作日志状态
+    final opUuid = uuid ?? SyncEngine.newUuid();
     try {
       await online();
       await LocalDb.instance.addOpLog(bookId,
@@ -620,9 +652,9 @@ final w = await _api.getWallets();
     } catch (e) {
       if (_isNetworkErr(e)) {
         await LocalDb.instance.enqueue(op, entity,
-            entityId: entityId, uuid: uuid, body: body);
+            entityId: entityId, uuid: opUuid, body: body);
         await LocalDb.instance.addOpLog(bookId,
-            op: op, entity: entity, entityId: entityId, uuid: uuid,
+            op: op, entity: entity, entityId: entityId, uuid: opUuid,
             summary: summary, status: 'queued');
         if (localApply != null) await localApply();
         return;

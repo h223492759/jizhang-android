@@ -1177,7 +1177,10 @@ class AutoRecordService {
       'source': 'auto',
     };
     try {
-      await ref.read(apiProvider).createFlow(body);
+      // v2.2.29：改走 localApiProvider（本地先行 + outbox 入队）——
+      // 原来直连服务器，断网时直接 toast 失败、这笔账就丢了，
+      // 违反「离线飞行模式也能用」的硬要求；与直接落库路径(855行)对齐
+      await ref.read(localApiProvider).createFlow(body);
       toast('已记账：${result.description}');
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));

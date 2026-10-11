@@ -133,6 +133,15 @@ class SyncEngine extends ChangeNotifier {
       try {
         await _replay(a, op, entityId, uuid, body, bookId);
         await LocalDb.instance.removeOutbox(id);
+        // v2.2.29：补传成功 → 回写操作日志「待同步」→「已同步」。
+        // 旧版只删 outbox 行，ops_log 的 queued 状态永不更新，
+        // 重装事故里积压 op 早已投递成功却一直显示「待同步」，误导排障方向。
+        if (uuid != null && uuid.isNotEmpty) {
+          await LocalDb.instance.markOpLogOkByUuid(uuid);
+        } else if (entityId != null) {
+          // 旧版本积压行没有 uuid：按 entity_id 兜底（仅正 id 流水生效）
+          await LocalDb.instance.markOpLogOkByEntityId(entityId);
+        }
         replayed = true;
       } catch (e) {
         if (_isNetErr(e)) {
@@ -142,6 +151,10 @@ class SyncEngine extends ChangeNotifier {
         // v2.2.28 服务器明确拒绝（400/404 等）＝重试永远不会成功：
         // 移除该条并记日志，防止毒丸卡死整个队列
         await LocalDb.instance.removeOutbox(id);
+        // v2.2.29：永久失败 → 对应操作日志置为「失败」，不再永远显示待同步
+        if (uuid != null && uuid.isNotEmpty) {
+          await LocalDb.instance.markOpLogFailedByUuid(uuid);
+        }
         final msg = e.toString();
         AutoRecordService.instance.recordLog('[同步] 补传失败(已跳过)：$op ${msg.length > 80 ? msg.substring(0, 80) : msg}');
       }

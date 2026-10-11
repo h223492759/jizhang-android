@@ -793,6 +793,37 @@ class LocalDb {
         orderBy: 'id DESC', limit: limit);
   }
 
+  /// v2.2.29 补传成功后回写操作日志：该 op 对应的 queued 日志 → ok。
+  /// uuid 是 outbox 行与 ops_log 行的关联键（入队时两边写同一个 uuid）。
+  /// 没有它，「待同步」状态永远不回写——重装事故里积压 op 早已投递成功，
+  /// 操作日志页却一直显示「待同步」，直接误导了故障定位方向。
+  Future<void> markOpLogOkByUuid(String uuid) async {
+    if (uuid.isEmpty) return;
+    final d = await db;
+    await d.update('ops_log', {'status': 'ok'},
+        where: "status='queued' AND uuid=?", whereArgs: [uuid]);
+  }
+
+  /// v2.2.29 补传被服务器明确拒绝（永久失败）时：对应 queued 日志 → failed，
+  /// 避免「服务器都拒收了还显示待同步」。
+  Future<void> markOpLogFailedByUuid(String uuid) async {
+    if (uuid.isEmpty) return;
+    final d = await db;
+    await d.update('ops_log', {'status': 'failed'},
+        where: "status='queued' AND uuid=?", whereArgs: [uuid]);
+  }
+
+  /// v2.2.29 旧版本积压的 outbox 行没有 uuid：按 entity_id 兜底回写
+  /// （仅限正 id 的流水 update/delete；负 id 临时行由 uuid 路径覆盖）。
+  Future<void> markOpLogOkByEntityId(int entityId) async {
+    if (entityId <= 0) return;
+    final d = await db;
+    await d.rawUpdate(
+        "UPDATE ops_log SET status='ok' "
+        "WHERE status='queued' AND entity='flow' AND entity_id=?",
+        [entityId]);
+  }
+
   // outbox 待重试数量（日志页展示）
   Future<int> pendingOutboxCount() async {
     final d = await db;
