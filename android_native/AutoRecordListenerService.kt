@@ -95,8 +95,13 @@ class AutoRecordListenerService : NotificationListenerService() {
         // 记账成功与否由 App 端决定，成功后统一弹一次「已记账」提醒（AutoRecordStore.postRecordedHeadsUp）。
         val now = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.CHINA).format(java.util.Date())
         val srcLabel = pkgLabel(pkg)
-        val logLine = if (amt.isNotEmpty()) "[$now] 已入队待处理 $srcLabel ¥$amt | ${title}"
-                      else "[$now] 已入队待处理 $srcLabel | ${title}"
+        // v2.2.30：入队行带上【完整】通知原文（all = 标题+正文+大字文本+副标题），
+        // 此前只记 title，事后查「这笔为什么记成这样 / 为什么没记」时缺原文无从复盘。
+        // 换行压成空格、多余空白合并，保持「一行一条」的日志格式（日志区按行渲染/排序）。
+        val fullText = all.replace("\n", " ").replace("\r", " ")
+            .replace(Regex("\\s{2,}"), " ").trim()
+        val logLine = if (amt.isNotEmpty()) "[$now] 已入队待处理 $srcLabel ¥$amt | $fullText"
+                      else "[$now] 已入队待处理 $srcLabel | $fullText"
         AutoRecordStore.appendLog(this, logLine)
         // v2.2.0 静默开关语义保留：默认开启=记账后不自动打开 App（点通知可进查看）；
         // 用户关闭静默=入队后拉起 App 首页让 Flutter 即时处理（v260908 起不再弹 heads-up）

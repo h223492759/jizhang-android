@@ -187,7 +187,12 @@ class AutoRecordAccessibilityService : AccessibilityService() {
             val appended = AutoRecordStore.appendA11yPending(this, item)
             if (appended) {
                 lastEnqueueAt[sigKey] = System.currentTimeMillis()
-                logFile("[无障碍] 已入队 id=${id.takeLast(18)} amt=${amt.ifEmpty { "0元占位" }}")
+                // v2.2.30：入队行带上完整页面原文（取队列里实际参与解析的 text，上限 600 字，
+                // 与 appendA11yPending 存入的字段严格一致），事后可完整复盘触发文字。
+                val a11yText = item.optString("text")
+                    .replace("\n", " ").replace("\r", " ")
+                    .replace(Regex("\\s{2,}"), " ").trim()
+                logFile("[无障碍] 已入队 id=${id.takeLast(18)} amt=${amt.ifEmpty { "0元占位" }} | $a11yText")
                 // v260908：不再逐条弹「已加入待处理」heads-up（弹窗太多）；只在 Flutter
                 // 真正记账成功后统一弹一次「已记账」（AutoRecordStore.postRecordedHeadsUp）。
                 // v2.0.1：不调 launchMain 抢前台——用户要求「弹 heads-up 即可，跳转 App 太烦」
