@@ -224,8 +224,9 @@ class _AutoRecordDialogState extends ConsumerState<AutoRecordDialog> {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 11,
+                                    // v2.3.0：选中 chip 是黄底（primary），文字 #222（原白色 1.4:1）
                                     color: on
-                                        ? Colors.white
+                                        ? AppColors.text
                                         : AppPalette.text(context),
                                     fontWeight:
                                         on ? FontWeight.w600 : FontWeight.normal,

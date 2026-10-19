@@ -11,7 +11,9 @@ class AppColors {
   static const divider = Color(0xFFEEEEEE);
 
   static const text = Color(0xFF222222);
-  static const textSecondary = Color(0xFF888888);
+  // v2.3.0：#888888 在白底上只有 3.54:1（WCAG AA 要求 4.5:1），12~13px 次级文字大量
+  // 使用 → 加深为 #767676（4.54:1）；暗色档 textSecondaryDark 不变（10.3:1 已达标）
+  static const textSecondary = Color(0xFF767676);
 
   static const expense = Color(0xFFF04438); // 支出 红
   static const income = Color(0xFF2BA471); //  收入 绿

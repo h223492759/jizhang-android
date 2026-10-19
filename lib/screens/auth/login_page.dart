@@ -156,7 +156,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             OutlinedButton(
               onPressed: _loading ? null : _testConnection,
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryDark,
+                // v2.3.0：原 primaryDark 黄字在浅色页面底上只有 1.9:1，改中性深色字
+                foregroundColor: AppColors.text,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: const Text('测试连接', style: TextStyle(fontSize: 14)),

@@ -1151,13 +1151,15 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
           border: Border.all(color: AppPalette.divider(context), width: 0.5),
         ),
         child: Center(
+          // v2.3.0：黄底键（primaryDark）上的文字/图标用 #222 深色字 —— 原白色在黄底上
+          // 只有 1.8:1，违反「黄底+222」配色规范；#222 on #F7B500 = 8.8:1
           child: icon != null
-              ? Icon(icon, size: 22, color: primary ? Colors.white : AppPalette.text(context))
+              ? Icon(icon, size: 22, color: primary ? AppColors.text : AppPalette.text(context))
               : Text(label,
                   style: TextStyle(
                       fontSize: primary ? 18 : 20,
                       fontWeight: FontWeight.bold,
-                      color: primary ? Colors.white : AppPalette.text(context))),
+                      color: primary ? AppColors.text : AppPalette.text(context))),
         ),
       ),
     );

@@ -155,10 +155,11 @@ class _SimpleDatePickerSheetState extends State<_SimpleDatePickerSheet> {
                       child: Text(
                         '$day',
                         style: TextStyle(
+                          // v2.3.0：选中圈是黄底（primaryDark），文字用 #222（原白色 1.8:1 不达标）
                           color: !enabled
                               ? Colors.grey.shade300
                               : isSelected
-                                  ? Colors.white
+                                  ? AppColors.text
                                   : (w_sat_sun(date)
                                       ? Colors.grey
                                       : Colors.black87),
@@ -186,7 +187,8 @@ class _SimpleDatePickerSheetState extends State<_SimpleDatePickerSheet> {
                     onPressed: () => Navigator.pop(context, _selected),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryDark,
-                      foregroundColor: Colors.white,
+                      // v2.3.0：黄底按钮文字 #222（原白色对比 1.8:1）
+                      foregroundColor: AppColors.text,
                     ),
                     child: const Text('确定'),
                   ),
