@@ -12,6 +12,7 @@ enum SyncStatus {
   idle, // 空闲（未开始 / 上次成功）
   syncing, // 同步中（右上角小圈）
   offline, // 离线（网络不可达，静默）
+  authExpired, // 登录态失效（401）：只能重新登录，等网络恢复也不会自己好
   error, // 出错（可展示在设置页）
 }
 
@@ -30,9 +31,16 @@ class SyncEngine extends ChangeNotifier {
   bool _syncing = false;
   int _syncTick = 0; // 每次完成自增，供页面监听刷新
   DateTime? _lastFailLogAt; // 失败日志节流（防离线时每次同步都刷一条）
+  bool _authNotified = false; // 401 只上报一次，避免每次同步都弹一次重登
+
+  /// 登录态失效回调（由 MainShell 注册）：收到后切回登录页。
+  /// v2.3.1 之前 401 只体现在一句笼统的「离线或同步失败」里，
+  /// 用户完全不知道要重新登录，就这样连续几天「同步连不上」。
+  void Function(String reason)? onAuthExpired;
 
   void bind(ApiClient api) {
     _api = api;
+    _authNotified = false;
   }
 
   ApiClient get api => _api!;
@@ -82,18 +90,28 @@ class SyncEngine extends ChangeNotifier {
       lastSyncAt = DateTime.now();
       status = SyncStatus.idle;
       lastError = null;
+      _authNotified = false;
       _syncTick++;
       notifyListeners();
       return true;
     } catch (e) {
+      // 401（token 过期 / 用户被删 / 未登录）单独处理：
+      // 这不是网络问题，等多久都不会自己好，必须把用户送回登录页。
+      if (e is AuthExpiredException) {
+        status = SyncStatus.authExpired;
+        lastError = e.message;
+        AutoRecordService.instance.recordLog('[同步] 失败：登录态已失效（${e.message}）→ 需要重新登录，本地数据未受影响');
+        if (!_authNotified) {
+          _authNotified = true;
+          try {
+            onAuthExpired?.call(e.message);
+          } catch (_) {}
+        }
+        notifyListeners();
+        return false;
+      }
       final s = e.toString();
-      final isNet = s.contains('SocketException') ||
-          s.contains('Connection') ||
-          s.contains('网络') ||
-          s.contains('timed out') ||
-          s.contains('TimeoutException') ||
-          s.contains('HandshakeException') ||
-          s.contains('Failed host lookup');
+      final isNet = _isNetErr(e);
       status = isNet ? SyncStatus.offline : SyncStatus.error;
       lastError = s;
       // v2.2.27：失败也写运行日志（5 分钟最多一条，防离线时每次同步都刷）。
@@ -116,8 +134,33 @@ class SyncEngine extends ChangeNotifier {
   /// 记录刷新信号：页面可 watch 此字段触发重新读取本地
   int get tick => _syncTick;
 
+  /// v2.3.1：给界面用的一句话失败原因。
+  /// 旧版 lastError 全项目没有任何地方展示，用户只能看到笼统的
+  /// 「离线或同步失败，本地数据仍可正常使用」——401 也被这句话盖住。
+  String get lastErrorText {
+    switch (status) {
+      case SyncStatus.offline:
+        return '网络不可达，本地数据仍可正常使用，联网后自动补传';
+      case SyncStatus.authExpired:
+        return '登录已过期，请重新登录（本地数据不会丢失）';
+      case SyncStatus.error:
+        final e = (lastError ?? '').trim();
+        if (e.isEmpty) return '同步失败，本地数据仍可正常使用';
+        final i = e.indexOf('\n');
+        final oneLine = (i > 0 ? e.substring(0, i) : e).trim();
+        return '同步失败：$oneLine';
+      default:
+        return '';
+    }
+  }
+
   // ---------------- Outbox 补传（全实体分发器） ----------------
   Future<void> _flushOutbox(int bookId, ApiClient a) async {
+    // v2.3.1 自愈：先替「本地还是负 id、队列里却已经没有它的 op」的流水补一条 create。
+    // 这些是 ①401 被判永久失败 ②中文包装文案匹配不上网络错误 —— 两处缺陷的事故残留：
+    // 界面显示「已同步」，服务器上一笔都没有。补排队后立即被下面的循环补传上云。
+    // uuid 是服务端幂等键（book_id + client_uuid 去重），重复补排队不会产生重复流水。
+    await _requeueOrphanTempFlows(bookId);
     final rows = await LocalDb.instance.listOutbox();
     if (rows.isEmpty) return;
     var replayed = false;
@@ -144,9 +187,9 @@ class SyncEngine extends ChangeNotifier {
         }
         replayed = true;
       } catch (e) {
-        if (_isNetErr(e)) {
+        if (_isRetryable(e)) {
           await LocalDb.instance.bumpRetries(id);
-          rethrow; // 网络错误：中止补传，等待下次同步
+          rethrow; // 网络/登录态问题：中止补传，等待下次同步（队列一条不删）
         }
         // v2.2.28 服务器明确拒绝（400/404 等）＝重试永远不会成功：
         // 移除该条并记日志，防止毒丸卡死整个队列
@@ -163,8 +206,54 @@ class SyncEngine extends ChangeNotifier {
     if (replayed) await _pullSmallTables(bookId, a);
   }
 
+  /// v2.3.1：把「只存在于本地」的负 id 流水重新排进补传队列（返回本次补排队条数）。
+  ///
+  /// 判据：id < 0（从未成功推到服务器）且 outbox 里没有任何 op 挂着同一个 client_uuid。
+  /// 这是 create 被误判「永久失败」删队列后的孤儿行 —— 以前它们会永远留在手机上，
+  /// 用户只看到「服务器上少了几笔」，重登也没用。这里按原 uuid 重发一次 create，
+  /// 服务端 (book_id, client_uuid) 幂等，万一其实已经上云也只会返回已有 id。
+  Future<int> _requeueOrphanTempFlows(int bookId) async {
+    List<Map<String, Object?>> rows;
+    try {
+      rows = await LocalDb.instance.orphanTmpFlows(bookId, limit: 100);
+    } catch (_) {
+      return 0; // 老库没有 client_uuid 列等异常：自愈失败不影响正常同步
+    }
+    if (rows.isEmpty) return 0;
+    var n = 0;
+    for (final r in rows) {
+      final uu = (r['client_uuid'] as String?) ?? '';
+      if (uu.isEmpty) continue;
+      final ymd = (r['flow_time'] ?? '').toString();
+      final desc = (r['description'] ?? '').toString();
+      final amount = (r['amount'] as num?)?.toDouble() ?? 0;
+      try {
+        await LocalDb.instance.enqueue('create', 'flow', uuid: uu, body: {
+          'uuid': uu,
+          'type': (r['type'] ?? 'expense').toString(),
+          'amount': amount,
+          'category': (r['category'] ?? '').toString(),
+          'payment_method': (r['payment_method'] ?? '').toString(),
+          'description': desc,
+          'flow_time': ymd,
+          'source': (r['source'] ?? '').toString(),
+        });
+        n++;
+        AutoRecordService.instance.recordLog('[同步] 补排队本地未上云的流水：$ymd $desc $amount');
+      } catch (e) {
+        AutoRecordService.instance.recordLog('[同步] 补排队失败（已跳过）：$uu $e');
+      }
+    }
+    return n;
+  }
+
   /// v2.2.28 网络类错误判定（与 LocalFirstApi._isNetworkErr 同口径）：
   /// 网络错误 → 保留队列重试；其余（400/404 等）→ 永久失败，跳过防毒丸。
+  ///
+  /// v2.3.1：补上 ApiClient 包装后的**中文**文案。旧版只认英文关键字，
+  /// 而 `api.dart` 把所有连接类异常包成了「连接服务器失败\nURL: …」——
+  /// 一条也匹配不上 → 断网时的写操作全被判成「服务器明确拒绝」，
+  /// 从队列里删掉并标记失败，联网后永不补传（弱网丢账的最后一环）。
   bool _isNetErr(Object e) {
     final s = e.toString();
     return s.contains('SocketException') ||
@@ -173,8 +262,18 @@ class SyncEngine extends ChangeNotifier {
         s.contains('TimeoutException') ||
         s.contains('HandshakeException') ||
         s.contains('Failed host lookup') ||
-        s.contains('网络');
+        s.contains('网络') ||
+        s.contains('连接服务器失败') ||
+        s.contains('证书校验失败') ||
+        s.contains('连接超时') ||
+        s.contains('接收超时') ||
+        s.contains('发送超时');
   }
+
+  /// v2.3.1：可重试 = 网络类 + 认证类。
+  /// 401 以前落到「永久失败」分支 → 队列被清空、操作日志置红，
+  /// 重新登录后也不会补传（10-22「6 笔流水只存在本地、服务器没有」的直接原因）。
+  bool _isRetryable(Object e) => e is AuthExpiredException || _isNetErr(e);
 
   Future<void> _replay(ApiClient a, String op, int? entityId, String? uuid,
       Map<String, dynamic> body, int bookId) async {
@@ -194,28 +293,59 @@ class SyncEngine extends ChangeNotifier {
         // 用 entityId（入队时带的），body 里从来没有 id 字段——
         // 旧代码从 body 里强取 id 是潜伏空指针毒丸；负/缺 id 时按 uuid 解析
         var rid = entityId ?? 0;
-        if (rid <= 0) {
-          final cu = (body['client_uuid'] as String?) ?? '';
-          if (cu.isNotEmpty) {
-            rid = await LocalDb.instance.flowIdByUuid(cu) ?? 0;
-          }
+        final uu = (body['client_uuid'] as String?) ?? '';
+        if (rid <= 0 && uu.isNotEmpty) {
+          rid = await LocalDb.instance.flowIdByUuid(uu) ?? 0;
         }
         if (rid > 0) {
           await a.updateFlow(rid, body);
           await LocalDb.instance.markDirty(rid, false);
+        } else {
+          // v2.3.1：负 id 说明这条流水在服务器上根本不存在（本地临时行，create 从未补传成功）。
+          // 旧版 `if (rid > 0)` 直接跳过，op 照样出队、操作日志显示「已同步」，
+          // 服务器上却什么都没有 —— 这是「改分类/改金额丢了」的最后一环。
+          // 现在降级为：用本地最终态 + 原 uuid 补一条 create（服务端 uuid 幂等，不会重复）。
+          if (uu.isEmpty) {
+            throw StateError('修改流水无法定位（entityId=$entityId，缺 client_uuid）');
+          }
+          final local = await LocalDb.instance.flowByUuid(uu);
+          if (local == null) {
+            throw StateError('修改流水失败：本地已无 uuid=$uu 的记录');
+          }
+          final newId = await a.createFlow({
+            'uuid': uu,
+            'type': (local['type'] ?? 'expense').toString(),
+            'amount': (local['amount'] as num?)?.toDouble() ?? 0,
+            'category': (local['category'] ?? '').toString(),
+            'payment_method': (local['payment_method'] ?? '').toString(),
+            'description': (local['description'] ?? '').toString(),
+            'flow_time': (local['flow_time'] ?? '').toString(),
+            'source': (local['source'] ?? '').toString(),
+          });
+          if (newId > 0) {
+            await LocalDb.instance.promoteTmpFlow(uu, newId);
+            await LocalDb.instance.markDirty(newId, false);
+          }
+          AutoRecordService.instance.recordLog('[同步] 修改流水补建（服务器无此记录 → 转 create）：uuid=$uu id=$newId');
         }
         break;
       case 'delete':
         var did = entityId ?? 0;
-        if (did <= 0) {
-          final cu = (body['client_uuid'] as String?) ?? '';
-          if (cu.isNotEmpty) {
-            did = await LocalDb.instance.flowIdByUuid(cu) ?? 0;
-          }
+        final du = (body['client_uuid'] as String?) ?? '';
+        if (did <= 0 && du.isNotEmpty) {
+          did = await LocalDb.instance.flowIdByUuid(du) ?? 0;
         }
         if (did > 0) {
           await a.deleteFlow(did);
           await LocalDb.instance.deleteFlowById(did);
+        } else {
+          // 负 id = 服务器上本来就没有这条 → 本地删掉即完成，并把排队的 create 一并撤回，
+          // 否则会留下一条「本地已删、服务器迟早建出来」的僵尸流水。
+          if (du.isNotEmpty) {
+            await LocalDb.instance.deleteFlowByUuid(du);
+            await LocalDb.instance.removeOutboxFlowCreate(uuid: du);
+          }
+          AutoRecordService.instance.recordLog('[同步] 删除流水（服务器无此记录，仅清本地）：uuid=$du');
         }
         break;
       // ---- 预算（budgets 天然幂等） ----
@@ -347,7 +477,10 @@ class SyncEngine extends ChangeNotifier {
         await a.deleteWalletTxn(body['id'] as int);
         break;
       default:
-        break;
+        // 未知 op 名绝不能当成功：旧版 `default: break` 让这类队列行静默出队、
+        // 操作日志还显示「已同步」（v2.2.28 的 createFlow/updateFlow 命名事故
+        // 就是这么被掩盖了一整版）。抛错 → 走「永久失败」分支，写日志 + 置红，能查。
+        throw StateError('未知同步操作：$op');
     }
   }
 

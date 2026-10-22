@@ -386,6 +386,16 @@ class LocalDb {
         where: 'client_uuid=?', whereArgs: [uuid]);
   }
 
+  /// v2.3.1 按 client_uuid 取整行（补传 update 时若服务器上没有这条流水，
+  /// 需要拿本地最终态去补一次 create —— 只有本地这一份是权威数据）
+  Future<Map<String, Object?>?> flowByUuid(String uuid) async {
+    if (uuid.isEmpty) return null;
+    final d = await db;
+    final rows = await d.query('flows',
+        where: 'client_uuid=?', whereArgs: [uuid], limit: 1);
+    return rows.isEmpty ? null : rows.first;
+  }
+
   Future<void> markDirty(int id, bool dirty) async {
     final d = await db;
     await d.update('flows', {'dirty': dirty ? 1 : 0},
@@ -655,6 +665,23 @@ class LocalDb {
   Future<void> bumpRetries(int id) async {
     final d = await db;
     await d.rawUpdate('UPDATE outbox SET retries=retries+1 WHERE id=?', [id]);
+  }
+
+  /// v2.3.1 自愈用：本地仍是负 id（从未成功推到服务器）、且队列里已经没有任何
+  /// 对应 op 的流水。这类行是「create 被误判永久失败删掉」的历史遗留，
+  /// 只存在于手机上，重新登录也不会自己上云。
+  Future<List<Map<String, Object?>>> orphanTmpFlows(int bookId,
+      {int limit = 100}) async {
+    final d = await db;
+    return d.rawQuery('''
+      SELECT * FROM flows f
+       WHERE f.id < 0
+         AND f.book_id = ?
+         AND f.client_uuid IS NOT NULL AND f.client_uuid <> ''
+         AND NOT EXISTS (SELECT 1 FROM outbox o WHERE o.uuid = f.client_uuid)
+       ORDER BY f.id DESC
+       LIMIT ?
+    ''', [bookId, limit]);
   }
 
   /// 判断某条流水（按 id 或 uuid）是否在待同步队列中（拉取时跳过覆盖）

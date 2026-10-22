@@ -210,7 +210,10 @@ class MePage extends ConsumerWidget {
       ref.read(dataVersionProvider.notifier).state++;
       toast('同步完成');
     } else {
-      toast('离线或同步失败，本地数据仍可正常使用');
+      // v2.3.1：显示真实失败原因（离线 / 登录过期 / 服务器返回的错误），
+      // 不再一律「离线或同步失败」——那句话把 401 也盖住了。
+      final msg = SyncEngine.instance.lastErrorText;
+      toast(msg.isEmpty ? '离线或同步失败，本地数据仍可正常使用' : msg);
     }
   }
 
@@ -369,6 +372,10 @@ class MePage extends ConsumerWidget {
     final se = SyncEngine.instance;
     if (se.status == SyncStatus.syncing) return '同步中…';
     if (se.status == SyncStatus.offline) return '离线 · 本地数据可用（点「同步」重试）';
+    // v2.3.1：把真实原因展示出来。以前只有「离线/失败」两种笼统文案，
+    // 401（登录过期）也被算进「离线」，用户根本不知道该重新登录。
+    if (se.status == SyncStatus.authExpired) return '登录已过期 · 请重新登录';
+    if (se.status == SyncStatus.error) return se.lastErrorText;
     final t = se.lastSyncAt;
     if (t == null) return '点「同步」立即同步';
     return '上次同步 ${t.month}月${t.day}日 '

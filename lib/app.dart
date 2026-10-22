@@ -97,6 +97,14 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // v2.3.1：同步遇到 401（token 过期/用户被删）时把用户送回登录页。
+    // 旧版只把状态记在 lastError 里且没人展示，界面永远停在「离线或同步失败」，
+    // 用户以为网络坏了，实际只需重新登录。本地流水库与待同步队列不受影响。
+    SyncEngine.instance.onAuthExpired = (reason) {
+      if (!mounted) return;
+      ref.read(sessionProvider.notifier).forceRelogin(reason);
+      toast('登录已过期，请重新登录（本地数据不会丢失）');
+    };
     // 事件驱动同步（用户：离线极少，不需要 30s 高频轮询）：
     // 启动一次 + 从后台切回前台一次 + 写操作成功后（LocalFirstApi 内触发）
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -112,6 +120,7 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    SyncEngine.instance.onAuthExpired = null;
     AutoRecordService.instance.stopPolling();
     super.dispose();
   }

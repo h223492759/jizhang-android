@@ -8,6 +8,12 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// 服务端返回 401（token 过期 / 用户不存在 / 未登录）时抛出的专用异常。
+/// 与普通网络错误区分开：这类错误不会「等网络恢复就自己好」，必须重新登录。
+class AuthExpiredException extends ApiException {
+  AuthExpiredException(super.message);
+}
+
 /// 对接 jizhang 后端的 HTTP 客户端。
 /// - baseUrl = serverUrl + '/api'
 /// - 拦截器自动附加 Authorization: Bearer <token>
@@ -54,6 +60,14 @@ class ApiClient {
       }
       return data;
     } on DioException catch (e) {
+      // 401 先单独识别：token 失效必须让上层切回登录页，不能混在「网络错误」里
+      if (e.response?.statusCode == 401) {
+        final data = e.response?.data;
+        final msg = (data is Map && data['error'] != null)
+            ? data['error'].toString()
+            : '登录已过期，请重新登录';
+        throw AuthExpiredException(msg);
+      }
       if (e.response?.data is Map && e.response?.data['error'] != null) {
         throw ApiException(e.response!.data['error'].toString());
       }
@@ -98,8 +112,10 @@ class ApiClient {
   }
 
   Future<LoginResult> login(String username, String password) async {
+    // remember: true → 服务端签发不过期 token（不写 exp），登录一次长期有效，
+    // 避免 30 天后所有请求 401 表现为「同步连不上」
     final d = await _req(() => _dio.post('/auth/login',
-        data: {'username': username, 'password': password}));
+        data: {'username': username, 'password': password, 'remember': true}));
     return LoginResult(
       token: d['token'], user: User.fromJson(d['user']));
   }

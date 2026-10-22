@@ -301,6 +301,22 @@ class SessionNotifier extends StateNotifier<SessionState> {
     state = SessionState(serverUrl: state.serverUrl, books: const [], restoring: false);
   }
 
+  /// v2.3.1：服务端返回 401（token 过期 / 用户被删 / 未登录）时的强制重登。
+  ///
+  /// 与 [logout] 的区别：**保留 bookId、账本列表和整个本地流水库**，只清 token/user。
+  /// - 本地 SQLite 里 8000+ 笔流水与 outbox 待同步队列一条不丢（logout 也不删，但会清 bookId，
+  ///   重新登录后要重新选账本）；
+  /// - 必须删镜像文件：镜像里存的是这个失效 token，不删的话下次冷启动会把它「恢复」回来，
+  ///   又变成连续几天同步不上（用户 10-22 遇到的就是这个形态）。
+  Future<void> forceRelogin(String reason) async {
+    if (!state.hasToken) return;
+    await Storage.setToken(null);
+    await Storage.setUserJson(null);
+    await Storage.deleteMirror();
+    AuthTrace.log('[登录态] 登录态已失效（$reason）→ 清除 token，需要重新登录；本地数据未受影响');
+    state = state.copyWith(clearToken: true, clearUser: true, restoring: false);
+  }
+
   /// 清掉当前服务器（连同登录态）：只在「把正在使用的服务器删掉、且列表已空」时调用。
   /// 不这么做的话，删完服务器再进 App 会一直停在旧的失效地址上。
   Future<void> clearServer() async {

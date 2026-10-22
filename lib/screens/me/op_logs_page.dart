@@ -53,7 +53,9 @@ class _OpLogsPageState extends ConsumerState<OpLogsPage> {
       toast('同步完成');
       await _load();
     } else {
-      toast('离线或同步失败，本地数据仍可正常使用');
+      // v2.3.1：显示真实原因（离线 / 登录过期 / 服务器错误），不再一律笼统提示
+      final msg = SyncEngine.instance.lastErrorText;
+      toast(msg.isEmpty ? '离线或同步失败，本地数据仍可正常使用' : msg);
     }
   }
 

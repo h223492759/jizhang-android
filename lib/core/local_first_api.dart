@@ -1736,6 +1736,9 @@ final w = await _api.getWallets();
       };
 
   bool _isNetworkErr(Object e) {
+    // v2.3.1：401（token 失效/过期）也按「可重试」处理——先入队，等用户重新登录后
+    // 由同步引擎补传。旧版把它当永久失败，token 过期期间记的账直接标红丢弃。
+    if (e is AuthExpiredException) return true;
     final s = e.toString();
     return s.contains('SocketException') ||
         s.contains('Connection') ||
@@ -1743,7 +1746,9 @@ final w = await _api.getWallets();
         s.contains('TimeoutException') ||
         s.contains('HandshakeException') ||
         s.contains('Failed host lookup') ||
-        s.contains('网络');
+        s.contains('网络') ||
+        s.contains('连接服务器失败') ||
+        s.contains('证书校验失败');
   }
 }
 
