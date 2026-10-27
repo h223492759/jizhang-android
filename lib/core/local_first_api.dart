@@ -432,7 +432,15 @@ final w = await _api.getWallets();
   Future<int> createFlow(Map<String, dynamic> body) async {
     final bookId = await _curBook();
     final db = LocalDb.instance;
-    final uuid = SyncEngine.newUuid();
+    // v2.4.0 幂等键：自动记账在 body 里带 client_uuid（官方单号或内容指纹），
+    // 这里直接采纳，服务端 UNIQUE(book_id, client_uuid) 就能拒掉第二条；
+    // 手动记账不传 → 随机 uuid，每条都是独立记录（用户故意记两笔一样的不该被吞）。
+    final hint = ((body['client_uuid'] ?? '') as String).trim();
+    final uuid = hint.isNotEmpty ? hint : SyncEngine.newUuid();
+    // 同一 uuid 已在本地（含还没推上去的临时行）→ 直接返回，不再建行/入队。
+    // 这是本地一道保险：即使服务端还没拒，本地也不会出两条。
+    final existingId = await db.flowIdByUuid(uuid);
+    if (existingId != null) return existingId;
     // v2.2.28 本地先行：立即写镜像（负 id 临时行）+ 入队，UI 零等待；
     // 推送由同步引擎补传（网络好时秒级完成并用真实 id 原地提升临时行）。
     // 之前在线直发等服务器返回，弱网下要等满超时才落本地 →「半天没反应」。
