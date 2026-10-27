@@ -79,7 +79,11 @@ class AutoRecordListenerService : NotificationListenerService() {
             ?: Regex("(?:人民币|RMB)\\s*([0-9]+(?:\\.[0-9]{1,2})?)").find(all)
         val amt = amtMatch?.groupValues?.getOrNull(1) ?: ""
         Log.d("AutoRecord", "hasStrong=$hasStrong amt=$amt")
-        val id = "${System.currentTimeMillis()}_${pkg}"
+        // v2.4.0：改用 sbn.key 作为稳定 id。原来用 System.currentTimeMillis() 拼 id，
+        // 同一条通知被重复投递（监听服务重启、系统重发）时 id 每次都不同，
+        // Flutter 端 _idDedupHit（按 id 去重）完全失效 → 同一笔记两次的主因之一。
+        // sbn.key 由系统生成、对同一条通知实例保持不变，重投递命中同一个 id。
+        val id = sbn.key ?: "${System.currentTimeMillis()}_${pkg}"
         val item = JSONObject()
             .put("id", id)
             .put("pkg", pkg)

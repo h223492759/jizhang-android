@@ -844,10 +844,12 @@ class AutoRecordService {
       'amount': p.amount,
       'category': _autoCategory('', p.isIncome),
       'description': desc,
-      'flow_time':
-          '${p.time.year}-${p.time.month.toString().padLeft(2, '0')}-${p.time.day.toString().padLeft(2, '0')}',
+      // v2.4.0：flow_time 存完整时分秒（原先只存日期，服务端内容去重分辨率被砍残）
+      'flow_time': _fullTime(p.time),
       'payment_method': _pkgName(p.pkg),
       'source': 'auto',
+      // v2.4.0：身份键。官方单号优先，其次内容指纹；服务端 UNIQUE 索引拒第二条
+      'client_uuid': _contentUuid(p, '${p.title} ${p.text}'),
     };
     try {
       // 走 localApiProvider：断网时本地入队 + enqueue outbox，连上后自动重试
@@ -1171,10 +1173,15 @@ class AutoRecordService {
       'amount': result.amount,
       'category': result.category,
       'description': result.description,
-      'flow_time':
-          '${result.time.year}-${result.time.month.toString().padLeft(2, '0')}-${result.time.day.toString().padLeft(2, '0')}',
+      // v2.4.0：完整时分秒 + 身份键（与直记路径对齐）
+      'flow_time': _fullTime(result.time),
       'payment_method': _pkgName(result.pkg),
       'source': 'auto',
+      'client_uuid': _contentUuidFrom(
+          pkg: result.pkg,
+          amount: result.amount,
+          time: result.time,
+          merchant: result.merchant),
     };
     try {
       // v2.2.29：改走 localApiProvider（本地先行 + outbox 入队）——
@@ -1187,35 +1194,7 @@ class AutoRecordService {
     }
   }
 
-  String _pkgName(String pkg) {
-    switch (pkg) {
-      case 'com.eg.android.AlipayGphone':
-      case 'com.aliyun.snotif':
-      case 'com.alipay.consumer':
-      case 'com.alipay.android.uiapay':
-      case 'com.alipay.mobile':
-        return '支付宝';
-      case 'com.tencent.mm':
-      case 'com.tencent.wepay':
-        return '微信支付';
-      case 'com.unionpay':
-        return '云闪付';
-      case 'com.cmbchina.cc':
-      case 'com.cmbchina.biz':
-      case 'com.cmbchina.mobilebank':
-      case 'com.cmbwallet':
-        return '招行信用卡';
-      case 'com.ss.android.ugc.aweme':
-      case 'com.ss.android.ugc.aweme.lite':
-        return '抖音支付';
-      case 'com.jingdong.app.mall':
-        return '京东支付';
-      case 'com.sankuai.meituan':
-        return '美团支付';
-      default:
-        return '';
-    }
-  }
+  String _pkgName(String pkg) => _payLabelOf(pkg);
 }
 
 /// 支持的支付方式（v2.2.0 起可在自动记账设置页勾选启用）
@@ -1286,3 +1265,113 @@ class ParsedNotification {
 // 工具：HH:mm 格式（待录入占位流水 name 用）
 String _hhmm(DateTime t) =>
     '${t.hour.toString().padLeft(2, "0")}:${t.minute.toString().padLeft(2, "0")}';
+
+// 工具：完整时间 yyyy-MM-dd HH:mm:ss（flow_time 落库用，v2.4.0 之前只存到日期）
+String _fullTime(DateTime t) =>
+    '${t.year.toString().padLeft(4, "0")}-${t.month.toString().padLeft(2, "0")}-${t.day.toString().padLeft(2, "0")} '
+    '${t.hour.toString().padLeft(2, "0")}:${t.minute.toString().padLeft(2, "0")}:${t.second.toString().padLeft(2, "0")}';
+
+// ============== v2.4.0 内容指纹（身份去重） ==============
+// 原有 7 层去重全是「同额 + 时间窗」启发式：时间窗一过必漏、商户名一变就散，
+// 这正是「一条记录能出现两次」的根因。这里给每一笔自动记账算一个确定性
+// client_uuid，服务端 flows 表已有 UNIQUE(book_id, client_uuid) 索引，
+// 第二次 create 会被幂等返回已有 id —— 重复在物理上不可能插入。
+//   优先级 1：通知里的官方单号（真身份，绝对去重）
+//   优先级 2：内容指纹 支付方式|金额分|日期|5分钟桶|规范商户名
+
+// 包名 → 支付方式显示名（与 native AutoRecordStore.PAY_METHODS 保持一致）
+String _payLabelOf(String pkg) {
+  switch (pkg) {
+    case 'com.eg.android.AlipayGphone':
+    case 'com.aliyun.snotif':
+    case 'com.alipay.consumer':
+    case 'com.alipay.android.uiapay':
+    case 'com.alipay.mobile':
+      return '支付宝';
+    case 'com.tencent.mm':
+    case 'com.tencent.wepay':
+      return '微信支付';
+    case 'com.unionpay':
+      return '云闪付';
+    case 'com.cmbchina.cc':
+    case 'com.cmbchina.biz':
+    case 'com.cmbchina.mobilebank':
+    case 'com.cmbwallet':
+      return '招行信用卡';
+    case 'com.ss.android.ugc.aweme':
+    case 'com.ss.android.ugc.aweme.lite':
+      return '抖音支付';
+    case 'com.jingdong.app.mall':
+      return '京东支付';
+    case 'com.sankuai.meituan':
+      return '美团支付';
+    default:
+      return '';
+  }
+}
+
+// 官方单号抽取：微信「单号/交易单号」、支付宝「交易号/订单号」、云闪付/招行「流水号」
+final List<RegExp> _txnIdPatterns = [
+  RegExp(
+      r'(?:交易单号|支付单号|交易流水号|流水号|订单编号|订单号|交易号|单号)\s*[:：]?\s*([A-Za-z0-9_-]{6,40})'),
+  RegExp(
+      r'(?:商户订单号|外部单号|商户单号|交易流水)\s*[:：]?\s*([A-Za-z0-9_-]{6,40})'),
+];
+
+String _extractTxnId(String text) {
+  for (final re in _txnIdPatterns) {
+    final m = re.firstMatch(text);
+    if (m != null) {
+      final v = (m.group(1) ?? '').trim();
+      // 纯数字短串多为「订单金额/时间」误抓，要求 6 位以上
+      if (v.length >= 6) return v;
+    }
+  }
+  return '';
+}
+
+/// 商户名归一化：去掉平台前缀与尾部噪声，让「微信支付-美团」「美团外卖收款」
+/// 这类变体尽量收敛到同一个键（描述字段也用它，落库更整齐）。
+String _normMerchant(String s) {
+  var t = s.trim();
+  const prefixes = [
+    '微信支付-', '微信支付', '支付宝-', '支付宝', '云闪付-', '云闪付',
+    '招商银行', '招行', '交通银行', '建设银行', '工商银行', '农业银行',
+  ];
+  for (final p in prefixes) {
+    if (t.startsWith(p) && t.length > p.length) {
+      t = t.substring(p.length);
+      break;
+    }
+  }
+  t = t.replaceAll(
+      RegExp(r'(的)?(收款方|收款|账单|支付|付款|转账|到账|提醒|通知|成功|订单)$'),
+      '');
+  return t.trim();
+}
+
+/// 自动记账身份键：同一笔支付被多通道/多次抓到时得到同一个值。
+String _contentUuid(ParsedNotification p, String rawText) => _contentUuidFrom(
+    pkg: p.pkg,
+    amount: p.amount,
+    time: p.time,
+    merchant: p.merchant,
+    rawText: rawText);
+
+String _contentUuidFrom({
+  required String pkg,
+  required double amount,
+  required DateTime time,
+  required String merchant,
+  String rawText = '',
+}) {
+  final txn = _extractTxnId(rawText);
+  if (txn.isNotEmpty) return 'ext:$txn';
+  final pay = _payLabelOf(pkg);
+  final cents = (amount * 100).round();
+  final ymd =
+      '${time.year.toString().padLeft(4, "0")}-${time.month.toString().padLeft(2, "0")}-${time.day.toString().padLeft(2, "0")}';
+  final bucket = time.hour * 12 + (time.minute ~/ 5); // 5 分钟一桶，覆盖双通道几秒到几分钟的时差
+  final merch = _normMerchant(merchant);
+  return 'fp:$pay|$cents|$ymd|$bucket|$merch';
+}
