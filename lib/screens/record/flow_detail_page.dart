@@ -272,7 +272,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
       await ref.read(localApiProvider).updateFlow(widget.flow.id, {
         'attribution': name,
         'attribution_uid': null,
-      });
+      }, clientUuid: widget.flow.clientUuid);
       ref.read(dataVersionProvider.notifier).state++;
       toast('归属已更新');
       if (mounted) Navigator.pop(context);
@@ -299,6 +299,7 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
         // - isAiSource 只认 'ai'/'auto'，manual 不显示 AI 标签
         // - 但 manual 是持久标记，下次进入还能识别'曾经是 AI 流水'，显示恢复按钮
         {"source": toRestore ? "auto" : "manual"},
+        clientUuid: widget.flow.clientUuid,
       );
       // 通知首页/列表刷新（home_page 监听 dataVersionProvider 自动 _load）
       ref.read(dataVersionProvider.notifier).state++;
@@ -336,7 +337,8 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
     if (ok != true) return;
     try {
       await AutoRecordService.instance.addIgnoreMerchant(widget.flow.description);
-      await ref.read(localApiProvider).deleteFlow(widget.flow.id);
+      await ref.read(localApiProvider)
+          .deleteFlow(widget.flow.id, clientUuid: widget.flow.clientUuid);
       ref.read(dataVersionProvider.notifier).state++;
       toast('已拉黑「${widget.flow.description}」，以后不再自动记账');
       if (mounted) Navigator.pop(context);
@@ -363,7 +365,8 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
     );
     if (ok != true) return;
     try {
-      await ref.read(localApiProvider).deleteFlow(widget.flow.id);
+      await ref.read(localApiProvider)
+          .deleteFlow(widget.flow.id, clientUuid: widget.flow.clientUuid);
       ref.read(dataVersionProvider.notifier).state++;
       toast('已删除');
       if (mounted) Navigator.pop(context);

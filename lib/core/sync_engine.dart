@@ -632,6 +632,13 @@ class SyncEngine extends ChangeNotifier {
       final id = (m['id'] as num).toInt();
       final uuid = m['client_uuid'] as String?;
       if (await db.flowPending(id: id, uuid: uuid)) continue;
+      if (uuid == null || uuid.isEmpty) {
+        // 老服务端（v1.1.1 及以前）/sync 不返回 client_uuid → upsert 是整行替换，
+        // 会把本地已有的幂等键冲成 null（v2.3.2 起靠它找回真实 id，冲掉就白改）。
+        final local = await db.flowById(id);
+        final keep = (local?['client_uuid'] as String?) ?? '';
+        if (keep.isNotEmpty) m['client_uuid'] = keep;
+      }
       rows.add(_flowToRow(bookId, m));
     }
     if (rows.isNotEmpty) await db.upsertFlows(rows);

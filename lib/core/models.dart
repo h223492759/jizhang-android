@@ -111,6 +111,10 @@ class Flow {
   final String source;
   /// 最后修改时间（排序用：同日期分组内修改过的排最上方）
   final String updatedAt;
+  /// 客户端幂等键。v2.3.2：列表里的 Flow 是快照——新增流水补传成功后本地行 id
+  /// 会从负临时 id 换成服务器真实 id，旧快照拿着负 id 去改就会 404「流水不存在」。
+  /// 改/删时用它在本地库重新定位当前行（见 LocalFirstApi.updateFlow/deleteFlow）。
+  final String clientUuid;
   Flow({
     required this.id,
     required this.type,
@@ -123,6 +127,7 @@ class Flow {
     this.attributionColor,
     this.source = '',
     this.updatedAt = '',
+    this.clientUuid = '',
   });
   factory Flow.fromJson(Map<String, dynamic> j) => Flow(
         id: j['id'],
@@ -136,6 +141,7 @@ class Flow {
         attributionColor: j['attribution_color'],
         source: j['source'] ?? '',
         updatedAt: j['updated_at'] ?? '',
+        clientUuid: (j['client_uuid'] as String?) ?? '',
       );
   static List<Flow> listFrom(dynamic v) =>
       (v as List? ?? []).map((e) => Flow.fromJson(e)).toList();

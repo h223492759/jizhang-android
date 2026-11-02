@@ -3,7 +3,10 @@ import 'models.dart';
 
 class ApiException implements Exception {
   final String message;
-  ApiException(this.message);
+  /// 服务端 HTTP 状态码（非 HTTP 错误时为空）。用来区分「服务器明确说这条不存在(404)」
+  /// 和普通失败——前者可以降级成新建，不能把用户填好的内容丢掉。
+  final int? statusCode;
+  ApiException(this.message, {this.statusCode});
   @override
   String toString() => message;
 }
@@ -11,7 +14,7 @@ class ApiException implements Exception {
 /// 服务端返回 401（token 过期 / 用户不存在 / 未登录）时抛出的专用异常。
 /// 与普通网络错误区分开：这类错误不会「等网络恢复就自己好」，必须重新登录。
 class AuthExpiredException extends ApiException {
-  AuthExpiredException(super.message);
+  AuthExpiredException(String message) : super(message, statusCode: 401);
 }
 
 /// 对接 jizhang 后端的 HTTP 客户端。
@@ -69,7 +72,8 @@ class ApiClient {
         throw AuthExpiredException(msg);
       }
       if (e.response?.data is Map && e.response?.data['error'] != null) {
-        throw ApiException(e.response!.data['error'].toString());
+        throw ApiException(e.response!.data['error'].toString(),
+            statusCode: e.response?.statusCode);
       }
       final url = e.requestOptions.uri.toString();
       final type = e.type.toString();

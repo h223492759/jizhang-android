@@ -165,7 +165,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _update(Flow f, Map<String, dynamic> body) async {
     try {
-      await ref.read(localApiProvider).updateFlow(f.id, body);
+      await ref.read(localApiProvider).updateFlow(f.id, body, clientUuid: f.clientUuid);
       ref.read(dataVersionProvider.notifier).state++;
       toast('已更新');
     } catch (e) {
@@ -337,7 +337,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
       if (ok == true) {
         try {
-          await ref.read(localApiProvider).deleteFlow(f.id);
+          await ref.read(localApiProvider).deleteFlow(f.id, clientUuid: f.clientUuid);
           ref.read(dataVersionProvider.notifier).state++;
           toast('已删除');
         } catch (e) {

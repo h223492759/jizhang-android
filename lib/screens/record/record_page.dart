@@ -222,7 +222,9 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       // v2.2.28 本地先行：无论网络好坏，写入立即生效（弱网不卡 UI），
       // 推送由同步引擎后台补传，不再区分「在线成功 / 离线入队」
       if (_isEdit) {
-        await ref.read(localApiProvider).updateFlow(widget.initialFlow!.id, body);
+        await ref.read(localApiProvider)
+            .updateFlow(widget.initialFlow!.id, body,
+                clientUuid: widget.initialFlow!.clientUuid);
       } else {
         await ref.read(localApiProvider).createFlow(body);
       }
