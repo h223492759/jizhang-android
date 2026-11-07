@@ -929,9 +929,9 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
   double? get _computedAmount => _compute(_expression);
 
   void _tapDigit(String d) {
+    final lastOp = _expression.lastIndexOf(RegExp(r'[+-]'));
+    final current = lastOp == -1 ? _expression : _expression.substring(lastOp + 1);
     if (d == '.') {
-      final lastOp = _expression.lastIndexOf(RegExp(r'[+-]'));
-      final current = lastOp == -1 ? _expression : _expression.substring(lastOp + 1);
       if (current.contains('.')) return;
       if (current.isEmpty) {
         setState(() {
@@ -939,6 +939,15 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
           _equalsShown = false;
         });
         return;
+      }
+    } else {
+      // 数字键限「当前操作数」而非整条表达式：旧版限总长 12，前数带小数时
+      // （如 573.32-403.5 已 12 字符）后数的第 2 位小数永远输不进（2026-11-07）
+      final dot = current.indexOf('.');
+      if (dot == -1) {
+        if (current.length >= 9) return; // 整数部分最多 9 位
+      } else {
+        if (current.length - dot - 1 >= 2) return; // 小数最多 2 位（金额到分）
       }
     }
     if (_expression == '0' && d != '.') {
@@ -948,7 +957,7 @@ class _AmountEditorSheetState extends ConsumerState<_AmountEditorSheet> {
       });
       return;
     }
-    if (_expression.length >= 12) return;
+    if (_expression.length >= 24) return; // 兜底总长
     setState(() {
       _expression += d;
       _equalsShown = false;
