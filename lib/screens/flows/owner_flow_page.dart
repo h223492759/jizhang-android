@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide Flow;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/core/cat_icon.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/owner_color.dart';
@@ -399,10 +400,11 @@ class _OwnerFlowPageState extends ConsumerState<OwnerFlowPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: ownerColorFor(f, overrides, user),
-                child: Text(catIconOf(iconMap, f.category), style: const TextStyle(fontSize: 16)),
+              CatIcon(
+                name: f.category,
+                bg: ownerColorFor(f, overrides, user),
+                size: 36,
+                emoji: catIconOf(iconMap, f.category),
               ),
               const SizedBox(width: 10),
               Expanded(

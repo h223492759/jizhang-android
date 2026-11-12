@@ -7,12 +7,34 @@ def _beijing_now():
     return datetime.now(timezone(timedelta(hours=8)))
 
 
+VERSIONCODE_EPOCH = datetime(2023, 1, 1, tzinfo=timezone(timedelta(hours=8)))
+
+
+def _version_code_from_tag(tag):
+    """versionCode 天数制：days_since(2023-01-01 BJT)*10000 + HHMM。
+
+    旧版取 tag 后 8 位（MMDDHHMM，现网最大约 11,121,8xx）跨年会倒退；
+    天数制从 2023-01-01 起算（当前约 1,41x,xxx），始终大于存量值，
+    覆盖安装不会降级，且跨年单调、32 位上限可用 500+ 年。
+    tag 形如 v261112-1834；解析失败时回退当前时间（仍单调）。
+    """
+    m = re.match(r"^v(\d{6})-(\d{4})$", tag)
+    if m:
+        try:
+            d = datetime.strptime(m.group(1), "%y%m%d").replace(
+                tzinfo=timezone(timedelta(hours=8)))
+            days = (d - VERSIONCODE_EPOCH).days
+            if days >= 0:
+                return days * 10000 + int(m.group(2))
+        except ValueError:
+            pass
+    now = _beijing_now()
+    return (now - VERSIONCODE_EPOCH).days * 10000 + now.hour * 100 + now.minute
+
+
 def patch_pubspec():
     tag = os.environ.get("GITHUB_REF_NAME", "v1").lstrip("v")
-    build = re.sub(r"\D", "", tag)
-    # Android versionCode 是 32 位有符号整数，最大 2147483647
-    # tag 形如 v260816-2057 -> 2608162057（10 位）会溢出，取后 8 位 MMDDHHMM
-    build = build[-8:] if len(build) >= 8 else (build or "1")
+    build = str(_version_code_from_tag(os.environ.get("GITHUB_REF_NAME", "")))
     with open("pubspec.yaml", encoding="utf-8") as f:
         s = f.read()
     # 版本号以本地 pubspec 为准（如 1.1.0），CI 不再自动 +1；
@@ -30,21 +52,28 @@ def patch_pubspec():
 
 
 def patch_build_gradle():
+    # 签名口令不再硬编码进构建脚本（安全报告 #2）：CI 从 Secret
+    # ANDROID_KEYSTORE_PASSWORD 注入；本地无该环境变量直接报错退出，
+    # 绝不回退到旧口令。
+    store_pwd = os.environ.get("ANDROID_KEYSTORE_PASSWORD")
+    if not store_pwd:
+        raise SystemExit(
+            "[security] 未设置 ANDROID_KEYSTORE_PASSWORD 环境变量，拒绝生成签名配置")
     p = "android/app/build.gradle"
     with open(p, encoding="utf-8") as f:
         s = f.read()
     # Flutter 模板默认已带 signingConfigs.debug，之前因为 "signingConfigs" 已存在
     # 没替换，导致 release 仍用模板 debug keystore，签名与 jizhang.p12 不一致。
     # 这里强制替换整个 signingConfigs 块，并确保 release 使用它。
-    signing_block = '''    signingConfigs {
-        debug {
+    signing_block = f'''    signingConfigs {{
+        debug {{
             storeFile rootProject.file("../jizhang.p12")
-            storePassword "jizhang123"
+            storePassword "{store_pwd}"
             keyAlias "jizhang"
-            keyPassword "jizhang123"
+            keyPassword "{store_pwd}"
             storeType "PKCS12"
-        }
-    }
+        }}
+    }}
 '''
     # 替换已有的 signingConfigs { ... } 块
     s = re.sub(
@@ -82,10 +111,15 @@ def patch_manifest():
     with open(p, encoding="utf-8") as f:
         s = f.read()
     s = re.sub(r'android:label="[^"]*"', 'android:label="记账本"', s)
-    # usesCleartextTraffic 必须是 <application> 的属性，<manifest> 上无效
-    if "usesCleartextTraffic" not in s:
-        s = s.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
-    # 显式引用 network_security_config，比单独 usesCleartextTraffic 更稳
+    # 安全报告 #7：禁止备份到云/adb 提取本地库（登录态 token、流水 SQLite 均在私有目录）
+    if 'android:allowBackup' not in s:
+        s = s.replace("<application", '<application android:allowBackup="false"', 1)
+    else:
+        s = re.sub(r'android:allowBackup="[^"]*"', 'android:allowBackup="false"', s)
+    # 明文流量改由 network_security_config 白名单控制（只放行 NAS 内网 IP），
+    # 不再全局 usesCleartextTraffic="true"
+    s = re.sub(r'\s*android:usesCleartextTraffic="[^"]*"', '', s)
+    # 显式引用 network_security_config，统一管理明文/HTTPS 策略
     if "networkSecurityConfig" not in s:
         s = s.replace("<application", '<application android:networkSecurityConfig="@xml/network_security_config"', 1)
     # 只保留 INTERNET 权限，去掉 Flutter 模板可能带的不必要权限，减少安装时 allow 提示
@@ -134,14 +168,21 @@ def patch_network_security_config():
     dir_path = "android/app/src/main/res/xml"
     os.makedirs(dir_path, exist_ok=True)
     p = os.path.join(dir_path, "network_security_config.xml")
+    # 安全报告 #7：默认禁明文，只对家庭 NAS 内网地址放行（家庭宽带自签/纯 HTTP 场景）。
+    # 公网域名一律走 HTTPS；以后服务端上 HTTPS 后可整段删除 domain-config。
     xml = '''<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true" />
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain>192.168.50.50</domain>
+        <domain>127.0.0.1</domain>
+        <domain>10.0.2.2</domain>
+    </domain-config>
 </network-security-config>
 '''
     with open(p, "w", encoding="utf-8") as f:
         f.write(xml)
-    print("network_security_config.xml created")
+    print("network_security_config.xml created (cleartext whitelist: 192.168.50.50)")
 
 
 # 无障碍兜底通道（v2.0.0）：packageNames 必须与 AutoRecordStore.PAY_METHODS（v2.2.0）

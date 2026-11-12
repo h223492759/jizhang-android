@@ -14,3 +14,6 @@ build/
 
 # local logs
 ci_log.txt
+
+# signing key must never be committed (security report #2)
+jizhang.p12

@@ -113,7 +113,7 @@ publish_to: 'none'
 #   - 根因：金额键盘数字键上限写的是「整条表达式总长 ≥12 就拒绝」，前数带小数时
 #     （如 573.32-403.5 已 12 字符）后数输完第 1 位小数后数字键全部无响应
 #   - 限制改到「当前操作数」：小数最多 2 位（金额到分）、整数最多 9 位，表达式总长兜底 24
-version: 2.3.3+1
+version: 2.4.0+1
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -132,6 +132,7 @@ dependencies:
   package_info_plus: ^8.0.0
   sqflite: ^2.3.3
   path: ^1.9.0
+  flutter_svg: ^2.0.10
 
 dev_dependencies:
   flutter_test:
@@ -140,3 +141,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/g/
+    - assets/icons/gw/
+    - assets/icons/fn/

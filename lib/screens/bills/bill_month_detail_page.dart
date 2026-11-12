@@ -6,6 +6,8 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/screens/record/flow_detail_page.dart';
+import 'package:jizhang_android/screens/charts/category_detail_page.dart';
+import 'package:jizhang_android/core/cat_icon.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
 
@@ -182,31 +184,75 @@ class _BillMonthDetailPageState extends ConsumerState<BillMonthDetailPage> {
       final cat = x['category'] ?? '';
       final amt = (x['amount'] ?? 0).toDouble();
       final pct = (x['percent'] ?? 0).toDouble();
+      // 点支出分类 → 分类详情页（该分类详细流水 + 归属人消费占比 + 支出排行榜）
       return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: Text(cat, style: const TextStyle(fontWeight: FontWeight.bold))),
-                  Text('${fmtMoney2(amt)} · ${pct.toStringAsFixed(1)}%',
-                      style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 13)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              LinearProgressIndicator(
-                value: (pct / 100).clamp(0, 1),
-                backgroundColor: AppPalette.background(context),
-                color: AppPalette.isDark(context) ? AppColors.primary : AppColors.primary,
-                minHeight: 6,
-              ),
-            ],
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => _openCatDetail(cat),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CatIcon(name: cat, bg: AppColors.primarySoft, size: 30, emoji: '💰'),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(cat, style: const TextStyle(fontWeight: FontWeight.bold))),
+                    Text('${fmtMoney2(amt)} · ${pct.toStringAsFixed(1)}%',
+                        style: TextStyle(color: AppPalette.textSecondary(context), fontSize: 13)),
+                    const SizedBox(width: 4),
+                    Icon(Icons.chevron_right, size: 18, color: AppPalette.textSecondary(context)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value: (pct / 100).clamp(0, 1),
+                  backgroundColor: AppPalette.background(context),
+                  color: AppPalette.isDark(context) ? AppColors.primary : AppColors.primary,
+                  minHeight: 6,
+                ),
+              ],
+            ),
           ),
         ),
       );
     }).toList();
+  }
+
+  // 账单总结页的期间换算：月场景 = 该自然月；年场景 = 整年
+  void _openCatDetail(String cat) {
+    final DateTime period;
+    final String start;
+    final String end;
+    if (widget.isYear) {
+      final y = widget.year ?? DateTime.now().year;
+      period = DateTime(y, 1);
+      start = '$y-01-01';
+      end = '$y-12-31';
+    } else {
+      final y = int.parse(widget.ym.substring(0, 4));
+      final m = int.parse(widget.ym.substring(5, 7));
+      final last = DateTime(y, m + 1, 0);
+      final mm = m.toString().padLeft(2, '0');
+      final dd = last.day.toString().padLeft(2, '0');
+      period = DateTime(y, m);
+      start = '$y-$mm-01';
+      end = '$y-$mm-$dd';
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CategoryDetailPage(
+          category: cat,
+          type: 'expense',
+          start: start,
+          end: end,
+          initialPeriod: period,
+          initialYearMode: widget.isYear,
+        ),
+      ),
+    );
   }
 
   Widget _statRow(Map d, bool isYear) {

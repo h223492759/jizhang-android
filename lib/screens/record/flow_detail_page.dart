@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide Flow;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/db.dart';
 import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/core/cat_icon.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/category_icon.dart';
@@ -78,16 +79,11 @@ class _FlowDetailPageState extends ConsumerState<FlowDetailPage> {
             padding: const EdgeInsets.only(bottom: 24),
             child: Column(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppPalette.card(context),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    catIconOf(iconMap, f.category),
-                    style: const TextStyle(fontSize: 32),
-                  ),
+                CatIcon(
+                  name: f.category,
+                  bg: AppPalette.card(context),
+                  size: 72,
+                  emoji: catIconOf(iconMap, f.category),
                 ),
                 const SizedBox(height: 12),
                 Text(

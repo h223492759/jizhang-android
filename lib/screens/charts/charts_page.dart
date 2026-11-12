@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/core/cat_icon.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/owner_color.dart';
@@ -612,10 +613,11 @@ class _ChartsPageState extends ConsumerState<ChartsPage> {
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: AppColors.primarySoft,
-                child: Text(catIconOf(iconMap, c.name), style: const TextStyle(fontSize: 16)),
+              CatIcon(
+                name: c.name,
+                bg: AppColors.primarySoft,
+                size: 36,
+                emoji: catIconOf(iconMap, c.name),
               ),
               const SizedBox(width: 10),
               Expanded(

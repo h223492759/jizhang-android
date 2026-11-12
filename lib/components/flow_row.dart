@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' hide Flow;
 import 'package:jizhang_android/core/models.dart';
+import 'package:jizhang_android/core/cat_icon.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 
@@ -36,7 +37,7 @@ Widget compactFlowTile(
     crossAxisAlignment: CrossAxisAlignment.center,
     children: [
       _tap(onIconTap ?? onTap,
-          CircleAvatar(radius: 18, backgroundColor: iconBg, child: Text(iconChar, style: const TextStyle(fontSize: 16)))),
+          CatIcon(name: f.category, bg: iconBg, size: 36, emoji: iconChar)),
       const SizedBox(width: 10),
       Expanded(
         child: _tap(

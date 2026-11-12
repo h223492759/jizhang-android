@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Flow;
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:jizhang_android/core/models.dart';
@@ -232,12 +233,13 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // ============ 第二区域：5 个图标不用圆形底色，压缩高度 ============
   Widget _quickModules() {
+    // 图标换用美图设计室矢量功能图标（assets/icons/fn/<名>.svg，含浅底圆整版）
     final items = [
-      ('账单', Icons.receipt_long, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillsPage()))),
-      ('预算', Icons.savings, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetPage()))),
-      ('目标', Icons.flag, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssetsPage(initialTab: 0)))),
-      ('钱包', Icons.account_balance_wallet, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletsPage()))),
-      ('定期', Icons.watch_later_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecurringPage()))),
+      ('账单', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillsPage()))),
+      ('预算', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetPage()))),
+      ('目标', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssetsPage(initialTab: 0)))),
+      ('钱包', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletsPage()))),
+      ('定期', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecurringPage()))),
     ];
     return Container(
       color: AppPalette.primaryDim(context),
@@ -249,11 +251,11 @@ class _HomePageState extends ConsumerState<HomePage> {
           children: items
               .map((e) => Expanded(
                     child: InkWell(
-                      onTap: e.$3,
+                      onTap: e.$2,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(e.$2, color: AppColors.primaryDark, size: 24),
+                          SvgPicture.asset('assets/icons/fn/${e.$1}.svg', width: 26, height: 26),
                           const SizedBox(height: 4),
                           Text(e.$1, style: TextStyle(fontSize: 12, color: AppPalette.text(context))),  // 直接拿 build context
                         ],

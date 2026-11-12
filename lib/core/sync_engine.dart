@@ -74,15 +74,23 @@ class SyncEngine extends ChangeNotifier {
         // 不会出现「一个 Future 报错后另一个 Future 的错误无人监听」。
         final smallF = _pullSmallTables(bookId, a);
         final flowsF = _pullFlows(bookId, a);
-        await smallF;
+        final failedTables = await smallF;
         final flowRows = await flowsF;
         // v2.2.27 修复：指纹必须等拉取【全部成功】之后再落盘！
         // 旧版先存指纹再拉取：拉取一旦中途失败（网络抖动、任一请求超时），
         // 指纹已被存成「最新」，之后每次同步服务器都返回 unchanged:true →
         // 拉取被整体跳过，家庭成员新增的流水永远拉不到，直到服务器数据
         // 再次变化才解锁（「队友记的账一直看不到、自己记一笔才出来」即此因）。
-        await db.setMeta(_fpKey(bookId), (fpResp['fp'] ?? '') as String);
-        AutoRecordService.instance.recordLog('[同步] 完成：流水变更 $flowRows 条');
+        // v2.4.0：小表拉取失败（guard 不再吞错，见 _pullSmallTables）同样不落盘
+        // 指纹 → 下轮同步 unchanged:false 自动重拉失败的小表，自愈。
+        if (failedTables.isEmpty) {
+          await db.setMeta(_fpKey(bookId), (fpResp['fp'] ?? '') as String);
+          AutoRecordService.instance.recordLog('[同步] 完成：流水变更 $flowRows 条');
+        } else {
+          AutoRecordService.instance.recordLog(
+              '[同步] 完成：流水变更 $flowRows 条，小表待重拉 '
+              '${failedTables.join('、')}（指纹未落盘，下轮自动重拉）');
+        }
       } else {
         AutoRecordService.instance.recordLog('[同步] 指纹一致，跳过拉取');
       }
@@ -485,10 +493,24 @@ class SyncEngine extends ChangeNotifier {
   }
 
   // ---------------- 小表全量（各表并行拉取，一次网络往返时间） ----------------
-  Future<void> _pullSmallTables(int bookId, ApiClient a) async {
+  /// 返回拉取失败的小表名列表（空 = 全部成功）。
+  /// v2.4.0 修复：旧版 guard 吞掉一切错误，调用方无法感知失败 →
+  /// 指纹照常落盘 → 之后每次同步 unchanged:true 跳过拉取，失败的小表
+  /// 数据永久停留在旧快照（与 v2.2.27 指纹死锁同构）。现在收集失败表名，
+  /// 由 syncNow 决定「指纹不落盘、下轮重拉自愈」。
+  Future<List<String>> _pullSmallTables(int bookId, ApiClient a) async {
     final db = LocalDb.instance;
-    // 单个小表失败不影响其它（分类/账本失败比较关键，预算/钱包等可容忍）
-    Future<void> guard(Future<void> f) => f.catchError((_) {});
+    // 单个小表失败不影响其它（分类/账本失败比较关键，预算/钱包等可容忍），
+    // 但失败要记名上报，绝不静默
+    final failedTables = <String>[];
+    Future<void> guard(String name, Future<void> f) async {
+      try {
+        await f;
+      } catch (e) {
+        failedTables.add(name);
+        AutoRecordService.instance.recordLog('[同步] 小表拉取失败：$name（$e）→ 下轮同步重拉');
+      }
+    }
 
     Future<void> pullCategories() async {
       final cats = await a.getCategories();
@@ -604,14 +626,15 @@ class SyncEngine extends ChangeNotifier {
     }
 
     await Future.wait([
-      guard(pullCategories()),
-      guard(pullBooks()),
-      guard(pullPresets()),
-      guard(pullSavings()),
-      guard(pullBudgets()),
-      guard(pullRecurring()),
-      guard(pullWallets()),
+      guard('categories', pullCategories()),
+      guard('books', pullBooks()),
+      guard('presets', pullPresets()),
+      guard('savings', pullSavings()),
+      guard('budgets', pullBudgets()),
+      guard('recurring', pullRecurring()),
+      guard('wallets', pullWallets()),
     ]);
+    return failedTables;
   }
 
   // ---------------- 流水增量 / 全量 ----------------

@@ -43,8 +43,18 @@ jobs:
           cp -f android_native/MainActivity.kt "$KDIR/MainActivity.kt"
           cp -f android_native/AutoRecordListenerService.kt "$KDIR/AutoRecordListenerService.kt"
           cp -f android_native/AutoRecordAccessibilityService.kt "$KDIR/AutoRecordAccessibilityService.kt"
+      - name: Restore signing keystore
+        run: |
+          # 签名密钥不再入库（安全报告 #2）：从 Actions Secret 还原到仓库根
+          # （patch_android.py 生成的 build.gradle 引用 rootProject.file("../jizhang.p12")）
+          echo "$ANDROID_KEYSTORE_B64" | base64 -d > jizhang.p12
+          ls -l jizhang.p12
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
       - name: Patch Android project
         run: python3 scripts/patch_android.py
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       - run: flutter pub get
       - name: Analyze Dart
         id: analyze
