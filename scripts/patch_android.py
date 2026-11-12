@@ -174,9 +174,9 @@ def patch_network_security_config():
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="true">
-        <domain>192.168.50.50</domain>
-        <domain>127.0.0.1</domain>
-        <domain>10.0.2.2</domain>
+        <domain includeSubdomains="false">192.168.50.50</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
     </domain-config>
 </network-security-config>
 '''
