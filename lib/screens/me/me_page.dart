@@ -117,26 +117,26 @@ class MePage extends ConsumerWidget {
                 children: [
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Expanded(
-                      child: _gridItem(context, '归属人底色',
+                      child: _gridItem(context, '归属人底色', '归属人底色',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OwnerColorSettingsPage()))),
                     ),
                     Expanded(
-                      child: _gridItem(context, '当前账本',
+                      child: _gridItem(context, '当前账本', '当前账本',
                           () => _switchBook(context, ref, s), subtitle: book?.name),
                     ),
                     Expanded(
-                      child: _gridItem(context, '自动记账',
+                      child: _gridItem(context, '自动记账', '自动记账',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoRecordSettingsPage()))),
                     ),
                     Expanded(
-                      child: _gridItem(context, '水电气',
+                      child: _gridItem(context, '水电气', '水电气',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UtilityPage()))),
                     ),
                   ]),
                   const SizedBox(height: 10),
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Expanded(
-                      child: _gridItem(context, '回收站',
+                      child: _gridItem(context, '回收站', '回收站',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrashPage())),
                           reserveSubtitle: false),
                     ),
@@ -145,17 +145,17 @@ class MePage extends ConsumerWidget {
                       child: AnimatedBuilder(
                         animation: SyncEngine.instance,
                         builder: (context, _) =>
-                            _gridItem(context, '同步', () => _syncNow(context, ref),
+                            _gridItem(context, '同步', '同步', () => _syncNow(context, ref),
                                 reserveSubtitle: false),
                       ),
                     ),
                     Expanded(
-                      child: _gridItem(context, '操作日志',
+                      child: _gridItem(context, '操作日志', '操作日志',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OpLogsPage())),
                           reserveSubtitle: false),
                     ),
                     Expanded(
-                      child: _gridItem(context, '切换服务器',
+                      child: _gridItem(context, '切换服务器', '切换服务器',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage())),
                           reserveSubtitle: false),
                     ),
