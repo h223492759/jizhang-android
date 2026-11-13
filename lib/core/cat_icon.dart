@@ -36,18 +36,27 @@ class CatIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 图标覆盖：emoji 传 "svg:<字形名>"（网页端编辑分类挑选的矢量图标，可与分类名不同）
+    String glyph = name;
+    final e = emoji.trim();
+    if (e.startsWith('svg:')) {
+      final g = e.substring(4).trim();
+      if (g.isNotEmpty && _hasSvg(g)) glyph = g;
+    }
     Widget child;
-    if (_hasSvg(name)) {
+    if (_hasSvg(glyph)) {
       final ink = _preferWhiteInk(bg) ? 'gw' : 'g';
       final d = size * _glyphRatio;
       child = SvgPicture.asset(
-        'assets/icons/$ink/$name.svg',
+        'assets/icons/$ink/$glyph.svg',
         width: d,
         height: d,
         // 字形颜色已烘焙进文件（g=#222 / gw=#FFF），这里不做二次着色
       );
     } else {
-      child = Text(emoji, style: TextStyle(fontSize: size * 0.44));
+      // 覆盖名无对应字形时不再原样显示 "svg:xxx"，回退默认 emoji
+      child = Text(e.startsWith('svg:') ? '💰' : emoji,
+          style: TextStyle(fontSize: size * 0.44));
     }
     return Container(
       width: size,

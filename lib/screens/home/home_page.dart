@@ -7,6 +7,7 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/core/owner_color.dart';
 import 'package:jizhang_android/core/category_icon.dart';
+import 'package:jizhang_android/core/cat_icon.dart';
 import 'package:jizhang_android/components/flow_row.dart';
 import 'package:jizhang_android/components/simple_date_picker.dart';
 import 'package:jizhang_android/state/session.dart';
@@ -707,13 +708,12 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: AppPalette.background(context),
-                            shape: BoxShape.circle,
-                          ),
-                          padding: const EdgeInsets.all(10),
-                          child: Text(c.icon, style: const TextStyle(fontSize: 22)),
+                        // 分类宫格接 CatIcon（与记账页/流水行同套 SVG），支持网页端挑选的矢量覆盖
+                        CatIcon(
+                          name: c.name,
+                          bg: AppPalette.background(context),
+                          size: 42,
+                          emoji: c.icon,
                         ),
                         const SizedBox(height: 4),
                         Text(c.name,

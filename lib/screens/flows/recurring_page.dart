@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/api.dart';
+import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
@@ -61,6 +62,15 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
       if (c.name == name) return c.icon;
     }
     return '💰';
+  }
+
+  /// 纯文本处展示用："svg:xxx" 覆盖没有对应 emoji 字符，剥离前缀只显示名称
+  String _plainIcon(String icon) => plainCatIcon(icon);
+
+  /// 「emoji(如有) + 分类名」纯文本标签
+  String _catLabel(String name) {
+    final ic = _plainIcon(_catIcon(name));
+    return ic.isEmpty ? name : '$ic $name';
   }
 
   Future<void> _generate() async {
@@ -216,7 +226,7 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('${_catIcon(t.category)} ${t.category}',
+                child: Text(_catLabel(t.category),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis),
               ),
@@ -403,7 +413,7 @@ class _RecurringFormDialogState extends State<_RecurringFormDialog> {
             // 分类
             DropdownButtonFormField<String>(
               value: f.category.isEmpty ? null : f.category,
-              items: cats.map((c) => DropdownMenuItem(value: c.name, child: Text('${c.icon} ${c.name}'))).toList(),
+              items: cats.map((c) => DropdownMenuItem(value: c.name, child: Text(_catLabel(c.name)))).toList(),
               onChanged: (v) => setState(() => f.category = v ?? ''),
               decoration: const InputDecoration(labelText: '分类', border: OutlineInputBorder(), isDense: true),
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
+import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
@@ -685,13 +686,18 @@ class _RuleEditPageState extends ConsumerState<_RuleEditPage> {
               style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 6, children: [
-            ..._cats.map((c) => ChoiceChip(
-                  avatar: Text(c.icon, style: const TextStyle(fontSize: 14)),
-                  label: Text(c.name),
-                  selected: _category == c.name,
-                  visualDensity: VisualDensity.compact,
-                  onSelected: (_) => setState(() => _category = c.name),
-                )),
+            ..._cats.map((c) {
+              final ic = plainCatIcon(c.icon);
+              return ChoiceChip(
+                avatar: ic.isNotEmpty
+                    ? Text(ic, style: const TextStyle(fontSize: 14))
+                    : null,
+                label: Text(c.name),
+                selected: _category == c.name,
+                visualDensity: VisualDensity.compact,
+                onSelected: (_) => setState(() => _category = c.name),
+              );
+            }),
             // 已选分类不在列表（历史分类已被删除）时仍保留显示
             if (!_cats.any((c) => c.name == _category))
               ChoiceChip(

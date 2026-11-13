@@ -14,3 +14,10 @@ String catIconOf(Map<String, String> iconMap, String name) {
   if (name.isEmpty) return '💰';
   return iconMap[name] ?? '💰';
 }
+
+/// 纯文本处展示用：分类 icon 可能存 "svg:<字形名>"（网页端挑选的矢量图标覆盖），
+/// 没有对应 emoji 字符，剥离前缀返回空串，避免原样显示 "svg:xxx"。
+String plainCatIcon(String? icon) {
+  final s = (icon ?? '').trim();
+  return s.startsWith('svg:') ? '' : s;
+}

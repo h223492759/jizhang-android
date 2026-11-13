@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jizhang_android/core/api.dart';
+import 'package:jizhang_android/core/category_icon.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
@@ -479,7 +480,8 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               onPressed: disabled ? null : () => Navigator.pop(ctx, c.name),
               child: Row(children: [
                 Expanded(
-                  child: Text('${c.icon} ${c.name}',
+                  child: Text(
+                      '${plainCatIcon(c.icon)}${plainCatIcon(c.icon).isNotEmpty ? ' ' : ''}${c.name}',
                       style: disabled ? TextStyle(color: grey) : null),
                 ),
                 if (disabled)
