@@ -6,6 +6,7 @@ import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/components/simple_date_picker.dart';
+import 'package:jizhang_android/core/cat_icon.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
 
 class RecordPage extends ConsumerStatefulWidget {
@@ -375,15 +376,22 @@ class _RecordPageState extends ConsumerState<RecordPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // v2.4.1：分类宫格接 CatIcon（与流水行/图表同套 SVG），
+              // 选中态圆底变主黄、加描边；自建分类无 SVG 时回退 emoji
               Container(
                 decoration: BoxDecoration(
-                  color: sel ? AppColors.primary : AppPalette.cardSubtle(context),
                   shape: BoxShape.circle,
                   border: Border.all(
-                      color: sel ? AppColors.primaryDark : Colors.transparent),
+                      color: sel ? AppColors.primaryDark : Colors.transparent,
+                      width: 2),
                 ),
-                padding: const EdgeInsets.all(10),
-                child: Text(c.icon, style: const TextStyle(fontSize: 22)),
+                padding: const EdgeInsets.all(2),
+                child: CatIcon(
+                  name: c.name,
+                  bg: sel ? AppColors.primary : AppPalette.cardSubtle(context),
+                  size: 40,
+                  emoji: c.icon,
+                ),
               ),
               const SizedBox(height: 4),
               Text(c.name,

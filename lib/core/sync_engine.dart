@@ -70,8 +70,9 @@ class SyncEngine extends ChangeNotifier {
       final unchanged = fpResp['unchanged'] == true;
       if (!unchanged) {
         // 3) 小表 + 流水并行拉取（互不依赖，一次网络往返时间）。
-        // _pullSmallTables 内部全部走 guard 吞错、永远不会抛 → 先 await 它
-        // 不会出现「一个 Future 报错后另一个 Future 的错误无人监听」。
+        // v2.4.0 起 _pullSmallTables 不再吞错：单个表失败会记入 failedTables
+        // 返回（不抛出）→ 先 await 它不会出现「一个 Future 报错后另一个
+        // Future 的错误无人监听」，且失败表会让指纹不落盘、下轮自动重拉。
         final smallF = _pullSmallTables(bookId, a);
         final flowsF = _pullFlows(bookId, a);
         final failedTables = await smallF;

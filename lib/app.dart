@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
@@ -182,11 +183,11 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _navItem(0, Icons.receipt_long, '明细'),
-              _navItem(1, Icons.pie_chart, '图表'),
+              _navItem(0, '明细', '明细'),
+              _navItem(1, '图表', '图表'),
               const SizedBox(width: 56),
-              _navItem(2, Icons.auto_awesome, '发现'),
-              _navItem(3, Icons.person_outline, '我的'),
+              _navItem(2, '发现', '发现'),
+              _navItem(3, '我的', '我的'),
             ],
           ),
         ),
@@ -194,16 +195,26 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
     );
   }
 
-  Widget _navItem(int i, IconData icon, String label) {
+  // v2.4.1：底部导航图标换成自定义 SVG（assets/icons/nav/，与分类/我的页同一套
+  // 线形规范），选中染 primaryDark、未选中染次级文字色，与旧 Material 图标同色逻辑。
+  Widget _navItem(int i, String iconAsset, String label) {
     final active = _idx == i;
+    final color =
+        active ? AppColors.primaryDark : AppPalette.textSecondary(context);
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _idx = i),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                color: active ? AppColors.primaryDark : AppPalette.textSecondary(context)),
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: SvgPicture.asset(
+                'assets/icons/nav/$iconAsset.svg',
+                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+              ),
+            ),
             const SizedBox(height: 2),
             Text(label,
                 style: TextStyle(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
@@ -116,26 +117,26 @@ class MePage extends ConsumerWidget {
                 children: [
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Expanded(
-                      child: _gridItem(context, Icons.palette, '归属人底色',
+                      child: _gridItem(context, '归属人底色',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OwnerColorSettingsPage()))),
                     ),
                     Expanded(
-                      child: _gridItem(context, Icons.book, '当前账本',
+                      child: _gridItem(context, '当前账本',
                           () => _switchBook(context, ref, s), subtitle: book?.name),
                     ),
                     Expanded(
-                      child: _gridItem(context, Icons.auto_awesome, '自动记账',
+                      child: _gridItem(context, '自动记账',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AutoRecordSettingsPage()))),
                     ),
                     Expanded(
-                      child: _gridItem(context, Icons.water_drop, '水电气',
+                      child: _gridItem(context, '水电气',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UtilityPage()))),
                     ),
                   ]),
                   const SizedBox(height: 10),
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Expanded(
-                      child: _gridItem(context, Icons.restore_from_trash, '回收站',
+                      child: _gridItem(context, '回收站',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrashPage())),
                           reserveSubtitle: false),
                     ),
@@ -144,17 +145,17 @@ class MePage extends ConsumerWidget {
                       child: AnimatedBuilder(
                         animation: SyncEngine.instance,
                         builder: (context, _) =>
-                            _gridItem(context, Icons.sync, '同步', () => _syncNow(context, ref),
+                            _gridItem(context, '同步', () => _syncNow(context, ref),
                                 reserveSubtitle: false),
                       ),
                     ),
                     Expanded(
-                      child: _gridItem(context, Icons.history, '操作日志',
+                      child: _gridItem(context, '操作日志',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OpLogsPage())),
                           reserveSubtitle: false),
                     ),
                     Expanded(
-                      child: _gridItem(context, Icons.swap_horiz, '切换服务器',
+                      child: _gridItem(context, '切换服务器',
                           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServerListPage())),
                           reserveSubtitle: false),
                     ),
@@ -385,7 +386,31 @@ class MePage extends ConsumerWidget {
   // 网格单元：图标 + 文字（可选第二行小字）
   // reserveSubtitle：副标题槽位是否固定占位（第一行「当前账本」有账本名，其余三格必须占位
   // 才能基线对齐；第二行四格都没有副标题 → 传 false，否则「同步」下方小字会多空出一行）
-  Widget _gridItem(BuildContext context, IconData icon, String label, VoidCallback? onTap,
+  // v2.4.1：图标从 Material 图标换成自定义 SVG（assets/icons/menu/<名>.svg，
+  // 8 个同一套线形规范：48 网格/笔画 3.5/圆角线帽），样式对齐分类图标（灰圆底+深字）。
+  // v2.4.1：图标改分类图标同款样式——灰圆底 + 深线字形（浅色 #F2F2F2 底 + #222 字，
+  // 暗色 #1C1C1F 底 + 白字），与流水/图表里的 CatIcon 观感一致。
+  Widget _menuIcon(BuildContext context, String iconAsset) {
+    final dark = AppPalette.isDark(context);
+    final bg = dark ? AppColors.cardSubtleDark : const Color(0xFFF2F2F2);
+    final ink = dark ? Colors.white : const Color(0xFF222222);
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: SizedBox(
+        width: 27,
+        height: 27,
+        child: SvgPicture.asset(
+          'assets/icons/menu/$iconAsset.svg',
+          colorFilter: ColorFilter.mode(ink, BlendMode.srcIn),
+        ),
+      ),
+    );
+  }
+
+  Widget _gridItem(BuildContext context, String iconAsset, String label, VoidCallback? onTap,
           {String? subtitle, bool reserveSubtitle = true}) =>
       InkWell(
         onTap: onTap,
@@ -395,7 +420,7 @@ class MePage extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: AppColors.primaryDark, size: 24),
+              _menuIcon(context, iconAsset),
               const SizedBox(height: 6),
               Text(label,
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),

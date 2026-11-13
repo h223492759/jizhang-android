@@ -255,7 +255,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          SvgPicture.asset('assets/icons/fn/${e.$1}.svg', width: 26, height: 26),
+                          // v2.4.1：26→36，与下方流水列表的分类图标（CatIcon 36）同大
+                          SvgPicture.asset('assets/icons/fn/${e.$1}.svg', width: 36, height: 36),
                           const SizedBox(height: 4),
                           Text(e.$1, style: TextStyle(fontSize: 12, color: AppPalette.text(context))),  // 直接拿 build context
                         ],

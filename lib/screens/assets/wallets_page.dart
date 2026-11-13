@@ -6,6 +6,8 @@ import 'package:jizhang_android/core/models.dart';
 import 'package:jizhang_android/core/theme.dart';
 import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/components/simple_date_picker.dart';
+import 'package:jizhang_android/core/cat_icon.dart';
+import 'package:jizhang_android/core/cat_icon_names.dart';
 import 'package:jizhang_android/screens/assets/wallet_detail_page.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
@@ -244,7 +246,9 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
             children: [
               Row(
                 children: [
-                  CircleAvatar(backgroundColor: AppColors.primarySoft, child: Text(w.icon)),
+                  // v2.4.1：钱包图标支持分类矢量图标（icon 存图标名），非图标集
+                  // 的值（老 emoji）自动回退 emoji 显示
+                  CatIcon(name: w.icon, bg: AppColors.primarySoft, size: 36, emoji: w.icon),
                   const SizedBox(width: 8),
                   Expanded(child: Text(w.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
                   Text('${w.count}笔', style: TextStyle(fontSize: 12, color: AppPalette.textSecondary(context))),
@@ -376,6 +380,45 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
     );
   }
 
+  // v2.4.1：钱包图标点选器——从分类矢量图标集（kCatIconNames）里选一个，
+  // 写入 controller；也可不点而在上方输入框手输 emoji（两套并存互不影响）。
+  // 选中项用主黄圆底高亮，其余浅灰底。
+  Widget _walletIconPicker(TextEditingController icon, void Function(VoidCallback) set) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        Container(
+          constraints: const BoxConstraints(maxHeight: 132),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppPalette.textSecondary(context).withOpacity(0.25)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          padding: const EdgeInsets.all(8),
+          child: SingleChildScrollView(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final n in kCatIconNames)
+                  GestureDetector(
+                    onTap: () => set(() => icon.text = n),
+                    child: CatIcon(
+                      name: n,
+                      bg: icon.text == n ? AppColors.primary : const Color(0xFFF2F2F2),
+                      size: 34,
+                      emoji: '👛',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+      ],
+    );
+  }
+
   Future<void> _addWallet() async {
     final name = TextEditingController();
     final icon = TextEditingController(text: '👛');
@@ -395,7 +438,8 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(controller: name, decoration: const InputDecoration(labelText: '名称（如 养娃 / 买房）')),
-                TextField(controller: icon, decoration: const InputDecoration(labelText: '图标 emoji（可选）')),
+                TextField(controller: icon, decoration: const InputDecoration(labelText: '图标 emoji（可手输，或从下方点选）')),
+                _walletIconPicker(icon, set),
                 TextField(controller: target, keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(labelText: '目标金额（可选）')),
                 TextField(controller: initBalance, keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -488,7 +532,8 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextField(controller: name, decoration: const InputDecoration(labelText: '名称')),
-                  TextField(controller: icon, decoration: const InputDecoration(labelText: '图标 emoji（可选）')),
+                  TextField(controller: icon, decoration: const InputDecoration(labelText: '图标 emoji（可手输，或从下方点选）')),
+                  _walletIconPicker(icon, set),
                   TextField(controller: target, keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(labelText: '目标金额（可选）')),
                   const SizedBox(height: 12),
