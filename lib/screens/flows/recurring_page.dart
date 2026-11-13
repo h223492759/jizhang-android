@@ -8,6 +8,20 @@ import 'package:jizhang_android/core/util.dart';
 import 'package:jizhang_android/state/session.dart';
 import 'package:jizhang_android/core/local_first_api.dart';
 
+/// 「emoji(如有) + 分类名」纯文本标签："svg:<字形名>" 覆盖没有对应 emoji 字符，
+/// 剥离前缀只显示名称；页面与编辑弹窗两个 state 共用，故放文件级。
+String _recurCatLabel(List<Category> cats, String name) {
+  String ic = '💰';
+  for (final c in cats) {
+    if (c.name == name) {
+      ic = c.icon;
+      break;
+    }
+  }
+  final s = plainCatIcon(ic);
+  return s.isEmpty ? name : '$s $name';
+}
+
 /// 定期记账：每月/每年固定收支模板，到时间自动生成流水
 class RecurringPage extends ConsumerStatefulWidget {
   const RecurringPage({super.key});
@@ -55,22 +69,6 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
     } catch (e) {
       toast(e.toString().replaceFirst('ApiException: ', ''));
     }
-  }
-
-  String _catIcon(String name) {
-    for (final c in _cats) {
-      if (c.name == name) return c.icon;
-    }
-    return '💰';
-  }
-
-  /// 纯文本处展示用："svg:xxx" 覆盖没有对应 emoji 字符，剥离前缀只显示名称
-  String _plainIcon(String icon) => plainCatIcon(icon);
-
-  /// 「emoji(如有) + 分类名」纯文本标签
-  String _catLabel(String name) {
-    final ic = _plainIcon(_catIcon(name));
-    return ic.isEmpty ? name : '$ic $name';
   }
 
   Future<void> _generate() async {
@@ -226,7 +224,7 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(_catLabel(t.category),
+                child: Text(_recurCatLabel(_cats, t.category),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis),
               ),
@@ -413,7 +411,7 @@ class _RecurringFormDialogState extends State<_RecurringFormDialog> {
             // 分类
             DropdownButtonFormField<String>(
               value: f.category.isEmpty ? null : f.category,
-              items: cats.map((c) => DropdownMenuItem(value: c.name, child: Text(_catLabel(c.name)))).toList(),
+              items: cats.map((c) => DropdownMenuItem(value: c.name, child: Text(_recurCatLabel(cats, c.name)))).toList(),
               onChanged: (v) => setState(() => f.category = v ?? ''),
               decoration: const InputDecoration(labelText: '分类', border: OutlineInputBorder(), isDense: true),
             ),
